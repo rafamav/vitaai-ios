@@ -153,7 +153,7 @@ struct LoginScreen: View {
                     .transition(.opacity)
                 }
 
-                Spacer().frame(height: 28)
+                Spacer().frame(height: 48)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)  // fills ZStack so Spacer() pushes buttons to bottom
         }
