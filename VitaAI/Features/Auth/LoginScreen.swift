@@ -19,16 +19,14 @@ struct LoginScreen: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            // Background logo image — top 75% of screen
-            // ContentScale.FillWidth equivalent: fill width, height proportional, clip bottom.
-            // scaledToFit() + explicit width (not scaledToFill) avoids unwanted zoom.
+            // Background logo image — fades smoothly into black via mask (no hard line)
             VStack {
                 ZStack {
                     Image("login_bg")
                         .resizable()
                         .scaledToFill()
-                        .scaleEffect(0.95)  // -5% zoom, still fills edge-to-edge
-                        .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height * 0.75)
+                        .scaleEffect(0.90)  // -10% zoom total vs fill, still covers edge-to-edge
+                        .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height * 0.82)
                         .opacity(imageOpacity)
 
                     // Organic glow overlay
@@ -37,27 +35,27 @@ struct LoginScreen: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: UIScreen.main.bounds.height * 0.75)
-                .clipped()  // clip at ZStack level so scaleEffect doesn't bleed outside
-
-                Spacer()
-            }
-
-            // Bottom gradient fade
-            VStack {
-                Spacer()
-                LinearGradient(
-                    colors: [.clear, Color.black.opacity(0.85), .black],
-                    startPoint: .top,
-                    endPoint: .bottom
+                .frame(height: UIScreen.main.bounds.height * 0.82)
+                .mask(
+                    // Fade image to transparent at bottom — no hard clip line
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black, location: 0),
+                            .init(color: .black, location: 0.50),
+                            .init(color: .black.opacity(0.3), location: 0.80),
+                            .init(color: .clear, location: 1.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
                 )
-                .frame(height: UIScreen.main.bounds.height * 0.55)
+
+                Spacer()
             }
-            .ignoresSafeArea()
 
             // Buttons + footer — pinned to bottom third of screen
             VStack(spacing: 0) {
-                Spacer(minLength: UIScreen.main.bounds.height * 0.70)  // pushes buttons to bottom ~30%
+                Spacer(minLength: UIScreen.main.bounds.height * 0.58)  // pushes buttons to lower half, footer fits
 
 
                 if authManager.isLoading {
@@ -153,7 +151,7 @@ struct LoginScreen: View {
                     .transition(.opacity)
                 }
 
-                Spacer().frame(height: 48)
+                Spacer().frame(height: 36)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)  // fills ZStack so Spacer() pushes buttons to bottom
         }
