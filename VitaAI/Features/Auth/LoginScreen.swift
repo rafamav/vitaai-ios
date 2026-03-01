@@ -76,7 +76,7 @@ struct LoginScreen: View {
                             authManager.signInWithGoogle()
                         }
                         .padding(.horizontal, 36)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .transition(.opacity.combined(with: .offset(y: 14)))  // Android: slideInVertically { h/3 } = 14pt
                     }
 
                     Spacer().frame(height: 12)
@@ -96,7 +96,7 @@ struct LoginScreen: View {
                             authManager.signInWithApple()
                         }
                         .padding(.horizontal, 36)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .transition(.opacity.combined(with: .offset(y: 14)))  // Android: slideInVertically { h/3 } = 14pt
                     }
 
                     Spacer().frame(height: 12)
@@ -116,7 +116,7 @@ struct LoginScreen: View {
                             // TODO: open email form sheet
                         }
                         .padding(.horizontal, 36)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .transition(.opacity.combined(with: .offset(y: 14)))  // Android: slideInVertically { h/3 } = 14pt
                     }
                 }
 
