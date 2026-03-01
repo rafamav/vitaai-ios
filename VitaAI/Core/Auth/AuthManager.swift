@@ -62,6 +62,77 @@ final class AuthManager: ObservableObject {
     func signInWithGoogle() { signIn(provider: "google") }
     func signInWithApple() { signIn(provider: "apple") }
 
+    func signInWithEmail(email: String, password: String) async {
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+
+        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/sign-in/email") else {
+            error = "URL inválida"; return
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["email": email, "password": password, "callbackURL": "/"])
+
+        await performEmailAuthRequest(req, email: email)
+    }
+
+    func signUpWithEmail(email: String, password: String, name: String) async {
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+
+        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/sign-up/email") else {
+            error = "URL inválida"; return
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["email": email, "password": password, "name": name, "callbackURL": "/"])
+
+        await performEmailAuthRequest(req, email: email)
+    }
+
+    func forgotPassword(email: String) async {
+        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/forget-password") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "email": email,
+            "redirectTo": "\(AppConfig.authBaseURL)/reset-password"
+        ])
+        _ = try? await URLSession.shared.data(for: req)
+    }
+
+    private func performEmailAuthRequest(_ request: URLRequest, email: String) async {
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else {
+                error = "Resposta inválida"; return
+            }
+            let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            if (200...299).contains(http.statusCode) {
+                let token = json?["token"] as? String
+                let user = json?["user"] as? [String: Any]
+                let name = user?["name"] as? String ?? json?["name"] as? String
+                let image = user?["image"] as? String
+                guard let token else {
+                    error = "Credenciais inválidas"; return
+                }
+                await tokenStore.saveSession(token: token, name: name, email: email, image: image)
+                userName = name
+                userImage = image
+                isLoggedIn = true
+            } else {
+                error = json?["message"] as? String ?? "Email ou senha incorretos"
+            }
+        } catch {
+            self.error = "Erro de conexão"
+        }
+    }
+
     private func handleCallback(url: URL) async {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             error = "Callback inválido"

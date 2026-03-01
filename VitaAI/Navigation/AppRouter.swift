@@ -56,14 +56,8 @@ struct MainTabView: View {
                         EstudosScreen()
                             .tag(TabItem.estudos)
 
-                        TrabalhoScreen()
-                            .tag(TabItem.trabalhos)
-
                         AgendaScreen()
                             .tag(TabItem.agenda)
-
-                        InsightsScreen()
-                            .tag(TabItem.insights)
 
                         ProfileScreen(authManager: authManager)
                             .tag(TabItem.profile)
