@@ -34,6 +34,22 @@ jobs:
           xcodegen generate --spec project.yml
           ls -la *.xcodeproj/
 
+      - name: Generate app icon
+        run: |
+          python3 - <<'EOF'
+          import struct, zlib, os
+          def png(w, h, r, g, b):
+              def chunk(t, d):
+                  c = zlib.crc32(t + d) & 0xffffffff
+                  return struct.pack('>I', len(d)) + t + d + struct.pack('>I', c)
+              ihdr = struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0)
+              raw = b''.join(b'\x00' + bytes([r,g,b]*w) for _ in range(h))
+              return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR',ihdr) + chunk(b'IDAT',zlib.compress(raw)) + chunk(b'IEND',b'')
+          os.makedirs('VitaAI/Assets.xcassets/AppIcon.appiconset', exist_ok=True)
+          open('VitaAI/Assets.xcassets/AppIcon.appiconset/icon-1024.png','wb').write(png(1024,1024,22,163,74))
+          print('Icon generated')
+          EOF
+
       - name: Write API Key
         run: |
           mkdir -p ~/.private_keys
