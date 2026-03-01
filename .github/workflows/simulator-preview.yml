@@ -48,6 +48,7 @@ jobs:
 
       - name: Build for Simulator
         run: |
+          set -o pipefail
           xcodebuild build \
             -project VitaAI.xcodeproj \
             -scheme VitaAI \
@@ -56,8 +57,9 @@ jobs:
             -derivedDataPath build/sim \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            TARGETED_DEVICE_FAMILY=1 \
-            | cat
+            TARGETED_DEVICE_FAMILY=1 2>&1 | tail -50
+          echo "=== Build products ==="
+          find build/sim/Build/Products -maxdepth 2 2>/dev/null || echo "Products dir not found"
 
       - name: Boot simulator & take screenshots
         run: |
