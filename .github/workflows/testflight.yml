@@ -81,14 +81,5 @@ jobs:
             -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
             -authenticationKeyPath $HOME/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
 
-      - name: Upload to TestFlight
-        run: |
-          echo "=== Export contents ==="
-          find ${{ github.workspace }}/build/export -type f | head -20
-          IPA=$(find ${{ github.workspace }}/build/export -name "*.ipa" | head -1)
-          echo "IPA: $IPA"
-          xcrun altool --upload-app \
-            -f "$IPA" \
-            -t ios \
-            --apiKey ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
-            --apiIssuer ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      - name: Upload done
+        run: echo "Upload to TestFlight was handled by Export IPA step (method=app-store-connect)"
