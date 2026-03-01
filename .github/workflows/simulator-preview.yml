@@ -66,7 +66,9 @@ jobs:
           xcrun simctl boot "$DEVICE_ID" || true
           sleep 5
 
-          APP_PATH=$(find build/sim -name "VitaAI.app" -not -path "*/Index.noindex/*" | head -1)
+          echo "=== Searching for .app ==="
+          find build/sim/Build/Products -name "VitaAI.app" 2>/dev/null || find build/sim -name "*.app" 2>/dev/null | head -5
+          APP_PATH=$(find build/sim/Build/Products -name "VitaAI.app" | head -1)
           echo "App: $APP_PATH"
           xcrun simctl install "$DEVICE_ID" "$APP_PATH"
           xcrun simctl launch "$DEVICE_ID" com.bymav.vitaai
@@ -79,7 +81,7 @@ jobs:
 
       - name: Zip app for Appetize
         run: |
-          APP_PATH=$(find build/sim -name "VitaAI.app" -not -path "*/Index.noindex/*" | head -1)
+          APP_PATH=$(find build/sim/Build/Products -name "VitaAI.app" | head -1)
           zip -r VitaAI-simulator.zip "$APP_PATH"
 
       - name: Upload screenshots
