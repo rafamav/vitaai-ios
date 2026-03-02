@@ -10,10 +10,10 @@ enum PdfExporter {
     static func export(
         document: PDFDocument,
         pageCount: Int,
-        getStrokes: (Int) -> [InkStroke],
-        getErasers: (Int) -> [EraserPath],
-        getShapes: (Int) -> [ShapeAnnotation],
-        getTexts: (Int) -> [TextAnnotation]
+        getStrokes: @escaping @Sendable (Int) -> [InkStroke],
+        getErasers: @escaping @Sendable (Int) -> [EraserPath],
+        getShapes: @escaping @Sendable (Int) -> [ShapeAnnotation],
+        getTexts: @escaping @Sendable (Int) -> [TextAnnotation]
     ) async throws -> URL {
         return try await Task.detached(priority: .userInitiated) {
             let tempURL = FileManager.default.temporaryDirectory
