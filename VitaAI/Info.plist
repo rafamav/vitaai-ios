@@ -51,5 +51,9 @@
 	<array>
 		<string>arm64</string>
 	</array>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>A Vita usa reconhecimento de fala para ouvir suas perguntas no modo voz.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>A Vita precisa do microfone para ouvir sua voz no modo voz.</string>
 </dict>
 </plist>

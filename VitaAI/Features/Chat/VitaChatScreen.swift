@@ -5,6 +5,7 @@ import SwiftUI
 struct VitaChatScreen: View {
     @Environment(\.appContainer) private var container
     @State private var viewModel: ChatViewModel?
+    @State private var showVoiceMode: Bool = false
     @FocusState private var isInputFocused: Bool
 
     var body: some View {
@@ -26,12 +27,18 @@ struct VitaChatScreen: View {
                 )
             }
         }
+        .fullScreenCover(isPresented: $showVoiceMode) {
+            VoiceModeScreen(
+                viewModel: VoiceModeViewModel(chatClient: container.chatClient),
+                onDismiss: { showVoiceMode = false }
+            )
+        }
     }
 
     @ViewBuilder
     private func chatContent(viewModel: ChatViewModel) -> some View {
         VStack(spacing: 0) {
-            ChatTopBar(viewModel: viewModel)
+            ChatTopBar(viewModel: viewModel, onVoiceMode: { showVoiceMode = true })
 
             Divider()
                 .background(VitaColors.surfaceBorder)
@@ -59,6 +66,7 @@ struct VitaChatScreen: View {
 
 private struct ChatTopBar: View {
     let viewModel: ChatViewModel
+    let onVoiceMode: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -85,6 +93,19 @@ private struct ChatTopBar: View {
             }
 
             Spacer()
+
+            // Voice mode button
+            Button(action: onVoiceMode) {
+                ZStack {
+                    Circle()
+                        .fill(VitaColors.accent.opacity(0.12))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "mic.fill")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(VitaColors.accent)
+                }
+            }
+            .buttonStyle(.plain)
 
             // New conversation
             Button {
