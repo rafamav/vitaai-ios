@@ -39,38 +39,81 @@ struct MainTabView: View {
     @State private var showChat = false
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            VitaAmbientBackground {
-                VStack(spacing: 0) {
-                    VitaTopBar(
-                        title: router.selectedTab.rawValue,
-                        userName: authManager.userName,
-                        userImageURL: authManager.userImage.flatMap(URL.init(string:)),
-                        onAvatarTap: { router.selectedTab = .profile }
-                    )
+        NavigationStack(path: $router.path) {
+            ZStack(alignment: .bottom) {
+                VitaAmbientBackground {
+                    VStack(spacing: 0) {
+                        VitaTopBar(
+                            title: router.selectedTab.rawValue,
+                            userName: authManager.userName,
+                            userImageURL: authManager.userImage.flatMap(URL.init(string:)),
+                            onAvatarTap: { router.selectedTab = .profile }
+                        )
 
-                    TabView(selection: $router.selectedTab) {
-                        DashboardScreen()
-                            .tag(TabItem.home)
+                        TabView(selection: $router.selectedTab) {
+                            DashboardScreen()
+                                .tag(TabItem.home)
 
-                        EstudosScreen()
-                            .tag(TabItem.estudos)
+                            EstudosScreen()
+                                .tag(TabItem.estudos)
 
-                        AgendaScreen()
-                            .tag(TabItem.agenda)
+                            AgendaScreen()
+                                .tag(TabItem.agenda)
 
-                        ProfileScreen(authManager: authManager)
-                            .tag(TabItem.profile)
+                            ProfileScreen(authManager: authManager)
+                                .tag(TabItem.profile)
+                        }
+                        .tabViewStyle(.page(indexDisplayMode: .never))
                     }
-                    .tabViewStyle(.page(indexDisplayMode: .never))
+                }
+
+                VitaTabBar(selectedTab: $router.selectedTab) {
+                    showChat = true
                 }
             }
-
-            VitaTabBar(selectedTab: $router.selectedTab) {
-                showChat = true
+            .ignoresSafeArea(.keyboard)
+            .navigationBarHidden(true)
+            // MARK: - Route destinations
+            .navigationDestination(for: Route.self) { route in
+                switch route {
+                case .notebookList:
+                    NotebookListScreen(
+                        store: container.notebookStore,
+                        onBack: { router.goBack() },
+                        onOpenNotebook: { id in
+                            router.navigate(to: .notebookEditor(notebookId: id.uuidString))
+                        }
+                    )
+                case .notebookEditor(let idString):
+                    let uuid = UUID(uuidString: idString) ?? UUID()
+                    EditorScreen(
+                        notebookId: uuid,
+                        store: container.notebookStore,
+                        onBack: { router.goBack() }
+                    )
+                case .pdfViewer(let urlString):
+                    if let url = URL(string: urlString) {
+                        PdfViewerScreen(url: url, onBack: { router.goBack() })
+                    } else {
+                        EmptyView()
+                    }
+                case .flashcardSession(let deckId):
+                    FlashcardSessionScreen(
+                        deckId: deckId,
+                        onBack: { router.goBack() },
+                        onFinished: { router.goBack() }
+                    )
+                case .about:
+                    AboutScreen()
+                case .appearance:
+                    AppearanceScreen()
+                case .notifications:
+                    NotificationSettingsScreen()
+                default:
+                    EmptyView()
+                }
             }
         }
-        .ignoresSafeArea(.keyboard)
         .sheet(isPresented: $showChat) {
             VitaChatScreen()
                 .presentationDetents([.large])

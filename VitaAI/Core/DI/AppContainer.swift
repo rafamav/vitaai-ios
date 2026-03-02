@@ -7,6 +7,7 @@ final class AppContainer: ObservableObject {
     let api: VitaAPI
     let chatClient: VitaChatClient
     let authManager: AuthManager
+    let notebookStore: NotebookStore
 
     init() {
         let tokenStore = TokenStore()
@@ -20,5 +21,6 @@ final class AppContainer: ObservableObject {
         self.api = api
         self.chatClient = chatClient
         self.authManager = authManager
+        self.notebookStore = NotebookStore()
     }
 }
