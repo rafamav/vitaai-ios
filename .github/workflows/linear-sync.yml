@@ -1,0 +1,47 @@
+name: Linear Sync
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"
+  issues:
+    types: [opened, edited, closed, reopened, labeled, unlabeled]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: github.repository_owner == 'rafamav'
+
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Sync GitHub issues to Linear
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          LINEAR_TEAM_KEY: ${{ vars.LINEAR_TEAM_KEY || 'BYM' }}
+          LINEAR_PROJECT_ID: ${{ vars.LINEAR_PROJECT_ID || '' }}
+          LINEAR_SYNC_MAX_ISSUES: ${{ vars.LINEAR_SYNC_MAX_ISSUES || '200' }}
+        run: node scripts/linear-sync.mjs
+
+      - name: Issue hygiene report (agent + priority coverage)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            node scripts/issue-hygiene-report.mjs --autofix-event
+            node scripts/issue-hygiene-report.mjs --strict
+          else
+            node scripts/issue-hygiene-report.mjs
+          fi
