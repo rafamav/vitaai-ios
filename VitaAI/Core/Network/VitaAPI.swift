@@ -152,4 +152,42 @@ actor VitaAPI {
     func unregisterPushToken(token: String) async throws {
         try await client.delete("push/unregister")
     }
+
+    // MARK: - Simulado
+
+    func listSimulados() async throws -> SimuladoListResponse {
+        try await client.get("simulados")
+    }
+
+    func generateSimulado(_ body: GenerateSimuladoRequest) async throws -> GenerateSimuladoResponse {
+        try await client.post("simulados/generate", body: body)
+    }
+
+    func answerSimuladoQuestion(attemptId: String, body: AnswerSimuladoRequest) async throws -> AnswerSimuladoResponse {
+        try await client.post("simulados/\(attemptId)/answer", body: body)
+    }
+
+    func finishSimulado(attemptId: String, timeTakenMs: Int64) async throws -> FinishSimuladoResponse {
+        struct FinishBody: Encodable { let timeTakenMs: Int64 }
+        return try await client.post("simulados/\(attemptId)/finish", body: FinishBody(timeTakenMs: timeTakenMs))
+    }
+
+    func explainQuestion(attemptId: String, questionId: String) async throws -> ExplainResponse {
+        try await client.get("simulados/\(attemptId)/explain/\(questionId)")
+    }
+
+    func deleteSimulado(attemptId: String) async throws {
+        try await client.delete("simulados/\(attemptId)")
+    }
+
+    func archiveSimulado(attemptId: String) async throws {
+        let _: EmptyResponse = try await client.post("simulados/\(attemptId)/archive")
+    }
+
+    func getSimuladoDiagnostics(subject: String = "all", period: String = "30d") async throws -> SimuladoDiagnosticsResponse {
+        try await client.get("simulados/diagnostics", queryItems: [
+            URLQueryItem(name: "subject", value: subject),
+            URLQueryItem(name: "period", value: period),
+        ])
+    }
 }

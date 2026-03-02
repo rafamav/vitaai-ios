@@ -10,6 +10,7 @@ struct EstudosScreen: View {
     var onNavigateToNotebooks:        (() -> Void)?
     var onNavigateToFlashcardSession: ((String) -> Void)?
     var onNavigateToPdfViewer:        ((URL) -> Void)?
+    var onNavigateToSimulados:        (() -> Void)?
 
     @State private var viewModel: EstudosViewModel?
 
@@ -21,7 +22,8 @@ struct EstudosScreen: View {
                     onNavigateToCanvasConnect:   onNavigateToCanvasConnect,
                     onNavigateToNotebooks:        onNavigateToNotebooks,
                     onNavigateToFlashcardSession: onNavigateToFlashcardSession,
-                    onNavigateToPdfViewer:        onNavigateToPdfViewer
+                    onNavigateToPdfViewer:        onNavigateToPdfViewer,
+                    onNavigateToSimulados:        onNavigateToSimulados
                 )
             } else {
                 ProgressView()
@@ -45,6 +47,7 @@ private struct EstudosContent: View {
     let onNavigateToNotebooks:        (() -> Void)?
     let onNavigateToFlashcardSession: ((String) -> Void)?
     let onNavigateToPdfViewer:        ((URL) -> Void)?
+    let onNavigateToSimulados:        (() -> Void)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -81,9 +84,9 @@ private extension EstudosContent {
         switch viewModel.selectedTab {
         case .disciplinas:
             DisciplinasTab(
-                courses: viewModel.courses,
-                isLoading: viewModel.isLoading,
+                viewModel: viewModel,
                 onCourseClick: { courseId in viewModel.selectCourse(courseId) },
+                onNavigateToSimulados: onNavigateToSimulados,
                 onRefresh: { await viewModel.load() }
             )
 
@@ -303,13 +306,20 @@ private struct EstudosErrorView: View {
 // MARK: - Disciplinas Tab
 
 private struct DisciplinasTab: View {
-    let courses: [Course]
-    var isLoading: Bool = false
+    @Bindable var viewModel: EstudosViewModel
     let onCourseClick: (String) -> Void
+    var onNavigateToSimulados: (() -> Void)?
     var onRefresh: (() async -> Void)?
 
+    @State private var isGridView = false
+
+    private let gridColumns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
+
     var body: some View {
-        if !isLoading && courses.isEmpty {
+        if !viewModel.isLoading && viewModel.courses.isEmpty {
             VitaEmptyState(
                 title: "Nenhuma disciplina",
                 message: "Conecte o Canvas para sincronizar suas disciplinas.",
@@ -322,42 +332,207 @@ private struct DisciplinasTab: View {
             }
         } else {
             ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 12) {
-                    ForEach(Array(courses.enumerated()), id: \.element.id) { index, course in
-                        CourseRow(course: course, onClick: { onCourseClick(course.id) })
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
-                            .animation(
-                                .easeOut(duration: 0.3).delay(Double(index) * 0.06),
-                                value: courses.count
-                            )
+                VStack(spacing: 0) {
+                    // Toolbar: sort menu + grid/list toggle
+                    DisciplinasToolbar(
+                        sortOption: $viewModel.sortOption,
+                        isGridView: $isGridView
+                    )
+
+                    // Simulados entry card
+                    if let onSimulados = onNavigateToSimulados {
+                        SimuladosEntryCard(onTap: onSimulados)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
+                    }
+
+                    if isGridView {
+                        // Grid layout
+                        LazyVGrid(columns: gridColumns, spacing: 12) {
+                            ForEach(
+                                Array(viewModel.sortedCourses.enumerated()),
+                                id: \.element.id
+                            ) { index, course in
+                                CourseGridCell(
+                                    course: course,
+                                    colorIndex: index,
+                                    isFavorite: viewModel.isFavorite(course.id),
+                                    onFavoriteToggle: { viewModel.toggleFavorite(course.id) },
+                                    onClick: { onCourseClick(course.id) }
+                                )
+                                .transition(.opacity.combined(with: .scale))
+                                .animation(
+                                    .easeOut(duration: 0.3).delay(Double(index) * 0.04),
+                                    value: viewModel.sortedCourses.count
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                        .padding(.bottom, 100)
+                    } else {
+                        // List layout
+                        LazyVStack(spacing: 12) {
+                            ForEach(
+                                Array(viewModel.sortedCourses.enumerated()),
+                                id: \.element.id
+                            ) { index, course in
+                                CourseRow(
+                                    course: course,
+                                    colorIndex: index,
+                                    isFavorite: viewModel.isFavorite(course.id),
+                                    onFavoriteToggle: { viewModel.toggleFavorite(course.id) },
+                                    onClick: { onCourseClick(course.id) }
+                                )
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                                .animation(
+                                    .easeOut(duration: 0.3).delay(Double(index) * 0.06),
+                                    value: viewModel.sortedCourses.count
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                        .padding(.bottom, 100)
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 100)
             }
             .refreshable {
                 await onRefresh?()
             }
+            .animation(.easeInOut(duration: 0.25), value: isGridView)
         }
     }
 }
 
+// MARK: - Simulados Entry Card
+
+private struct SimuladosEntryCard: View {
+    let onTap: () -> Void
+    var body: some View {
+        Button(action: onTap) {
+            VitaGlassCard {
+                HStack(spacing: 14) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(VitaColors.accent.opacity(0.15))
+                            .frame(width: 44, height: 44)
+                        Image(systemName: "text.badge.checkmark")
+                            .font(.system(size: 20))
+                            .foregroundStyle(VitaColors.accent)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Simulados")
+                            .font(VitaTypography.bodyLarge)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(VitaColors.textPrimary)
+                        Text("Pratique com questões de múltipla escolha")
+                            .font(VitaTypography.labelSmall)
+                            .foregroundStyle(VitaColors.textSecondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12))
+                        .foregroundStyle(VitaColors.textTertiary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Disciplinas Toolbar (Sort + Grid/List Toggle)
+
+private struct DisciplinasToolbar: View {
+    @Binding var sortOption: CourseSortOption
+    @Binding var isGridView: Bool
+
+    var body: some View {
+        HStack {
+            // Sort menu
+            Menu {
+                ForEach(CourseSortOption.allCases, id: \.self) { option in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            sortOption = option
+                        }
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        Label(option.label, systemImage: option.iconName)
+                    }
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 12, weight: .medium))
+                    Text(sortOption.label)
+                        .font(VitaTypography.labelSmall)
+                        .fontWeight(.medium)
+                }
+                .foregroundStyle(VitaColors.textSecondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(VitaColors.glassBg)
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule().stroke(VitaColors.glassBorder, lineWidth: 1)
+                )
+            }
+
+            Spacer()
+
+            // Grid / List toggle
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    isGridView.toggle()
+                }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            } label: {
+                Image(systemName: isGridView ? "list.bullet" : "square.grid.2x2")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(VitaColors.textSecondary)
+                    .frame(width: 32, height: 32)
+                    .background(VitaColors.glassBg)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle().stroke(VitaColors.glassBorder, lineWidth: 1)
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
+    }
+}
+
+// MARK: - Course Row (List Mode)
+
 private struct CourseRow: View {
     let course: Course
+    let colorIndex: Int
+    let isFavorite: Bool
+    let onFavoriteToggle: () -> Void
     let onClick: () -> Void
+
+    private var folderColor: Color {
+        FolderPalette.color(forIndex: colorIndex)
+    }
 
     var body: some View {
         Button(action: onClick) {
             VitaGlassCard {
                 HStack(spacing: 14) {
+                    // Colorful folder icon
                     ZStack {
                         RoundedRectangle(cornerRadius: 12)
-                            .fill(VitaColors.accent.opacity(0.12))
+                            .fill(folderColor.opacity(0.15))
                             .frame(width: 44, height: 44)
                         Image(systemName: "folder.fill")
                             .font(.system(size: 18))
-                            .foregroundStyle(VitaColors.accent)
+                            .foregroundStyle(folderColor)
                     }
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -373,12 +548,96 @@ private struct CourseRow: View {
 
                     Spacer()
 
+                    // Star/Favorite button
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            onFavoriteToggle()
+                        }
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    } label: {
+                        Image(systemName: isFavorite ? "star.fill" : "star")
+                            .font(.system(size: 16))
+                            .foregroundStyle(
+                                isFavorite ? VitaColors.dataAmber : VitaColors.textTertiary
+                            )
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .buttonStyle(.plain)
+
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12))
                         .foregroundStyle(VitaColors.textTertiary)
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Course Grid Cell (Grid Mode)
+
+private struct CourseGridCell: View {
+    let course: Course
+    let colorIndex: Int
+    let isFavorite: Bool
+    let onFavoriteToggle: () -> Void
+    let onClick: () -> Void
+
+    private var folderColor: Color {
+        FolderPalette.color(forIndex: colorIndex)
+    }
+
+    var body: some View {
+        Button(action: onClick) {
+            VitaGlassCard {
+                VStack(spacing: 10) {
+                    // Top row: folder icon + star
+                    HStack {
+                        Spacer()
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                onFavoriteToggle()
+                            }
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            Image(systemName: isFavorite ? "star.fill" : "star")
+                                .font(.system(size: 14))
+                                .foregroundStyle(
+                                    isFavorite ? VitaColors.dataAmber : VitaColors.textTertiary
+                                )
+                                .contentTransition(.symbolEffect(.replace))
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    // Centered folder icon
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(folderColor.opacity(0.15))
+                            .frame(width: 52, height: 52)
+                        Image(systemName: "folder.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(folderColor)
+                    }
+
+                    // Course name
+                    Text(course.name)
+                        .font(VitaTypography.labelMedium)
+                        .fontWeight(.medium)
+                        .foregroundStyle(VitaColors.textPrimary)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                        .frame(minHeight: 30)
+
+                    // File count
+                    Text("\(course.filesCount) arquivo\(course.filesCount == 1 ? "" : "s")")
+                        .font(VitaTypography.labelSmall)
+                        .foregroundStyle(VitaColors.textSecondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
             }
         }
         .buttonStyle(.plain)

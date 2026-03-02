@@ -17,6 +17,14 @@ enum Route: Hashable {
     case flashcardSession(deckId: String)
     case pdfViewer(url: String)
 
+    // MARK: - Simulado
+    case simuladoHome
+    case simuladoConfig
+    case simuladoSession(attemptId: String)
+    case simuladoResult(attemptId: String)
+    case simuladoReview(attemptId: String)
+    case simuladoDiagnostics
+
     // MARK: - Settings sub-screens
     case about
     case appearance

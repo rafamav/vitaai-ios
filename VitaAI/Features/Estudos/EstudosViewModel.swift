@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 // MARK: - EstudosTab
 
@@ -15,6 +16,50 @@ enum EstudosTab: Int, CaseIterable {
         case .flashcards:  return "Flashcards"
         case .pdfs:        return "PDFs"
         }
+    }
+}
+
+// MARK: - CourseSortOption
+
+enum CourseSortOption: String, CaseIterable {
+    case favoritesFirst = "favoritesFirst"
+    case nameAZ         = "nameAZ"
+    case nameZA         = "nameZA"
+    case mostFiles      = "mostFiles"
+
+    var label: String {
+        switch self {
+        case .favoritesFirst: return "Favoritos primeiro"
+        case .nameAZ:         return "Nome (A-Z)"
+        case .nameZA:         return "Nome (Z-A)"
+        case .mostFiles:      return "Mais arquivos"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .favoritesFirst: return "star.fill"
+        case .nameAZ:         return "textformat.abc"
+        case .nameZA:         return "textformat.abc"
+        case .mostFiles:      return "doc.on.doc.fill"
+        }
+    }
+}
+
+// MARK: - Folder Colors
+
+enum FolderPalette {
+    static let colors: [Color] = [
+        Color(hex: 0x4FC3F7), // Light Blue
+        Color(hex: 0x66BB6A), // Green
+        Color(hex: 0xEF5350), // Red/Pink
+        Color(hex: 0xFDD835), // Yellow
+        Color(hex: 0xAB47BC), // Purple
+        Color(hex: 0x26A69A), // Teal
+    ]
+
+    static func color(forIndex index: Int) -> Color {
+        colors[index % colors.count]
     }
 }
 
@@ -47,7 +92,7 @@ final class EstudosViewModel {
     // Canvas connection state
     var canvasConnected: Bool = true
 
-    // Disciplinas
+    // Disciplinas (raw from API/mock)
     var courses: [Course] = []
 
     // Flashcards tab — display entries (include progress)
@@ -79,8 +124,65 @@ final class EstudosViewModel {
     // Selected course filter for PDFs tab
     var selectedCourseId: String? = nil
 
+    // MARK: - Disciplinas Sort & Favorites
+
+    var sortOption: CourseSortOption = .favoritesFirst
+    var favoriteCourseIds: Set<String> = []
+
+    /// Sorted courses based on current sort option, with favorites support.
+    var sortedCourses: [Course] {
+        let sorted: [Course]
+        switch sortOption {
+        case .favoritesFirst:
+            sorted = courses.sorted { a, b in
+                let aFav = favoriteCourseIds.contains(a.id)
+                let bFav = favoriteCourseIds.contains(b.id)
+                if aFav != bFav { return aFav }
+                return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+            }
+        case .nameAZ:
+            sorted = courses.sorted {
+                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+        case .nameZA:
+            sorted = courses.sorted {
+                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedDescending
+            }
+        case .mostFiles:
+            sorted = courses.sorted { $0.filesCount > $1.filesCount }
+        }
+        return sorted
+    }
+
+    func isFavorite(_ courseId: String) -> Bool {
+        favoriteCourseIds.contains(courseId)
+    }
+
+    func toggleFavorite(_ courseId: String) {
+        if favoriteCourseIds.contains(courseId) {
+            favoriteCourseIds.remove(courseId)
+        } else {
+            favoriteCourseIds.insert(courseId)
+        }
+        saveFavorites()
+    }
+
+    // MARK: - Favorites Persistence (UserDefaults)
+
+    private static let favoritesKey = "estudos_favorite_course_ids"
+
+    private func loadFavorites() {
+        let stored = UserDefaults.standard.stringArray(forKey: Self.favoritesKey) ?? []
+        favoriteCourseIds = Set(stored)
+    }
+
+    private func saveFavorites() {
+        UserDefaults.standard.set(Array(favoriteCourseIds), forKey: Self.favoritesKey)
+    }
+
     init(api: VitaAPI) {
         self.api = api
+        loadFavorites()
     }
 
     // MARK: - Load
