@@ -1,46 +1,48 @@
 import SwiftUI
 
 // MARK: - VitaAI Cyan Ambient Glass Design System
+// DO NOT hardcode Color(hex:) here — all values must come from VitaTokens.
+// Source of truth: packages/design-tokens/tokens.json → node generate.mjs
 
 enum VitaColors {
     // Accent: Cyan (ONLY accent color)
-    static let accent = Color(hex: 0x22D3EE)        // cyan-400 primary
-    static let accentDark = Color(hex: 0x06B6D4)     // cyan-500
-    static let accentLight = Color(hex: 0x67E8F9)    // cyan-300
-    static let accentSubtle = Color(hex: 0x082F38)   // deep subtle bg
+    static let accent        = VitaTokens.DarkColors.accent          // cyan-400 primary
+    static let accentDark    = VitaTokens.DarkColors.accentHover     // cyan-500
+    static let accentLight   = VitaTokens.PrimitiveColors.cyan300    // cyan-300
+    static let accentSubtle  = VitaTokens.DarkColors.bgSubtle        // deep accent-tinted bg
 
     // Ambient light colors (for background radial gradients)
-    static let ambientPrimary = Color(hex: 0x22D3EE)
-    static let ambientSecondary = Color(hex: 0x06B6D4)
-    static let ambientTertiary = Color(hex: 0x0891B2)
+    static let ambientPrimary   = VitaTokens.DarkColors.accent          // cyan-400
+    static let ambientSecondary = VitaTokens.DarkColors.accentHover     // cyan-500
+    static let ambientTertiary  = VitaTokens.PrimitiveColors.cyan600    // cyan-600
 
     // Glow animation colors
-    static let glowA = Color(hex: 0x22D3EE)
-    static let glowB = Color(hex: 0x00E5FF)
-    static let glowC = Color(hex: 0x40C4FF)
+    static let glowA = VitaTokens.DarkColors.accent                  // cyan-400
+    static let glowB = VitaTokens.PrimitiveColors.glowB              // #00e5ff
+    static let glowC = VitaTokens.PrimitiveColors.glowC              // #40c4ff
 
     // Surfaces — near-black with cool tint
-    static let black = Color(hex: 0x000000)
-    static let surface = Color(hex: 0x040809)
-    static let surfaceElevated = Color(hex: 0x0A1014)
-    static let surfaceCard = Color(hex: 0x0D1318)
-    static let surfaceBorder = Color(hex: 0x1A2028)
+    static let black           = VitaTokens.PrimitiveColors.black
+    static let surface         = VitaTokens.DarkColors.bg
+    static let surfaceElevated = VitaTokens.DarkColors.bgElevated
+    static let surfaceCard     = VitaTokens.DarkColors.bgCard
+    static let surfaceBorder   = VitaTokens.DarkColors.borderSurface  // #1A2028
 
-    // Glass
-    static let glassBg = Color.white.opacity(0.025)
-    static let glassBorder = Color.white.opacity(0.04)
+    // Glass (fine-tuned opacities — no exact token, intentional)
+    static let glassBg        = Color.white.opacity(0.025)
+    static let glassBorder    = Color.white.opacity(0.04)
     static let glassHighlight = Color.white.opacity(0.06)
 
     // Text
-    static let white = Color.white
-    static let textPrimary = Color.white.opacity(0.85)
-    static let textSecondary = Color.white.opacity(0.55)
-    static let textTertiary = Color.white.opacity(0.25)
+    static let white         = VitaTokens.PrimitiveColors.white
+    static let textPrimary   = VitaTokens.DarkColors.text
+    static let textSecondary = VitaTokens.DarkColors.textSecondary
+    static let textTertiary  = VitaTokens.DarkColors.textMuted
 
-    // Semantic data colors (mirrors BymavTokens DataGreen/DataRed/DataAmber/DataBlue)
-    static let dataGreen  = Color(hex: 0x22C55E)   // green-500
-    static let dataRed    = Color(hex: 0xEF4444)   // red-500
-    static let dataAmber  = Color(hex: 0xF59E0B)   // amber-500
-    static let dataBlue   = Color(hex: 0x60A5FA)   // blue-400
-    static let dataIndigo = Color(hex: 0xA78BFA)   // violet-400 (card back accent)
+    // Semantic data colors
+    static let dataGreen  = VitaTokens.PrimitiveColors.green500     // #22c55e
+    static let dataRed    = VitaTokens.PrimitiveColors.red500       // #ef4444
+    static let dataAmber  = VitaTokens.PrimitiveColors.amber500     // #f59e0b
+    static let dataBlue   = VitaTokens.PrimitiveColors.blue400      // #60a5fa
+    static let dataIndigo = VitaTokens.PrimitiveColors.indigo400    // #a78bfa (card back accent)
 }
