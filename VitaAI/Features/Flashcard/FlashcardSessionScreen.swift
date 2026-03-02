@@ -281,41 +281,5 @@ private struct FlashcardLoadingSkeleton: View {
     }
 }
 
-// MARK: - Shimmer modifier (lightweight, no external deps)
-
-private struct ShimmerModifier: ViewModifier {
-    @State private var phase: CGFloat = 0
-
-    func body(content: Content) -> some View {
-        content
-            .overlay(
-                GeometryReader { geo in
-                    LinearGradient(
-                        colors: [
-                            .white.opacity(0),
-                            .white.opacity(0.06),
-                            .white.opacity(0)
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                    .frame(width: geo.size.width * 2)
-                    .offset(x: -geo.size.width + phase * geo.size.width * 3)
-                    .clipped()
-                }
-                .allowsHitTesting(false)
-            )
-            .onAppear {
-                withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) {
-                    phase = 1
-                }
-            }
-    }
-}
-
-private extension View {
-    func shimmer() -> some View {
-        modifier(ShimmerModifier())
-    }
-}
+// Uses ShimmerModifier from VitaShimmer.swift (DesignSystem/Components)
 

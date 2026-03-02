@@ -39,9 +39,9 @@ enum BrushType: String, Codable, CaseIterable {
     case eraser   = "ERASER"
 }
 
-// MARK: - Stroke Point
+// MARK: - Stroke Point (Notes-specific, uses Float for compact serialization)
 
-struct StrokePoint: Codable {
+struct NoteStrokePoint: Codable {
     var x: Float
     var y: Float
 }
@@ -50,7 +50,7 @@ struct StrokePoint: Codable {
 
 struct DrawStroke: Codable, Identifiable {
     var id: UUID = UUID()
-    var points: [StrokePoint]
+    var points: [NoteStrokePoint]
     var color: UInt64          // ARGB hex e.g. 0xFF1A1A2E
     var size: Float
     var brushType: BrushType
@@ -69,7 +69,7 @@ struct DrawStroke: Codable, Identifiable {
         case id, points, color, size, brushType
     }
 
-    init(id: UUID = UUID(), points: [StrokePoint], color: UInt64, size: Float, brushType: BrushType) {
+    init(id: UUID = UUID(), points: [NoteStrokePoint], color: UInt64, size: Float, brushType: BrushType) {
         self.id = id
         self.points = points
         self.color = color

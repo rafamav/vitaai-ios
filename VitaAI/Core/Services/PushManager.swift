@@ -16,6 +16,7 @@ import UIKit
 final class PushManager: NSObject, ObservableObject {
 
     static let shared = PushManager()
+    var api: VitaAPI?
     private override init() { super.init() }
 
     // MARK: - Published State
@@ -97,7 +98,7 @@ final class PushManager: NSObject, ObservableObject {
     private func uploadToken(_ token: String) async {
         // Attempt to register token with backend; failure is non-fatal.
         do {
-            try await VitaAPI.shared.registerPushToken(token)
+            try await api?.registerPushToken(token: token)
             print("[PushManager] APNs token registered with backend: \(token.prefix(10))...")
         } catch {
             print("[PushManager] Failed to register APNs token with backend: \(error)")
