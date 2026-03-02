@@ -36,6 +36,7 @@ struct MainTabView: View {
     @Bindable var router: Router
     let authManager: AuthManager
     @Environment(\.appContainer) private var container
+    @Environment(\.subscriptionStatus) private var subStatus
     @State private var showChat = false
 
     var body: some View {
@@ -85,7 +86,8 @@ struct MainTabView: View {
                                 onNavigateToAppearance:    { router.navigate(to: .appearance) },
                                 onNavigateToNotifications: { router.navigate(to: .notifications) },
                                 onNavigateToCanvasConnect: { router.navigate(to: .canvasConnect) },
-                                onNavigateToWebAluno:      { router.navigate(to: .webalunoConnect) }
+                                onNavigateToWebAluno:      { router.navigate(to: .webalunoConnect) },
+                                onNavigateToPaywall:       { router.navigate(to: .paywall) }
                             )
                             .tag(TabItem.profile)
                         }
@@ -99,6 +101,11 @@ struct MainTabView: View {
             }
             .ignoresSafeArea(.keyboard)
             .navigationBarHidden(true)
+            .task {
+                // Load subscription status once when the main tab appears.
+                // Subsequent refreshes happen when the user opens the paywall.
+                await subStatus.refresh()
+            }
             // MARK: - Route destinations
             .navigationDestination(for: Route.self) { route in
                 switch route {
@@ -188,6 +195,8 @@ struct MainTabView: View {
                     AppearanceScreen()
                 case .notifications:
                     NotificationSettingsScreen()
+                case .paywall:
+                    PaywallScreen()
                 default:
                     EmptyView()
                 }

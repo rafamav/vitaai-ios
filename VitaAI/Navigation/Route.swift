@@ -29,4 +29,7 @@ enum Route: Hashable {
     case about
     case appearance
     case notifications
+
+    // MARK: - Billing
+    case paywall
 }

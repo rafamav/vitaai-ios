@@ -17,6 +17,10 @@ final class AppContainer: ObservableObject {
     let chatClient: VitaChatClient
     let authManager: AuthManager
 
+    // MARK: - Billing / Subscription
+
+    let subscriptionStatus: SubscriptionStatusProvider
+
     // MARK: - Notes persistence
 
     /// The shared SwiftData container.  Exposed so VitaAIApp can attach the
@@ -40,6 +44,7 @@ final class AppContainer: ObservableObject {
         self.api = api
         self.chatClient = chatClient
         self.authManager = authManager
+        self.subscriptionStatus = SubscriptionStatusProvider(api: api)
 
         // --- SwiftData ModelContainer ---
         // Schema covers all three persistent entity types.

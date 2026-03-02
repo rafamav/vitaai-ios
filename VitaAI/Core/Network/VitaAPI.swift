@@ -153,6 +153,18 @@ actor VitaAPI {
         try await client.delete("push/unregister")
     }
 
+    // MARK: - Billing
+    // Mirrors Android: MedCoachApi.getBillingStatus / getCheckoutUrl
+    // Endpoints: GET billing/status, POST billing/checkout
+
+    func getBillingStatus() async throws -> BillingStatus {
+        try await client.get("billing/status")
+    }
+
+    func getCheckoutUrl(plan: String = "pro") async throws -> CheckoutResponse {
+        try await client.post("billing/checkout", body: CheckoutRequest(plan: plan))
+    }
+
     // MARK: - Simulado
 
     func listSimulados() async throws -> SimuladoListResponse {

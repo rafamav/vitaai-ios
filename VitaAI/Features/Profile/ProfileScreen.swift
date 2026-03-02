@@ -9,6 +9,9 @@ struct ProfileScreen: View {
     var onNavigateToNotifications: (() -> Void)?
     var onNavigateToCanvasConnect: (() -> Void)?
     var onNavigateToWebAluno:      (() -> Void)?
+    var onNavigateToPaywall:       (() -> Void)?
+
+    @Environment(\.subscriptionStatus) private var subStatus
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -28,12 +31,54 @@ struct ProfileScreen: View {
                     }
 
                     if let name = authManager.userName {
-                        Text(name)
-                            .font(VitaTypography.titleLarge)
-                            .foregroundStyle(VitaColors.white)
+                        HStack(spacing: 8) {
+                            Text(name)
+                                .font(VitaTypography.titleLarge)
+                                .foregroundStyle(VitaColors.white)
+
+                            if subStatus.isPro {
+                                ProBadge()
+                            }
+                        }
+                    }
+
+                    // Plan status row
+                    if subStatus.isLoaded {
+                        Button(action: { onNavigateToPaywall?() }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: subStatus.isPro ? "crown.fill" : "crown")
+                                    .font(.system(size: 12, weight: .medium))
+                                Text(subStatus.isPro ? "Plano Pro ativo" : "Assinar Pro — R$39/mes")
+                                    .font(VitaTypography.labelMedium)
+                                if !subStatus.isPro {
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 10))
+                                }
+                            }
+                            .foregroundStyle(subStatus.isPro ? VitaColors.accent : VitaColors.accent.opacity(0.8))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(VitaColors.accent.opacity(0.08))
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(VitaColors.accent.opacity(0.2), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.top, 20)
+
+                // Subscription group
+                VitaGlassCard {
+                    settingsRow(
+                        icon: subStatus.isPro ? "crown.fill" : "crown",
+                        title: subStatus.isPro ? "VitaAI Pro" : "Assinar Pro",
+                        subtitle: subStatus.isPro
+                            ? (subStatus.periodEnd.map { "Valido ate \($0)" } ?? "Assinatura ativa")
+                            : "Desbloqueie recursos avancados de IA",
+                        action: { onNavigateToPaywall?() }
+                    )
+                }
+                .padding(.horizontal, 20)
 
                 // Integrations group
                 VitaGlassCard {
@@ -110,6 +155,24 @@ struct ProfileScreen: View {
 
                 Spacer().frame(height: 100)
             }
+        }
+    }
+
+    // MARK: - Pro badge
+
+    private struct ProBadge: View {
+        var body: some View {
+            HStack(spacing: 3) {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 8, weight: .bold))
+                Text("PRO")
+                    .font(.system(size: 9, weight: .bold))
+            }
+            .foregroundStyle(VitaColors.black)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(VitaColors.accent)
+            .clipShape(Capsule())
         }
     }
 
