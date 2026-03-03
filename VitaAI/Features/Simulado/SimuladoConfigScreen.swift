@@ -164,8 +164,8 @@ struct SimuladoConfigScreen: View {
                 } else {
                     VitaButton(
                         text: "Gerar Simulado",
-                        isEnabled: !vm.state.selectedSubject.isEmpty,
-                        action: { vm.generateSimulado() }
+                        action: { vm.generateSimulado() },
+                        isEnabled: !vm.state.selectedSubject.isEmpty
                     )
                     .padding(.horizontal, 16)
                 }
