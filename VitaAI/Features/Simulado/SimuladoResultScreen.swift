@@ -32,26 +32,49 @@ struct SimuladoResultScreen: View {
         }
     }
 
-    private func calcCorrectQ(vm: SimuladoViewModel) -> Int {
-        if let r = vm.state.result { return r.correctQ }
-        return vm.state.answers.reduce(0) { acc, pair in
-            let isCorrect = vm.state.questions.first { $0.id == pair.key }?.correctIdx == pair.value
-            return acc + (isCorrect ? 1 : 0)
-        }
-    }
-
     @ViewBuilder
     private func resultContent(vm: SimuladoViewModel) -> some View {
         let totalQ = vm.state.result?.totalQ ?? vm.state.questions.count
-        let correctQ = calcCorrectQ(vm: vm)
-        let wrongQ = vm.state.answers.count - correctQ
-        let blankQ = totalQ - vm.state.answers.count
-        let scorePercent = totalQ > 0 ? Int(Double(correctQ) / Double(totalQ) * 100) : 0
-        let scoreColor: Color = scorePercent >= 70 ? VitaColors.dataGreen : scorePercent >= 50 ? VitaColors.dataAmber : VitaColors.dataRed
+        let correctQ: Int = {
+            if let r = vm.state.result { return r.correctQ }
+            return vm.state.answers.reduce(0) { acc, pair in
+                let ok = vm.state.questions.first { $0.id == pair.key }?.correctIdx == pair.value
+                return acc + (ok ? 1 : 0)
+            }
+        }()
+        ResultBody(
+            vm: vm,
+            totalQ: totalQ,
+            correctQ: correctQ,
+            wrongQ: vm.state.answers.count - correctQ,
+            blankQ: totalQ - vm.state.answers.count,
+            animatedProgress: $animatedProgress,
+            onBack: onBack,
+            onReview: onReview,
+            onNewSimulado: onNewSimulado
+        )
+    }
+}
 
+// MARK: - Result Body (extracted to help the type-checker)
+
+private struct ResultBody: View {
+    let vm: SimuladoViewModel
+    let totalQ: Int
+    let correctQ: Int
+    let wrongQ: Int
+    let blankQ: Int
+    @Binding var animatedProgress: Double
+    let onBack: () -> Void
+    let onReview: () -> Void
+    let onNewSimulado: () -> Void
+
+    private var scorePercent: Int { totalQ > 0 ? Int(Double(correctQ) / Double(totalQ) * 100) : 0 }
+    private var scoreColor: Color { scorePercent >= 70 ? VitaColors.dataGreen : scorePercent >= 50 ? VitaColors.dataAmber : VitaColors.dataRed }
+
+    var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                // Back button
                 HStack {
                     Button(action: onBack) {
                         Image(systemName: "arrow.left")
@@ -65,18 +88,13 @@ struct SimuladoResultScreen: View {
 
                 Spacer().frame(height: 32)
 
-                // Circular score arc
                 ZStack {
-                    Circle()
-                        .stroke(VitaColors.glassBorder, lineWidth: 10)
-                        .frame(width: 160, height: 160)
-
+                    Circle().stroke(VitaColors.glassBorder, lineWidth: 10).frame(width: 160, height: 160)
                     Circle()
                         .trim(from: 0, to: animatedProgress)
                         .stroke(scoreColor, style: StrokeStyle(lineWidth: 10, lineCap: .round))
                         .frame(width: 160, height: 160)
                         .rotationEffect(.degrees(-90))
-
                     Text("\(scorePercent)%")
                         .font(.system(size: 36, weight: .bold))
                         .foregroundStyle(scoreColor)
@@ -89,7 +107,6 @@ struct SimuladoResultScreen: View {
 
                 Spacer().frame(height: 24)
 
-                // Stats row
                 HStack {
                     Spacer()
                     ResultStatItem(icon: "checkmark", count: correctQ, label: "Corretas", color: VitaColors.dataGreen)
@@ -102,67 +119,74 @@ struct SimuladoResultScreen: View {
 
                 Spacer().frame(height: 8)
 
-                // Subject breakdown
-                let subjectGroups = Dictionary(
-                    grouping: vm.state.questions.filter { !($0.subject ?? "").isEmpty }
-                ) { $0.subject! }
-
-                if subjectGroups.count > 1 {
-                    Spacer().frame(height: 20)
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Por Matéria")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(VitaColors.textPrimary)
-
-                        ForEach(subjectGroups.keys.sorted(), id: \.self) { subject in
-                            let qs = subjectGroups[subject] ?? []
-                            let subCorrect = qs.filter { q in
-                                let chosen = vm.state.answers[q.id]
-                                return chosen != nil && chosen == q.correctIdx
-                            }.count
-                            let rate = qs.isEmpty ? 0.0 : Double(subCorrect) / Double(qs.count)
-                            let barColor: Color = rate >= 0.7 ? VitaColors.dataGreen : rate >= 0.5 ? VitaColors.dataAmber : VitaColors.dataRed
-
-                            HStack(spacing: 10) {
-                                Text(subject)
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(VitaColors.textPrimary)
-                                    .frame(width: 100, alignment: .leading)
-
-                                GeometryReader { geo in
-                                    ZStack(alignment: .leading) {
-                                        RoundedRectangle(cornerRadius: 3).fill(VitaColors.glassBorder)
-                                        RoundedRectangle(cornerRadius: 3).fill(barColor)
-                                            .frame(width: geo.size.width * rate)
-                                    }
-                                }
-                                .frame(height: 6)
-
-                                Text("\(Int(rate * 100))%")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(barColor)
-                                    .frame(width: 34, alignment: .trailing)
-                            }
-                        }
-                    }
-                    .padding(16)
-                    .background(VitaColors.glassBg)
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(VitaColors.glassBorder, lineWidth: 1))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .padding(.horizontal, 24)
-                }
+                subjectBreakdown
 
                 Spacer().frame(height: 32)
 
                 VStack(spacing: 10) {
-                    VitaButton(text: "Revisar Questões", variant: .secondary, action: onReview)
+                    VitaButton(text: "Revisar Questões", action: onReview, variant: .secondary)
                     VitaButton(text: "Novo Simulado", action: onNewSimulado)
                 }
                 .padding(.horizontal, 24)
 
                 Spacer().frame(height: 24)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var subjectBreakdown: some View {
+        let groups = Dictionary(
+            grouping: vm.state.questions.filter { !($0.subject ?? "").isEmpty }
+        ) { $0.subject! }
+
+        if groups.count > 1 {
+            Spacer().frame(height: 20)
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Por Matéria")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(VitaColors.textPrimary)
+                ForEach(groups.keys.sorted(), id: \.self) { subject in
+                    SubjectRow(subject: subject, qs: groups[subject] ?? [], answers: vm.state.answers)
+                }
+            }
+            .padding(16)
+            .background(VitaColors.glassBg)
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(VitaColors.glassBorder, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 24)
+        }
+    }
+}
+
+private struct SubjectRow: View {
+    let subject: String
+    let qs: [SimuladoQuestionEntry]
+    let answers: [String: Int]
+
+    private var subCorrect: Int {
+        qs.filter { q in answers[q.id] != nil && answers[q.id] == q.correctIdx }.count
+    }
+    private var rate: Double { qs.isEmpty ? 0 : Double(subCorrect) / Double(qs.count) }
+    private var barColor: Color { rate >= 0.7 ? VitaColors.dataGreen : rate >= 0.5 ? VitaColors.dataAmber : VitaColors.dataRed }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text(subject)
+                .font(.system(size: 12))
+                .foregroundStyle(VitaColors.textPrimary)
+                .frame(width: 100, alignment: .leading)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 3).fill(VitaColors.glassBorder)
+                    RoundedRectangle(cornerRadius: 3).fill(barColor).frame(width: geo.size.width * rate)
+                }
+            }
+            .frame(height: 6)
+            Text("\(Int(rate * 100))%")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(barColor)
+                .frame(width: 34, alignment: .trailing)
         }
     }
 }

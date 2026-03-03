@@ -140,7 +140,7 @@ struct SimuladoHomeScreen: View {
                             }
                         }
 
-                        VitaButton(text: "Ver Diagnóstico Completo", variant: .secondary, action: onOpenDiagnostics)
+                        VitaButton(text: "Ver Diagnóstico Completo", action: onOpenDiagnostics, variant: .secondary)
                             .padding(.horizontal, 16)
                             .padding(.bottom, 24)
                     }

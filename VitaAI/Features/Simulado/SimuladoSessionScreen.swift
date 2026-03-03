@@ -253,10 +253,10 @@ struct SimuladoSessionScreen: View {
                 }
             }
 
-            VitaButton(text: "Finalizar Prova", variant: .secondary, action: {
+            VitaButton(text: "Finalizar Prova", action: {
                 showGrid = false
                 showFinishDialog = true
-            })
+            }, variant: .secondary)
         }
         .padding(20)
         .background(VitaColors.surface)
