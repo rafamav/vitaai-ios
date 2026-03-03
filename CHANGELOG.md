@@ -172,6 +172,12 @@ TranscricaoScreen referenciava container.transcricaoClient mas o
 withAnimation/_Animation requer SwiftUI. ViewModel tinha só Foundation+Observation.
 - *(ios)* Fix VitaButton argument order in SimuladoConfigScreen
 action deve preceder isEnabled na chamada VitaButton.
+- *(ios)* Fix remaining Simulado build errors
+- SimuladoHomeScreen/Session: corrigir ordem variant/action no VitaButton
+    (action deve preceder variant na definição do struct)
+  - SimuladoResultScreen: extrair ResultBody + SubjectRow como structs privados
+    para resolver "compiler unable to type-check expression" causado por
+    let bindings complexos dentro de @ViewBuilder
 
 ### Documentation
 
@@ -464,6 +470,7 @@ Minimal GitHub Actions workflow for iOS build without Mac.
 
   New tokens now available: cyan300, indigo400, glowB, glowC,
   bgSubtle, borderSurface
+- Update changelog
 - Update changelog
 - Update changelog
 - Update changelog
