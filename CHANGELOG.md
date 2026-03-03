@@ -162,6 +162,12 @@ SimuladoConfigScreen.swift definia `private struct FlowLayout` ao mesmo tempo
 - *(ios)* Merge duplicate BillingModels.swift — fix filename collision
 Features/Billing/BillingModels.swift e Models/API/BillingModels.swift
   tinham o mesmo filename, causando erro de build no XcodeGen.
+- *(ios)* Add missing Osce + Transcricao feature files — fix OsceStartResponse scope error
+VitaAPI.swift referenciava OsceStartResponse e OsceSseClient mas os
+  arquivos da feature não tinham sido commitados, causando build failure.
+- *(ios)* Register TranscricaoClient in AppContainer
+TranscricaoScreen referenciava container.transcricaoClient mas o
+  client não havia sido instanciado nem exposto no AppContainer.
 
 ### Documentation
 
@@ -454,6 +460,7 @@ Minimal GitHub Actions workflow for iOS build without Mac.
 
   New tokens now available: cyan300, indigo400, glowB, glowC,
   bgSubtle, borderSurface
+- Update changelog
 - Update changelog
 - Update changelog
 - Update changelog
