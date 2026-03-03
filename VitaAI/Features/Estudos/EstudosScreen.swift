@@ -262,7 +262,7 @@ private struct EstudosSkeleton: View {
                         if groupIdx == 0 { Spacer().frame(height: 8) }
                     }
 
-                case .notebooks:
+                case .notebooks, .mindMaps:
                     ForEach(0..<5, id: \.self) { _ in
                         ShimmerBox(height: 76, cornerRadius: 14)
                             .padding(.horizontal, 16)
