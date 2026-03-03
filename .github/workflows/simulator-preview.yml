@@ -49,6 +49,7 @@ jobs:
       - name: Build for Simulator
         run: |
           set -o pipefail
+          # Tee to build.log so full output is available on failure; filter for display
           xcodebuild build \
             -project VitaAI.xcodeproj \
             -scheme VitaAI \
@@ -57,7 +58,14 @@ jobs:
             -derivedDataPath build/sim \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            TARGETED_DEVICE_FAMILY=1 2>&1 | tail -50
+            TARGETED_DEVICE_FAMILY=1 2>&1 | tee build.log | \
+            grep -E "^(.*error:|.*warning:.*[Ee]rror|Build.*SUCCEEDED|Build.*FAILED|\*\* BUILD)" || true
+          # Surface full log on failure so errors are never truncated
+          if grep -q "\*\* BUILD FAILED \*\*" build.log; then
+            echo "::error::Build failed — full log follows"
+            grep -E "error:|Build.*FAILED" build.log | head -80
+            exit 1
+          fi
           echo "=== Build products ==="
           find build/sim/Build/Products -maxdepth 2 2>/dev/null || echo "Products dir not found"
 
@@ -68,54 +76,68 @@ jobs:
           xcrun simctl boot "$DEVICE_ID" || true
           sleep 5
 
-          echo "=== Searching for .app ==="
-          find build/sim/Build/Products -name "VitaAI.app" 2>/dev/null || find build/sim -name "*.app" 2>/dev/null | head -5
           APP_PATH=$(find build/sim/Build/Products -name "VitaAI.app" | head -1)
           echo "App: $APP_PATH"
           xcrun simctl install "$DEVICE_ID" "$APP_PATH"
-          xcrun simctl launch "$DEVICE_ID" com.bymav.vitaai
+
+          # Launch with demo login flag — app injects session before AuthManager boots
+          xcrun simctl launch "$DEVICE_ID" com.bymav.vitaai --vita-demo-login
+          sleep 4  # wait for auth check + dashboard render
 
           mkdir -p screenshots
 
-          # Screenshot 1: Launch/Login
+          snap() {
+            xcrun simctl io "$DEVICE_ID" screenshot "screenshots/$1.png"
+            echo "✓ $1"
+          }
+
+          # ── 01 Dashboard (logged in, XpBar + StreakBadge visíveis) ─────────────
+          snap "01-dashboard"
+
+          # ── 02 Estudos (tab 2 — bottom bar) ───────────────────────────────────
+          xcrun simctl ui "$DEVICE_ID" tap 97 870
+          sleep 2
+          snap "02-estudos"
+
+          # ── 03 FlashcardStats (botão "Ver Estatísticas" no hub de flashcards) ──
+          # Scroll para seção flashcard e tap no botão stats
+          xcrun simctl ui "$DEVICE_ID" tap 197 520    # tap flashcard section
+          sleep 1
+          xcrun simctl ui "$DEVICE_ID" tap 197 650    # tap "Ver Estatísticas"
+          sleep 2
+          snap "03-flashcard-stats"
+          xcrun simctl ui "$DEVICE_ID" tap 20 60      # back
+
+          # ── 04 Insights (charts: Retention, Heatmap, Forecast, Donut) ─────────
+          sleep 1
+          xcrun simctl ui "$DEVICE_ID" tap 290 870    # tab Insights
+          sleep 2
+          snap "04-insights-charts"
+
+          # ── 05 Trabalhos (com FAB para novo trabalho) ─────────────────────────
+          xcrun simctl ui "$DEVICE_ID" tap 97 870     # tab Estudos
+          sleep 1
+          xcrun simctl ui "$DEVICE_ID" tap 197 400    # tap Trabalhos section
+          sleep 2
+          snap "05-trabalhos"
+
+          # ── 06 TrabalhoEditor (FAB "Novo Trabalho") ──────────────────────────
+          xcrun simctl ui "$DEVICE_ID" tap 350 800    # FAB
+          sleep 2
+          snap "06-trabalho-editor"
+          xcrun simctl ui "$DEVICE_ID" tap 20 60      # cancel
+
+          # ── 07 Chat (voice input button visível) ─────────────────────────────
+          xcrun simctl ui "$DEVICE_ID" tap 193 870    # tab Chat
+          sleep 2
+          snap "07-chat-voice"
+
+          # ── 08 MindMap Editor ────────────────────────────────────────────────
+          xcrun simctl ui "$DEVICE_ID" tap 290 870    # tab Mapas
+          sleep 1
+          xcrun simctl ui "$DEVICE_ID" tap 350 800    # FAB novo mapa
           sleep 3
-          xcrun simctl io "$DEVICE_ID" screenshot screenshots/01-launch.png
-          echo "✓ Screenshot 1: Launch"
-
-          # Screenshot 2: Dashboard (tap skip onboarding if exists, or tap login)
-          sleep 2
-          xcrun simctl ui "$DEVICE_ID" tap 200 600 || true
-          sleep 2
-          xcrun simctl io "$DEVICE_ID" screenshot screenshots/02-dashboard.png
-          echo "✓ Screenshot 2: Dashboard"
-
-          # Screenshot 3: Navigate to Estudos
-          sleep 1
-          xcrun simctl ui "$DEVICE_ID" tap 200 700 || true
-          sleep 2
-          xcrun simctl io "$DEVICE_ID" screenshot screenshots/03-estudos.png
-          echo "✓ Screenshot 3: Estudos"
-
-          # Screenshot 4: Tap Mapas tab (3rd tab)
-          sleep 1
-          xcrun simctl ui "$DEVICE_ID" tap 300 850 || true
-          sleep 2
-          xcrun simctl io "$DEVICE_ID" screenshot screenshots/04-mindmap-list.png
-          echo "✓ Screenshot 4: MindMap List"
-
-          # Screenshot 5: Create new map (FAB button)
-          sleep 1
-          xcrun simctl ui "$DEVICE_ID" tap 350 800 || true
-          sleep 3
-          xcrun simctl io "$DEVICE_ID" screenshot screenshots/05-mindmap-editor.png
-          echo "✓ Screenshot 5: MindMap Editor"
-
-          # Screenshot 6: After interaction (tap canvas)
-          sleep 1
-          xcrun simctl ui "$DEVICE_ID" tap 200 400 || true
-          sleep 1
-          xcrun simctl io "$DEVICE_ID" screenshot screenshots/06-mindmap-interaction.png
-          echo "✓ Screenshot 6: MindMap Interaction"
+          snap "08-mindmap-editor"
 
           echo "=== Generated $(ls screenshots/*.png | wc -l) screenshots ==="
           ls -lh screenshots/
