@@ -25,7 +25,11 @@ actor TokenStore {
     // MARK: - Token
 
     var token: String? {
-        keychain.read(key: Keys.sessionToken)
+        #if DEBUG
+        // CI mode: xcrun simctl spawn writes vita_ci_token via defaults before app launch
+        if let ciToken = defaults.string(forKey: "vita_ci_token") { return ciToken }
+        #endif
+        return keychain.read(key: Keys.sessionToken)
     }
 
     var isLoggedIn: Bool {
