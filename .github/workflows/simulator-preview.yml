@@ -70,7 +70,10 @@ jobs:
           find build/sim/Build/Products -maxdepth 2 2>/dev/null || echo "Products dir not found"
 
       - name: Boot simulator & take screenshots
+        id: screenshots
+        continue-on-error: true
         run: |
+          set +e  # don't abort on failed taps — best-effort navigation
           DEVICE_ID=$(xcrun simctl list devices available | grep "iPhone 16" | grep -v "Plus\|Pro" | head -1 | grep -o '[A-F0-9-]\{36\}')
           echo "Device: $DEVICE_ID"
           xcrun simctl boot "$DEVICE_ID" || true
@@ -82,64 +85,55 @@ jobs:
 
           # Launch with demo login flag — app injects session before AuthManager boots
           xcrun simctl launch "$DEVICE_ID" com.bymav.vitaai --vita-demo-login
-          sleep 4  # wait for auth check + dashboard render
+          sleep 5  # wait for auth check + dashboard render
 
           mkdir -p screenshots
 
           snap() {
-            xcrun simctl io "$DEVICE_ID" screenshot "screenshots/$1.png"
-            echo "✓ $1"
+            xcrun simctl io "$DEVICE_ID" screenshot "screenshots/$1.png" && echo "✓ $1" || echo "✗ $1 (skipped)"
+          }
+          tap() {
+            xcrun simctl ui "$DEVICE_ID" tap "$1" "$2" || true
           }
 
           # ── 01 Dashboard (logged in, XpBar + StreakBadge visíveis) ─────────────
           snap "01-dashboard"
 
-          # ── 02 Estudos (tab 2 — bottom bar) ───────────────────────────────────
-          xcrun simctl ui "$DEVICE_ID" tap 97 870
-          sleep 2
+          # ── 02 Estudos (tab — bottom bar) ─────────────────────────────────────
+          tap 97 870; sleep 3
           snap "02-estudos"
 
-          # ── 03 FlashcardStats (botão "Ver Estatísticas" no hub de flashcards) ──
-          # Scroll para seção flashcard e tap no botão stats
-          xcrun simctl ui "$DEVICE_ID" tap 197 520    # tap flashcard section
-          sleep 1
-          xcrun simctl ui "$DEVICE_ID" tap 197 650    # tap "Ver Estatísticas"
-          sleep 2
+          # ── 03 FlashcardStats ──────────────────────────────────────────────────
+          tap 197 520; sleep 1
+          tap 197 650; sleep 3
           snap "03-flashcard-stats"
-          xcrun simctl ui "$DEVICE_ID" tap 20 60      # back
+          tap 20 60; sleep 1
 
-          # ── 04 Insights (charts: Retention, Heatmap, Forecast, Donut) ─────────
-          sleep 1
-          xcrun simctl ui "$DEVICE_ID" tap 290 870    # tab Insights
-          sleep 2
+          # ── 04 Insights (4 charts) ─────────────────────────────────────────────
+          tap 290 870; sleep 3
           snap "04-insights-charts"
 
-          # ── 05 Trabalhos (com FAB para novo trabalho) ─────────────────────────
-          xcrun simctl ui "$DEVICE_ID" tap 97 870     # tab Estudos
-          sleep 1
-          xcrun simctl ui "$DEVICE_ID" tap 197 400    # tap Trabalhos section
-          sleep 2
+          # ── 05 Trabalhos ───────────────────────────────────────────────────────
+          tap 97 870; sleep 1
+          tap 197 400; sleep 3
           snap "05-trabalhos"
 
-          # ── 06 TrabalhoEditor (FAB "Novo Trabalho") ──────────────────────────
-          xcrun simctl ui "$DEVICE_ID" tap 350 800    # FAB
-          sleep 2
+          # ── 06 TrabalhoEditor (FAB) ────────────────────────────────────────────
+          tap 350 800; sleep 3
           snap "06-trabalho-editor"
-          xcrun simctl ui "$DEVICE_ID" tap 20 60      # cancel
+          tap 20 60; sleep 1
 
-          # ── 07 Chat (voice input button visível) ─────────────────────────────
-          xcrun simctl ui "$DEVICE_ID" tap 193 870    # tab Chat
-          sleep 2
+          # ── 07 Chat + VoiceInput ───────────────────────────────────────────────
+          tap 193 870; sleep 3
           snap "07-chat-voice"
 
-          # ── 08 MindMap Editor ────────────────────────────────────────────────
-          xcrun simctl ui "$DEVICE_ID" tap 290 870    # tab Mapas
-          sleep 1
-          xcrun simctl ui "$DEVICE_ID" tap 350 800    # FAB novo mapa
-          sleep 3
+          # ── 08 MindMap Editor ──────────────────────────────────────────────────
+          tap 290 870; sleep 1
+          tap 350 800; sleep 3
           snap "08-mindmap-editor"
 
-          echo "=== Generated $(ls screenshots/*.png | wc -l) screenshots ==="
+          COUNT=$(ls screenshots/*.png 2>/dev/null | wc -l)
+          echo "=== Generated $COUNT screenshots ==="
           ls -lh screenshots/
 
           xcrun simctl shutdown "$DEVICE_ID" || true
@@ -150,6 +144,7 @@ jobs:
           zip -r VitaAI-simulator.zip "$APP_PATH"
 
       - name: Upload screenshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: screenshots
