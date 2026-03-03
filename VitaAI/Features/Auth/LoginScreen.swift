@@ -10,9 +10,10 @@ struct LoginScreen: View {
     @State private var showFooter = false
     @State private var loadingProvider: LoadingProvider = .none
     @State private var glowStarted = false
+    @State private var showEmailSheet = false
 
     private enum LoadingProvider {
-        case google, apple, email, none
+        case google, apple, none
     }
 
     var body: some View {
@@ -110,10 +111,9 @@ struct LoginScreen: View {
                                     .font(.system(size: 16))
                                     .foregroundStyle(VitaColors.textSecondary)
                             ),
-                            isLoading: loadingProvider == .email
+                            isLoading: false
                         ) {
-                            loadingProvider = .email
-                            // TODO: open email form sheet
+                            showEmailSheet = true
                         }
                         .padding(.horizontal, 36)
                         .transition(.opacity.combined(with: .offset(y: 14)))  // Android: slideInVertically { h/3 } = 14pt
@@ -156,6 +156,9 @@ struct LoginScreen: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)  // fills ZStack so Spacer() pushes buttons to bottom
         }
         .ignoresSafeArea()  // full bleed — no black bars at top/bottom from safe area
+        .sheet(isPresented: $showEmailSheet) {
+            EmailAuthSheet(authManager: authManager)
+        }
         .onAppear {
             withAnimation(.easeOut(duration: 1.5)) { imageOpacity = 1 }
             Task {
