@@ -17,3 +17,17 @@ struct CheckoutResponse: Decodable {
 struct CheckoutRequest: Encodable {
     let plan: String
 }
+
+// MARK: - Apple IAP Verification Models
+
+struct VerifyAppleReceiptRequest: Codable {
+    let transactionId: String
+    let productId: String
+    let bundleId: String
+}
+
+struct VerifyAppleReceiptResponse: Codable {
+    let ok: Bool
+    let plan: String?
+    let error: String?
+}
