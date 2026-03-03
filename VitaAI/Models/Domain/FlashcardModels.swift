@@ -10,16 +10,20 @@ struct FlashcardDeck: Identifiable, Hashable {
     var dueCount: Int { cards.filter { $0.isDue }.count }
 }
 
-/// A single flashcard with front/back content and SM-2 scheduling state
+/// A single flashcard with front/back content and FSRS-5 scheduling state.
+/// Backward-compatible with SM-2 legacy fields from the API layer:
+///   stability  ← easeFactor (SM-2) or stability (FSRS-5)
+///   difficulty ← FSRS-5 difficulty 1–10 (0 = unmigrated legacy card)
+///   state      ← FsrsCardStatus raw value (0=New,1=Learning,2=Review,3=Relearning)
 struct FlashcardCard: Identifiable, Hashable {
     let id: String
     let front: String
     let back: String
 
-    // SM-2 spaced repetition state
-    var stability: Double = 2.5      // easiness factor (EF)
-    var difficulty: Double = 0.0     // FSRS difficulty (0-10)
-    var state: Int = 0               // 0=New, 1=Learning, 2=Review, 3=Relearning
+    // FSRS-5 spaced repetition state
+    var stability: Double = 2.5      // FSRS S (or SM-2 EF for legacy cards)
+    var difficulty: Double = 0.0     // FSRS D 1–10 (0 = legacy card, will be migrated)
+    var state: Int = 0               // FsrsCardStatus raw value
     var scheduledDays: Int = 0
     var nextReviewAt: Date?
 
@@ -73,11 +77,15 @@ struct FlashcardSessionResult {
     }
 }
 
-// MARK: - SM-2 Algorithm (Supermemo-2 simplified, Anki-compatible)
+// MARK: - SM-2 Algorithm (LEGACY — kept for reference only)
+//
+// The active scheduler is now FsrsScheduler (FSRS-5), defined in FsrsScheduler.swift.
+// SM2Scheduler is retained so existing code that calls it doesn't break during the
+// transition. New code MUST use FsrsScheduler instead.
 
-/// Pure SM-2 spaced repetition scheduler.
-/// Implements the same logic as the Android FSRS integration but runs client-side
-/// so sessions work offline and the API review response can optionally override.
+/// Legacy SM-2 scheduler — do NOT use for new flashcard sessions.
+/// Use FsrsScheduler (FSRS-5) instead.
+@available(*, deprecated, renamed: "FsrsScheduler")
 enum SM2Scheduler {
 
     struct Output {

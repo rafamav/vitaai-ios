@@ -28,17 +28,17 @@ final class FlashcardViewModel {
     private(set) var correctCount: Int = 0
     private(set) var result: FlashcardSessionResult? = nil
 
-    // SM-2 per-card state (parallel arrays, indexed by cards)
-    private(set) var easeFactors: [Double] = []
-    private(set) var repetitions: [Int] = []
-    private(set) var intervals: [Int] = []
+    // FSRS-5 per-card state (parallel array, indexed by cards)
+    private(set) var fsrsStates: [FsrsCardState] = []
 
     // Session timing
     private(set) var sessionStartDate: Date = Date()
     private(set) var cardStartDate: Date = Date()
 
     // MARK: Private
+
     private let api: VitaAPI
+    private let scheduler = FsrsScheduler()
 
     // MARK: Computed helpers
 
@@ -55,14 +55,16 @@ final class FlashcardViewModel {
 
     var elapsedSeconds: Int { Int(Date().timeIntervalSince(sessionStartDate)) }
 
-    /// SM-2 interval previews for the current card's rating buttons
+    /// FSRS-5 interval previews for the current card's rating buttons
     var intervalPreviews: [ReviewRating: Int] {
-        guard cards.indices.contains(currentIndex) else { return [:] }
-        return SM2Scheduler.previewIntervals(
-            easeFactor: easeFactors[currentIndex],
-            repetitions: repetitions[currentIndex],
-            currentInterval: intervals[currentIndex]
-        )
+        guard fsrsStates.indices.contains(currentIndex) else { return [:] }
+        let preview = scheduler.preview(card: fsrsStates[currentIndex])
+        return [
+            .again: preview.again,
+            .hard:  preview.hard,
+            .good:  preview.good,
+            .easy:  preview.easy,
+        ]
     }
 
     // MARK: - Init
@@ -104,20 +106,17 @@ final class FlashcardViewModel {
 
     func rateCard(_ rating: ReviewRating) {
         guard case .studying = phase, let card = currentCard else { return }
-        guard cards.indices.contains(currentIndex) else { return }
+        guard fsrsStates.indices.contains(currentIndex) else { return }
 
         phase = .reviewing
 
-        // Apply SM-2 locally (instant, offline-capable)
-        let output = SM2Scheduler.compute(
+        // Apply FSRS-5 locally (instant, offline-capable)
+        let result = scheduler.schedule(
+            card: fsrsStates[currentIndex],
             rating: rating,
-            easeFactor: easeFactors[currentIndex],
-            repetitions: repetitions[currentIndex],
-            currentInterval: intervals[currentIndex]
+            now: Date()
         )
-        easeFactors[currentIndex] = output.newEaseFactor
-        intervals[currentIndex] = output.nextIntervalDays
-        repetitions[currentIndex] = rating.isCorrect ? repetitions[currentIndex] + 1 : 0
+        fsrsStates[currentIndex] = result.card
 
         // Fire-and-forget API review — session always advances even on failure
         let cardId = card.id
@@ -160,10 +159,34 @@ final class FlashcardViewModel {
         sessionStartDate = Date()
         cardStartDate = Date()
 
-        // Initialize SM-2 state from card metadata
-        easeFactors = cards.map { max(1.3, $0.stability == 0 ? 2.5 : $0.stability) }
-        repetitions = cards.map { $0.state > 0 ? 1 : 0 }
-        intervals   = cards.map { $0.scheduledDays }
+        // Initialise FSRS-5 state from card metadata.
+        // Cards that previously used SM-2 fields (easeFactor/interval) are migrated
+        // via FsrsCardState.migratedFromSM2() — data is never lost.
+        fsrsStates = cards.map { card in
+            if card.difficulty > 0 && card.stability > 0 {
+                // Already has FSRS-5 native state
+                return FsrsCardState(
+                    stability:     card.stability,
+                    difficulty:    card.difficulty,
+                    elapsedDays:   0,
+                    scheduledDays: card.scheduledDays,
+                    reps:          card.state > 0 ? 1 : 0,
+                    lapses:        0,
+                    status:        FsrsCardStatus(rawValue: card.state) ?? .new,
+                    lastReviewDate: card.nextReviewAt.map { Calendar.current.date(byAdding: .day, value: -card.scheduledDays, to: $0) } ?? nil
+                )
+            } else {
+                // Legacy SM-2 card — migrate gracefully
+                return FsrsCardState.migratedFromSM2(
+                    easeFactor:     max(1.3, card.stability == 0 ? 2.5 : card.stability),
+                    repetitions:    card.state > 0 ? 1 : 0,
+                    interval:       card.scheduledDays,
+                    lastReviewDate: card.nextReviewAt.map {
+                        Calendar.current.date(byAdding: .day, value: -card.scheduledDays, to: $0)
+                    } ?? nil
+                )
+            }
+        }
 
         phase = .studying
     }
