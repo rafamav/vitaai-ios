@@ -15,7 +15,7 @@ username(ENV["APPLE_ID"] || "seu-email@bymav.com")
 team_id(ENV["TEAM_ID"] || "YOUR_TEAM_ID")
 
 # Keychain (para CI/CD)
-keychain_name("login.keychain")
+keychain_name("build.keychain-db")  # Match the keychain created in GitHub Actions
 keychain_password(ENV["MATCH_KEYCHAIN_PASSWORD"])
 
 # Para usar App Store Connect API (sem senha)
