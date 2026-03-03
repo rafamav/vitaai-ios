@@ -41,6 +41,6 @@ jobs:
       - name: Configure Git credentials for Match
         run: |
           git config --global credential.helper store
-          echo "https://rafamav:${{ secrets.GITHUB_TOKEN }}@github.com" > ~/.git-credentials
+          echo "https://rafamav:${{ secrets.GIT_PAT }}@github.com" > ~/.git-credentials
 
       - run: fastlane beta
