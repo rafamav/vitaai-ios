@@ -39,11 +39,11 @@ jobs:
           # Delete keychain if exists
           security delete-keychain build.keychain-db || true
 
-          # Create with EMPTY password (critical for CI)
-          security create-keychain -p "" build.keychain-db
+          # Create with PASSWORD (needed for partition list)
+          security create-keychain -p "${{ secrets.MATCH_KEYCHAIN_PASSWORD }}" build.keychain-db
 
           # Unlock permanently (no timeout)
-          security unlock-keychain -p "" build.keychain-db
+          security unlock-keychain -p "${{ secrets.MATCH_KEYCHAIN_PASSWORD }}" build.keychain-db
           security set-keychain-settings build.keychain-db
 
           # Set as default

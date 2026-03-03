@@ -104,10 +104,8 @@ platform :ios do
     match(
       type: "appstore",
       app_identifier: app_identifier,
-      readonly: false,  # false na primeira vez para criar certificados
-      keychain_name: "build.keychain-db",
-      keychain_password: "",
-      skip_set_partition_list: false  # Force configure partition list for CI
+      readonly: false  # false na primeira vez para criar certificados
+      # keychain settings come from Matchfile
     )
 
     # 5. Build + Archive
