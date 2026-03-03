@@ -61,6 +61,30 @@ struct StudyEventEntry: Codable, Identifiable {
     var courseId: String?
 }
 
+// MARK: - Flashcard Stats API Response
+
+struct FlashcardStatsResponse: Codable {
+    var totalCards: Int = 0
+    var newCards: Int = 0
+    var youngCards: Int = 0
+    var matureCards: Int = 0
+    var totalReviews: Int = 0
+    var retentionRate: Double = 0.0
+    var streakDays: Int = 0
+    var totalStudyMinutes: Int = 0
+    var todayReviews: Int = 0
+    var reviewsPerDay: [String: Int] = [:]
+    var forecastNext7Days: [Int] = []
+    var dailyRetention: [DailyRetentionEntry] = []
+}
+
+struct DailyRetentionEntry: Codable, Identifiable {
+    var date: String = ""
+    var count: Int = 0
+    var retention: Double = 0.0
+    var id: String { date }
+}
+
 struct FlashcardDeckEntry: Codable, Identifiable {
     var id: String = ""
     var title: String = ""

@@ -81,6 +81,10 @@ actor VitaAPI {
         return try await client.get("study/flashcards", queryItems: items.isEmpty ? nil : items)
     }
 
+    func getFlashcardStats() async throws -> FlashcardStatsResponse {
+        try await client.get("study/flashcards/stats")
+    }
+
     func reviewFlashcard(cardId: String, rating: Int, responseTimeMs: Int64) async throws {
         let _: EmptyResponse = try await client.post(
             "study/flashcards/\(cardId)/review",
@@ -151,6 +155,18 @@ actor VitaAPI {
 
     func unregisterPushToken(token: String) async throws {
         try await client.delete("push/unregister")
+    }
+
+    // MARK: - Billing
+    // Mirrors Android: MedCoachApi.getBillingStatus / getCheckoutUrl
+    // Endpoints: GET billing/status, POST billing/checkout
+
+    func getBillingStatus() async throws -> BillingStatus {
+        try await client.get("billing/status")
+    }
+
+    func getCheckoutUrl(plan: String = "pro") async throws -> CheckoutResponse {
+        try await client.post("billing/checkout", body: CheckoutRequest(plan: plan))
     }
 
     // MARK: - Simulado

@@ -125,6 +125,35 @@ private struct InsightsContentView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
 
+                // ── Flashcard charts ───────────────────────────────────────────
+                if !vm.cardDistribution.isEmpty || !vm.retentionHistory.isEmpty {
+                    SectionHeader(title: "Flashcards")
+                        .padding(.top, 4)
+
+                    if !vm.cardDistribution.isEmpty {
+                        CardDistributionDonutView(categories: vm.cardDistribution)
+                            .padding(.horizontal, 16)
+                    }
+                    if !vm.forecastData.isEmpty {
+                        ForecastBarView(days: vm.forecastData)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 8)
+                    }
+                    if !vm.retentionHistory.isEmpty {
+                        RetentionChartView(points: vm.retentionHistory)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 8)
+                    }
+                }
+
+                // ── Study heatmap ──────────────────────────────────────────────
+                if !vm.studyHeatmap.isEmpty {
+                    SectionHeader(title: "Histórico")
+                        .padding(.top, 4)
+                    HeatmapCalendarView(days: vm.studyHeatmap)
+                        .padding(.horizontal, 16)
+                }
+
                 // ── Today's progress ───────────────────────────────────────────
                 if vm.todayTotal > 0 {
                     TodayProgressCard(

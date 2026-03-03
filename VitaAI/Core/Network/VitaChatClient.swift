@@ -7,15 +7,11 @@ actor VitaChatClient {
         self.tokenStore = tokenStore
     }
 
-    func streamChat(message: String, conversationId: String?) -> AsyncThrowingStream<SSEEvent, Error> {
+    func streamChat(message: String, conversationId: String?, voiceMode: Bool = false) -> AsyncThrowingStream<SSEEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
-                    guard var components = URLComponents(string: AppConfig.apiBaseURL + "/ai/chat") else {
-                        continuation.finish(throwing: APIError.invalidURL)
-                        return
-                    }
-                    guard let url = components.url else {
+                    guard let url = URL(string: AppConfig.apiBaseURL + "/ai/chat") else {
                         continuation.finish(throwing: APIError.invalidURL)
                         return
                     }
@@ -29,7 +25,7 @@ actor VitaChatClient {
                         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
                     }
 
-                    let body = ChatRequest(message: message, conversationId: conversationId)
+                    let body = ChatRequest(message: message, conversationId: conversationId, voiceMode: voiceMode ? true : nil)
                     request.httpBody = try JSONEncoder().encode(body)
 
                     let (bytes, response) = try await URLSession.shared.bytes(for: request)

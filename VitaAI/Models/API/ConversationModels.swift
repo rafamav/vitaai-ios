@@ -30,4 +30,6 @@ struct PushTokenRequest: Codable {
 struct ChatRequest: Codable {
     var message: String
     var conversationId: String?
+    /// Signals voice mode to the backend — matches Android's voiceMode flag.
+    var voiceMode: Bool?
 }

@@ -51,5 +51,9 @@
 	<array>
 		<string>arm64</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>A Vita IA usa o microfone para transcrever sua voz em texto.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>O reconhecimento de voz converte sua fala em perguntas para a Vita IA.</string>
 </dict>
 </plist>

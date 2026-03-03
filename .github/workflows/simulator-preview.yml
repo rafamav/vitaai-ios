@@ -49,6 +49,7 @@ jobs:
       - name: Build for Simulator
         run: |
           set -o pipefail
+          # Tee to build.log so full output is available on failure; filter for display
           xcodebuild build \
             -project VitaAI.xcodeproj \
             -scheme VitaAI \
@@ -57,27 +58,86 @@ jobs:
             -derivedDataPath build/sim \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            TARGETED_DEVICE_FAMILY=1 2>&1 | tail -50
+            TARGETED_DEVICE_FAMILY=1 2>&1 | tee build.log | \
+            grep -E "^(.*error:|.*warning:.*[Ee]rror|Build.*SUCCEEDED|Build.*FAILED|\*\* BUILD)" || true
+          # Surface full log on failure so errors are never truncated
+          if grep -q "\*\* BUILD FAILED \*\*" build.log; then
+            echo "::error::Build failed — full log follows"
+            grep -E "error:|Build.*FAILED" build.log | head -80
+            exit 1
+          fi
           echo "=== Build products ==="
           find build/sim/Build/Products -maxdepth 2 2>/dev/null || echo "Products dir not found"
 
       - name: Boot simulator & take screenshots
+        id: screenshots
+        continue-on-error: true
         run: |
+          set +e  # don't abort on failed taps — best-effort navigation
           DEVICE_ID=$(xcrun simctl list devices available | grep "iPhone 16" | grep -v "Plus\|Pro" | head -1 | grep -o '[A-F0-9-]\{36\}')
           echo "Device: $DEVICE_ID"
           xcrun simctl boot "$DEVICE_ID" || true
           sleep 5
 
-          echo "=== Searching for .app ==="
-          find build/sim/Build/Products -name "VitaAI.app" 2>/dev/null || find build/sim -name "*.app" 2>/dev/null | head -5
           APP_PATH=$(find build/sim/Build/Products -name "VitaAI.app" | head -1)
           echo "App: $APP_PATH"
           xcrun simctl install "$DEVICE_ID" "$APP_PATH"
-          xcrun simctl launch "$DEVICE_ID" com.bymav.vitaai
+
+          # Inject CI session via env vars — ProcessInfo.environment is read inside the sandbox.
+          # TokenStore reads VITA_CI_TOKEN as token fallback + marks onboarding done (DEBUG only).
+          xcrun simctl launch \
+            --env VITA_CI_TOKEN=demo-ci-token \
+            "$DEVICE_ID" com.bymav.vitaai
+          sleep 5  # wait for auth check + dashboard render
 
           mkdir -p screenshots
-          sleep 15  # wait for splash + login animation (image fade 1.5s + button stagger ~2s)
-          xcrun simctl io "$DEVICE_ID" screenshot screenshots/01-launch.png
+
+          snap() {
+            xcrun simctl io "$DEVICE_ID" screenshot "screenshots/$1.png" && echo "✓ $1" || echo "✗ $1 (skipped)"
+          }
+          tap() {
+            xcrun simctl ui "$DEVICE_ID" tap "$1" "$2" || true
+          }
+
+          # ── 01 Dashboard (logged in, XpBar + StreakBadge visíveis) ─────────────
+          snap "01-dashboard"
+
+          # ── 02 Estudos (tab — bottom bar) ─────────────────────────────────────
+          tap 97 870; sleep 3
+          snap "02-estudos"
+
+          # ── 03 FlashcardStats ──────────────────────────────────────────────────
+          tap 197 520; sleep 1
+          tap 197 650; sleep 3
+          snap "03-flashcard-stats"
+          tap 20 60; sleep 1
+
+          # ── 04 Insights (4 charts) ─────────────────────────────────────────────
+          tap 290 870; sleep 3
+          snap "04-insights-charts"
+
+          # ── 05 Trabalhos ───────────────────────────────────────────────────────
+          tap 97 870; sleep 1
+          tap 197 400; sleep 3
+          snap "05-trabalhos"
+
+          # ── 06 TrabalhoEditor (FAB) ────────────────────────────────────────────
+          tap 350 800; sleep 3
+          snap "06-trabalho-editor"
+          tap 20 60; sleep 1
+
+          # ── 07 Chat + VoiceInput ───────────────────────────────────────────────
+          tap 193 870; sleep 3
+          snap "07-chat-voice"
+
+          # ── 08 MindMap Editor ──────────────────────────────────────────────────
+          tap 290 870; sleep 1
+          tap 350 800; sleep 3
+          snap "08-mindmap-editor"
+
+          COUNT=$(ls screenshots/*.png 2>/dev/null | wc -l)
+          echo "=== Generated $COUNT screenshots ==="
+          ls -lh screenshots/
 
           xcrun simctl shutdown "$DEVICE_ID" || true
 
@@ -87,6 +147,7 @@ jobs:
           zip -r VitaAI-simulator.zip "$APP_PATH"
 
       - name: Upload screenshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: screenshots

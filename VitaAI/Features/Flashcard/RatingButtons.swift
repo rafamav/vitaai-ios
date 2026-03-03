@@ -28,7 +28,7 @@ struct RatingButtonsView: View {
     private let colorEasy  = Color(hex: 0x60A5FA)   // --data-blue  dark
 
     private func options() -> [RatingOption] {
-        let fmt = SM2Scheduler.formatInterval
+        let fmt = FsrsScheduler.formatInterval
 
         return [
             RatingOption(

@@ -36,6 +36,7 @@ struct MainTabView: View {
     @Bindable var router: Router
     let authManager: AuthManager
     @Environment(\.appContainer) private var container
+    @Environment(\.subscriptionStatus) private var subStatus
     @State private var showChat = false
 
     var body: some View {
@@ -68,11 +69,13 @@ struct MainTabView: View {
                             .tag(TabItem.home)
 
                             EstudosScreen(
-                                onNavigateToCanvasConnect:   { router.navigate(to: .canvasConnect) },
-                                onNavigateToNotebooks:        { router.navigate(to: .notebookList) },
-                                onNavigateToFlashcardSession: { deckId in router.navigate(to: .flashcardSession(deckId: deckId)) },
-                                onNavigateToPdfViewer:        { url in router.navigate(to: .pdfViewer(url: url.absoluteString)) },
-                                onNavigateToSimulados:        { router.navigate(to: .simuladoHome) }
+                                onNavigateToCanvasConnect:     { router.navigate(to: .canvasConnect) },
+                                onNavigateToNotebooks:          { router.navigate(to: .notebookList) },
+                                onNavigateToMindMaps:           { router.navigate(to: .mindMapList) },
+                                onNavigateToFlashcardSession:   { deckId in router.navigate(to: .flashcardSession(deckId: deckId)) },
+                                onNavigateToFlashcardStats:     { router.navigate(to: .flashcardStats) },
+                                onNavigateToPdfViewer:          { url in router.navigate(to: .pdfViewer(url: url.absoluteString)) },
+                                onNavigateToSimulados:          { router.navigate(to: .simuladoHome) }
                             )
                             .tag(TabItem.estudos)
 
@@ -85,7 +88,10 @@ struct MainTabView: View {
                                 onNavigateToAppearance:    { router.navigate(to: .appearance) },
                                 onNavigateToNotifications: { router.navigate(to: .notifications) },
                                 onNavigateToCanvasConnect: { router.navigate(to: .canvasConnect) },
-                                onNavigateToWebAluno:      { router.navigate(to: .webalunoConnect) }
+                                onNavigateToWebAluno:      { router.navigate(to: .webalunoConnect) },
+                                onNavigateToInsights:      { router.navigate(to: .insights) },
+                                onNavigateToTrabalhos:     { router.navigate(to: .trabalhos) },
+                                onNavigateToPaywall:       { router.navigate(to: .paywall) }
                             )
                             .tag(TabItem.profile)
                         }
@@ -99,6 +105,11 @@ struct MainTabView: View {
             }
             .ignoresSafeArea(.keyboard)
             .navigationBarHidden(true)
+            .task {
+                // Load subscription status once when the main tab appears.
+                // Subsequent refreshes happen when the user opens the paywall.
+                await subStatus.refresh()
+            }
             // MARK: - Route destinations
             .navigationDestination(for: Route.self) { route in
                 switch route {
@@ -117,6 +128,20 @@ struct MainTabView: View {
                         store: container.notebookStore,
                         onBack: { router.goBack() }
                     )
+                case .mindMapList:
+                    MindMapListView(
+                        store: container.mindMapStore,
+                        onBack: { router.goBack() },
+                        onOpenMindMap: { id in
+                            router.navigate(to: .mindMapEditor(id: id))
+                        }
+                    )
+                case .mindMapEditor(let id):
+                    MindMapEditorView(
+                        mindMapId: id,
+                        store: container.mindMapStore,
+                        onBack: { router.goBack() }
+                    )
                 case .pdfViewer(let urlString):
                     if let url = URL(string: urlString) {
                         PdfViewerScreen(url: url, onBack: { router.goBack() })
@@ -129,6 +154,8 @@ struct MainTabView: View {
                         onBack: { router.goBack() },
                         onFinished: { router.goBack() }
                     )
+                case .flashcardStats:
+                    FlashcardStatsView(onBack: { router.goBack() })
                 case .simuladoHome:
                     SimuladoHomeScreen(
                         onBack: { router.goBack() },
@@ -182,12 +209,18 @@ struct MainTabView: View {
                     WebAlunoConnectScreen(
                         onBack: { router.goBack() }
                     )
+                case .insights:
+                    InsightsScreen()
+                case .trabalhos:
+                    TrabalhoScreen()
                 case .about:
                     AboutScreen()
                 case .appearance:
                     AppearanceScreen()
                 case .notifications:
                     NotificationSettingsScreen()
+                case .paywall:
+                    PaywallScreen()
                 default:
                     EmptyView()
                 }

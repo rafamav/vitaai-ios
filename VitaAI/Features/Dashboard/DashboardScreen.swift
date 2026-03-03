@@ -3,6 +3,7 @@ import SwiftUI
 struct DashboardScreen: View {
     @Environment(\.appContainer) private var container
     @State private var viewModel: DashboardViewModel?
+    @State private var xpToastState = VitaXpToastState()
 
     // Navigation callbacks injected by AppRouter
     var onNavigateToFlashcards: (() -> Void)?
@@ -24,6 +25,8 @@ struct DashboardScreen: View {
                 Task { await viewModel?.loadDashboard() }
             }
         }
+        // XP toast overlay — anchored to top of screen, above all content
+        .vitaXpToastHost(xpToastState)
     }
 
     @ViewBuilder
@@ -33,6 +36,28 @@ struct DashboardScreen: View {
                 // Greeting Card with progress ring
                 if let progress = viewModel.progress {
                     GreetingCard(progress: progress)
+                }
+
+                // XP Bar — level progress + daily goal
+                if let userProgress = viewModel.userProgress {
+                    VitaGlassCard {
+                        VStack(spacing: 8) {
+                            // Header row: title + streak badge
+                            HStack {
+                                Text("Progresso")
+                                    .font(VitaTypography.labelLarge)
+                                    .foregroundColor(VitaColors.textSecondary)
+                                Spacer()
+                                VitaStreakBadge(streak: userProgress.currentStreak, size: .sm)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+
+                            VitaXpBar(userProgress: userProgress)
+                        }
+                        .padding(.bottom, 4)
+                    }
+                    .padding(.horizontal, 20)
                 }
 
                 // Upcoming Exams
@@ -61,6 +86,16 @@ struct DashboardScreen: View {
                             }
                         }
                     )
+                }
+
+                // Achievements section
+                if let userProgress = viewModel.userProgress, !userProgress.badges.isEmpty {
+                    SectionHeader(title: "Conquistas")
+                    VitaGlassCard {
+                        VitaBadgeGrid(badges: userProgress.badges)
+                            .padding(16)
+                    }
+                    .padding(.horizontal, 20)
                 }
 
                 // Study Tip

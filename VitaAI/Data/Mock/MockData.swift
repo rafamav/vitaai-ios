@@ -79,4 +79,46 @@ enum MockData {
         let dayIndex = Calendar.current.ordinality(of: .day, in: .year, for: Date()) ?? 0
         return tips[dayIndex % tips.count]
     }
+
+    // MARK: - Gamification
+
+    static func userProgress() -> UserProgress {
+        let now = Date()
+        return UserProgress(
+            totalXp: 1_250,
+            level: 5,
+            currentLevelXp: 400,
+            xpToNextLevel: 450,
+            currentStreak: 7,
+            longestStreak: 14,
+            streakFreezes: 1,
+            badges: badges(),
+            totalCardsReviewed: 245,
+            totalChatMessages: 18,
+            totalNotesCreated: 6,
+            dailyXp: 35,
+            dailyGoal: 50,
+            dailyLoginClaimed: true
+        )
+    }
+
+    static func badges() -> [VitaBadge] {
+        let now = Date()
+        let cal = Calendar.current
+        return [
+            VitaBadge(id: "first_review",  name: "Primeira Revisão",   description: "Complete sua primeira sessão de flashcards.",    icon: "rectangle.stack.fill",  earnedAt: cal.date(byAdding: .day, value: -10, to: now), category: .cards),
+            VitaBadge(id: "streak_3",      name: "3 Dias Seguidos",    description: "Mantenha uma sequência de 3 dias.",              icon: "flame.fill",            earnedAt: cal.date(byAdding: .day, value: -4, to: now),  category: .streak),
+            VitaBadge(id: "streak_7",      name: "Semana Perfeita",    description: "Mantenha uma sequência de 7 dias.",              icon: "flame.fill",            earnedAt: now,                                           category: .streak),
+            VitaBadge(id: "streak_30",     name: "Mês Dedicado",       description: "Mantenha uma sequência de 30 dias.",             icon: "flame.fill",            earnedAt: nil,                                           category: .streak),
+            VitaBadge(id: "cards_100",     name: "Centurião",          description: "Revise 100 flashcards.",                        icon: "100.circle.fill",       earnedAt: cal.date(byAdding: .day, value: -2, to: now),  category: .cards),
+            VitaBadge(id: "cards_500",     name: "Mestre dos Cards",   description: "Revise 500 flashcards.",                        icon: "star.circle.fill",      earnedAt: nil,                                           category: .cards),
+            VitaBadge(id: "cards_1000",    name: "Lenda",              description: "Revise 1000 flashcards.",                       icon: "trophy.fill",           earnedAt: nil,                                           category: .cards),
+            VitaBadge(id: "level_5",       name: "Estudante Dedicado", description: "Alcance o nível 5.",                            icon: "graduationcap.fill",    earnedAt: now,                                           category: .milestone),
+            VitaBadge(id: "level_10",      name: "Residente",          description: "Alcance o nível 10.",                           icon: "cross.case.fill",       earnedAt: nil,                                           category: .milestone),
+            VitaBadge(id: "first_note",    name: "Anotador",           description: "Crie sua primeira nota.",                       icon: "note.text",             earnedAt: cal.date(byAdding: .day, value: -6, to: now),  category: .study),
+            VitaBadge(id: "first_chat",    name: "Curioso",            description: "Envie sua primeira mensagem para Vita.",        icon: "bubble.left.fill",      earnedAt: cal.date(byAdding: .day, value: -8, to: now),  category: .social),
+            VitaBadge(id: "night_owl",     name: "Coruja",             description: "Estude após as 22h.",                           icon: "moon.fill",             earnedAt: nil,                                           category: .study),
+            VitaBadge(id: "early_bird",    name: "Madrugador",         description: "Estude antes das 7h.",                          icon: "sunrise.fill",          earnedAt: nil,                                           category: .study),
+        ]
+    }
 }

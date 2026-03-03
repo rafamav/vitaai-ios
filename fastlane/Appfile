@@ -1,0 +1,16 @@
+# Fastlane App Configuration
+
+# Apple ID (App Store Connect)
+apple_id ENV["APPLE_ID"] || "seu-email@bymav.com"
+
+# Developer Portal Team ID (10 caracteres)
+team_id ENV["TEAM_ID"] || "YOUR_TEAM_ID"
+
+# App Store Connect Team ID (se diferente)
+itc_team_id ENV["ITC_TEAM_ID"] || ENV["TEAM_ID"]
+
+# Bundle Identifier
+app_identifier "com.bymav.vitaai"
+
+# Para múltiplos apps (se necessário)
+# app_identifier(["com.bymav.vitaai", "com.bymav.vitaai.widget"])

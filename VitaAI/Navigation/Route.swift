@@ -14,7 +14,10 @@ enum Route: Hashable {
     case vitaChat(prompt: String? = nil)
     case notebookList
     case notebookEditor(notebookId: String)
+    case mindMapList
+    case mindMapEditor(id: String)
     case flashcardSession(deckId: String)
+    case flashcardStats
     case pdfViewer(url: String)
 
     // MARK: - Simulado
@@ -29,4 +32,7 @@ enum Route: Hashable {
     case about
     case appearance
     case notifications
+
+    // MARK: - Billing
+    case paywall
 }
