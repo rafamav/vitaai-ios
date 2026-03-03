@@ -34,10 +34,24 @@ jobs:
           mkdir -p ./fastlane/keys
           echo '${{ secrets.ASC_KEY_CONTENT }}' > ./fastlane/keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
 
-      - run: |
-          security create-keychain -p "${{ secrets.MATCH_KEYCHAIN_PASSWORD }}" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "${{ secrets.MATCH_KEYCHAIN_PASSWORD }}" build.keychain
+      - name: Setup Keychain (fix codesign hang)
+        run: |
+          # Delete keychain if exists
+          security delete-keychain build.keychain-db || true
+
+          # Create with EMPTY password (critical for CI)
+          security create-keychain -p "" build.keychain-db
+
+          # Unlock permanently (no timeout)
+          security unlock-keychain -p "" build.keychain-db
+          security set-keychain-settings build.keychain-db
+
+          # Set as default
+          security list-keychains -d user -s build.keychain-db
+          security default-keychain -s build.keychain-db
+
+          # Allow codesign to access WITHOUT password prompt
+          security set-key-partition-list -S apple-tool:,apple: -k "" build.keychain-db
 
       - run: xcodegen generate
 
