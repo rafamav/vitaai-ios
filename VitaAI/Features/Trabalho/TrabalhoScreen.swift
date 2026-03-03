@@ -6,6 +6,10 @@ struct TrabalhoScreen: View {
     @Environment(\.appContainer) private var container
     @State private var viewModel: TrabalhoViewModel?
 
+    // Editor navigation state
+    @State private var showEditor: Bool = false
+    @State private var editorAssignmentId: String? = nil
+
     private let segments = ["Tarefas", "Notas"]
 
     var body: some View {
@@ -23,28 +27,67 @@ struct TrabalhoScreen: View {
                 Task { await viewModel?.load() }
             }
         }
+        .fullScreenCover(isPresented: $showEditor) {
+            TrabalhoEditorView(
+                assignmentId: editorAssignmentId,
+                templateId: editorAssignmentId == nil ? nil : nil,
+                onDismiss: {
+                    showEditor = false
+                    editorAssignmentId = nil
+                }
+            )
+        }
     }
 
     // MARK: - Content
 
     @ViewBuilder
     private func content(vm: TrabalhoViewModel) -> some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 16) {
-                segmentControl(vm: vm)
+        ZStack(alignment: .bottomTrailing) {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 16) {
+                    segmentControl(vm: vm)
 
-                if vm.selectedSegment == 0 {
-                    assignmentsContent(vm: vm)
-                } else {
-                    gradesContent(vm: vm)
+                    if vm.selectedSegment == 0 {
+                        assignmentsContent(vm: vm)
+                    } else {
+                        gradesContent(vm: vm)
+                    }
+
+                    Spacer().frame(height: 100)
                 }
-
-                Spacer().frame(height: 100)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
+            .refreshable { await vm.load() }
+
+            // FAB — Novo Trabalho (only on Tarefas tab)
+            if vm.selectedSegment == 0 {
+                Button {
+                    editorAssignmentId = nil
+                    showEditor = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(VitaColors.surface)
+                        .frame(width: 52, height: 52)
+                        .background(
+                            LinearGradient(
+                                colors: [VitaColors.accent, VitaColors.accentDark],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .clipShape(Circle())
+                        .shadow(color: VitaColors.accent.opacity(0.4), radius: 12, x: 0, y: 4)
+                }
+                .padding(.trailing, 20)
+                .padding(.bottom, 24)
+                .sensoryFeedback(.selection, trigger: showEditor)
+                .transition(.scale.combined(with: .opacity))
+                .animation(.spring(duration: 0.3), value: vm.selectedSegment)
+            }
         }
-        .refreshable { await vm.load() }
     }
 
     // MARK: - Segment Control
@@ -100,7 +143,13 @@ struct TrabalhoScreen: View {
             } else {
                 VStack(spacing: 8) {
                     ForEach(vm.sortedAssignments) { assignment in
-                        AssignmentRow(assignment: assignment)
+                        Button {
+                            editorAssignmentId = assignment.id
+                            showEditor = true
+                        } label: {
+                            AssignmentRow(assignment: assignment)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }

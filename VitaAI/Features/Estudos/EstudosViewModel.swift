@@ -6,13 +6,15 @@ import SwiftUI
 enum EstudosTab: Int, CaseIterable {
     case disciplinas = 0
     case notebooks   = 1
-    case flashcards  = 2
-    case pdfs        = 3
+    case mindMaps    = 2
+    case flashcards  = 3
+    case pdfs        = 4
 
     var title: String {
         switch self {
         case .disciplinas: return "Disciplinas"
         case .notebooks:   return "Notebooks"
+        case .mindMaps:    return "Mapas"
         case .flashcards:  return "Flashcards"
         case .pdfs:        return "PDFs"
         }

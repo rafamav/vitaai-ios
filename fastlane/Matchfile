@@ -1,0 +1,22 @@
+# Fastlane Match Configuration
+# Gerencia certificados/provisioning profiles via git repository
+
+git_url("https://github.com/rafamav/vitaai-certificates")
+
+storage_mode("git")
+
+type("appstore") # appstore, adhoc, development, enterprise
+
+app_identifier(["com.bymav.vitaai"])
+
+username(ENV["APPLE_ID"] || "seu-email@bymav.com")
+
+# Team ID
+team_id(ENV["TEAM_ID"] || "YOUR_TEAM_ID")
+
+# Keychain (para CI/CD)
+keychain_name("build.keychain-db")
+keychain_password(ENV["MATCH_KEYCHAIN_PASSWORD"] || "")  # Use env password for partition list
+
+# Para usar App Store Connect API (sem senha)
+# api_key_path("./fastlane/AppStoreAPIKey.json")

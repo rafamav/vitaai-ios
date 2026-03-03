@@ -81,6 +81,10 @@ actor VitaAPI {
         return try await client.get("study/flashcards", queryItems: items.isEmpty ? nil : items)
     }
 
+    func getFlashcardStats() async throws -> FlashcardStatsResponse {
+        try await client.get("study/flashcards/stats")
+    }
+
     func reviewFlashcard(cardId: String, rating: Int, responseTimeMs: Int64) async throws {
         let _: EmptyResponse = try await client.post(
             "study/flashcards/\(cardId)/review",

@@ -25,7 +25,11 @@ actor TokenStore {
     // MARK: - Token
 
     var token: String? {
-        keychain.read(key: Keys.sessionToken)
+        #if DEBUG
+        // CI mode: xcrun simctl launch --env VITA_CI_TOKEN=xxx injects env var into the process
+        if let ciToken = ProcessInfo.processInfo.environment["VITA_CI_TOKEN"] { return ciToken }
+        #endif
+        return keychain.read(key: Keys.sessionToken)
     }
 
     var isLoggedIn: Bool {
@@ -33,7 +37,10 @@ actor TokenStore {
     }
 
     var isOnboarded: Bool {
-        defaults.bool(forKey: Keys.isOnboarded)
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["VITA_CI_TOKEN"] != nil { return true }
+        #endif
+        return defaults.bool(forKey: Keys.isOnboarded)
     }
 
     // MARK: - User Info

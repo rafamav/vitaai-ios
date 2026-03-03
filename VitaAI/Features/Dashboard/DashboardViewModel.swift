@@ -6,6 +6,7 @@ final class DashboardViewModel {
     private let api: VitaAPI
 
     var progress: DashboardProgress?
+    var userProgress: UserProgress?
     var upcomingExams: [UpcomingExam] = []
     var weekDays: [WeekDay] = []
     var studyModules: [StudyModule] = []
@@ -58,6 +59,7 @@ final class DashboardViewModel {
 
     private func loadMockData() {
         progress = MockData.dashboardProgress()
+        userProgress = MockData.userProgress()
         upcomingExams = MockData.upcomingExams()
         weekDays = MockData.weekDays()
         studyModules = MockData.studyModules()

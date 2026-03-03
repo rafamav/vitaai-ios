@@ -5,6 +5,20 @@ import SwiftData
 struct VitaAIApp: App {
     @StateObject private var container = AppContainer()
 
+    init() {
+        #if DEBUG
+        // CI screenshot mode: inject demo session before AppContainer boots
+        // so AuthManager finds a valid token on first checkLoginStatus().
+        // Launch via: xcrun simctl launch <device> com.bymav.vitaai --vita-demo-login
+        if CommandLine.arguments.contains("--vita-demo-login") {
+            KeychainHelper.shared.save(key: "vita_session_token", value: "demo-ci-token")
+            UserDefaults.standard.set("Estudante CI", forKey: "vita_user_name")
+            UserDefaults.standard.set("ci@vitaai.app", forKey: "vita_user_email")
+            UserDefaults.standard.set(true, forKey: "vita_is_onboarded")
+        }
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             AppRouter(authManager: container.authManager)

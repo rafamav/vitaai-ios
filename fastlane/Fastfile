@@ -1,0 +1,199 @@
+# Fastlane Configuration for VitaAI iOS
+# Automates: Build → Archive → Upload TestFlight
+
+default_platform(:ios)
+
+platform :ios do
+  # =====================================
+  # CONFIGURAÇÕES
+  # =====================================
+
+  # App Info
+  app_identifier = "com.bymav.vitaai"
+  app_name = "VitaAI"
+  project = "VitaAI.xcodeproj"
+  scheme = "VitaAI"
+
+  # Build Settings
+  output_directory = "./build"
+
+  # =====================================
+  # LANES (Comandos)
+  # =====================================
+
+  # Lane: Setup inicial
+  desc "Setup project (primeira vez)"
+  lane :setup do
+    # Gerar xcodeproj com xcodegen
+    sh("cd .. && xcodegen generate")
+
+    # Instalar dependências (se houver CocoaPods)
+    # cocoapods
+
+    UI.success("✅ Setup completo! Próximo passo: configurar credenciais Apple")
+    UI.message("Execute: fastlane match appstore")
+  end
+
+  # Lane: Configurar certificados/provisioning (Code Signing)
+  desc "Configure code signing via Match"
+  lane :certificates do
+    match(
+      type: "appstore",
+      app_identifier: app_identifier,
+      readonly: false
+    )
+
+    UI.success("✅ Certificados configurados!")
+  end
+
+  # Lane: Incrementar build number automaticamente
+  desc "Increment build number"
+  lane :bump do
+    increment_build_number(
+      xcodeproj: project
+    )
+
+    current_build = get_build_number(xcodeproj: project)
+    UI.success("✅ Build number: #{current_build}")
+  end
+
+  # Lane: Build local (teste de compilação)
+  desc "Build app locally (test compilation)"
+  lane :build do
+    # Gerar xcodeproj
+    sh("cd .. && xcodegen generate")
+
+    # Build (sem archive)
+    build_app(
+      scheme: scheme,
+      project: project,
+      configuration: "Release",
+      skip_archive: true,
+      clean: true
+    )
+
+    UI.success("✅ Build local OK!")
+  end
+
+  # Lane: TestFlight COMPLETO (build + upload)
+  desc "Build and upload to TestFlight"
+  lane :beta do
+    # 1. Configurar API Key (se disponível) - para Match e TestFlight
+    if ENV['ASC_KEY_ID'] && ENV['ASC_ISSUER_ID']
+      UI.message("🔑 Configurando App Store Connect API Key...")
+      app_store_connect_api_key(
+        key_id: ENV['ASC_KEY_ID'],
+        issuer_id: ENV['ASC_ISSUER_ID'],
+        key_filepath: "./fastlane/keys/AuthKey_#{ENV['ASC_KEY_ID']}.p8",
+        in_house: false
+      )
+    end
+
+    # 2. Gerar xcodeproj
+    UI.message("🔨 Gerando Xcode project...")
+    sh("cd .. && xcodegen generate")
+
+    # 3. Incrementar build number
+    UI.message("📈 Incrementando build number...")
+    increment_build_number(xcodeproj: project)
+    current_build = get_build_number(xcodeproj: project)
+    current_version = get_version_number(xcodeproj: project, target: app_name)
+
+    # 4. Code signing (certificates + provisioning profiles)
+    UI.message("🔐 Configurando code signing...")
+    match(
+      type: "appstore",
+      app_identifier: app_identifier,
+      readonly: false  # false na primeira vez para criar certificados
+      # keychain settings come from Matchfile
+    )
+
+    # 5. Build + Archive
+    UI.message("🏗️  Building and archiving...")
+    build_app(
+      scheme: scheme,
+      project: project,
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: output_directory,
+      clean: true,
+      xcargs: "DEVELOPMENT_TEAM=#{ENV['TEAM_ID']}",
+      export_options: {
+        teamID: ENV['TEAM_ID'],
+        provisioningProfiles: {
+          app_identifier => "match AppStore #{app_identifier}"
+        }
+      }
+    )
+
+    # 6. Upload para TestFlight
+    UI.message("📤 Uploading to TestFlight...")
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true,
+      distribute_external: false,
+      notify_external_testers: false,
+      changelog: "Build #{current_build}\n\n✅ MindMap feature completa\n✅ Canvas pan/zoom/drag\n✅ Paleta 8 cores"
+    )
+
+    # 7. Commit build number increment
+    UI.message("💾 Commitando build number...")
+    commit_version_bump(
+      message: "chore(ios): bump build to #{current_build} for TestFlight",
+      xcodeproj: project,
+      force: true
+    )
+
+    # 8. Push para git
+    push_to_git_remote(
+      remote: "origin",
+      local_branch: "main",
+      remote_branch: "main"
+    )
+
+    UI.success("🎉 SUCESSO! Build #{current_version} (#{current_build}) no TestFlight!")
+    UI.success("App Store Connect: https://appstoreconnect.apple.com")
+  end
+
+  # Lane: Screenshots automáticos (Snapshot)
+  desc "Generate screenshots"
+  lane :screenshots do
+    capture_screenshots(
+      scheme: "VitaAIUITests"
+    )
+
+    UI.success("✅ Screenshots gerados!")
+  end
+
+  # Lane: Testes automatizados
+  desc "Run tests"
+  lane :test do
+    run_tests(
+      scheme: scheme,
+      devices: ["iPhone 15 Pro"],
+      clean: true
+    )
+
+    UI.success("✅ Testes passaram!")
+  end
+
+  # Lane: Release completo (testes + build + upload)
+  desc "Full release: test → build → upload TestFlight"
+  lane :release do
+    # 1. Rodar testes
+    test
+
+    # 2. Upload TestFlight
+    beta
+
+    UI.success("🚀 Release completo!")
+  end
+
+  # =====================================
+  # HELPERS
+  # =====================================
+
+  # Error handling
+  error do |lane, exception|
+    UI.error("❌ Erro em #{lane}: #{exception.message}")
+  end
+end

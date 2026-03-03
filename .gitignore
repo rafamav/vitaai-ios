@@ -30,3 +30,8 @@ Pods/
 .DS_Store
 *.swp
 *~
+.env
+*.ipa
+*.dSYM.zip
+build/
+fastlane/keys/

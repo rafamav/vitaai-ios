@@ -206,16 +206,18 @@ private struct MessageBubble: View {
             if message.content.isEmpty && isStreaming {
                 // Typing indicator: three pulsing dots
                 TypingIndicator()
-            } else {
-                // Message text with optional streaming cursor
+                    .padding(.vertical, 4)
+            } else if isStreaming {
+                // During streaming: plain text + cursor (avoid re-parsing markdown mid-stream)
                 (Text(message.content)
                     .font(VitaTypography.bodyMedium)
                     .foregroundStyle(VitaColors.textPrimary)
-                + (isStreaming
-                    ? Text(cursorVisible ? " |" : "  ")
-                        .font(VitaTypography.bodyMedium)
-                        .foregroundStyle(VitaColors.accent)
-                    : Text("")))
+                + Text(cursorVisible ? " |" : "  ")
+                    .font(VitaTypography.bodyMedium)
+                    .foregroundStyle(VitaColors.accent))
+            } else {
+                // Finished: render full Markdown
+                VitaMarkdown(content: message.content)
             }
         }
         .padding(.horizontal, 14)
@@ -367,36 +369,60 @@ private struct ChatInputBar: View {
     let viewModel: ChatViewModel
     var isInputFocused: FocusState<Bool>.Binding
 
+    @State private var isListening: Bool = false
+
     var body: some View {
         VStack(spacing: 0) {
             Divider()
                 .background(VitaColors.surfaceBorder)
 
             HStack(spacing: 10) {
-                TextField("Pergunte para a Vita...", text: Binding(
-                    get: { viewModel.inputText },
-                    set: { viewModel.inputText = $0 }
-                ), axis: .vertical)
+                TextField(
+                    isListening ? "Ouvindo..." : "Pergunte para a Vita...",
+                    text: Binding(
+                        get: { viewModel.inputText },
+                        set: { viewModel.inputText = $0 }
+                    ),
+                    axis: .vertical
+                )
                 .font(VitaTypography.bodyMedium)
                 .foregroundStyle(VitaColors.textPrimary)
                 .tint(VitaColors.accent)
                 .lineLimit(1...5)
                 .focused(isInputFocused)
                 .submitLabel(.send)
+                .disabled(isListening)
                 .onSubmit {
                     Task { await viewModel.send() }
+                }
+
+                // Mic button — appends transcribed text to input
+                VitaMicButton(isListening: $isListening) { transcribed in
+                    if viewModel.inputText.isEmpty {
+                        viewModel.inputText = transcribed
+                    } else {
+                        viewModel.inputText += " " + transcribed
+                    }
                 }
 
                 SendButton(viewModel: viewModel)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(VitaColors.surfaceElevated)
+            .background(
+                isListening
+                    ? VitaColors.dataRed.opacity(0.06)
+                    : VitaColors.surfaceElevated
+            )
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(VitaColors.glassBorder, lineWidth: 1)
+                    .stroke(
+                        isListening ? VitaColors.dataRed.opacity(0.25) : VitaColors.glassBorder,
+                        lineWidth: 1
+                    )
             )
+            .animation(.easeInOut(duration: 0.2), value: isListening)
             .padding(.horizontal, 16)
             .padding(.top, 10)
             .padding(.bottom, 12)

@@ -30,19 +30,21 @@ targets:
         PRODUCT_NAME: VitaAI
         PRODUCT_BUNDLE_IDENTIFIER: com.bymav.vitaai
         DEVELOPMENT_TEAM: $(DEVELOPMENT_TEAM)
-        CODE_SIGN_STYLE: Automatic
         INFOPLIST_FILE: VitaAI/Info.plist
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        SWIFT_OPTIMIZATION_LEVEL: "-Onone"
         ENABLE_PREVIEWS: YES
       configs:
         Debug:
+          CODE_SIGN_STYLE: Automatic
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
           SWIFT_OPTIMIZATION_LEVEL: "-Onone"
           DEBUG_INFORMATION_FORMAT: dwarf
         Release:
+          CODE_SIGN_STYLE: Manual
+          PROVISIONING_PROFILE_SPECIFIER: "match AppStore com.bymav.vitaai"
+          CODE_SIGN_IDENTITY: "Apple Distribution"
           SWIFT_OPTIMIZATION_LEVEL: "-O"
           DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
           VALIDATE_PRODUCT: YES
