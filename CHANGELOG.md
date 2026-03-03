@@ -401,4 +401,16 @@ Minimal GitHub Actions workflow for iOS build without Mac.
 - Update changelog
 - Update changelog
 - Update changelog
+- Update changelog
+- *(ios)* Add Sentry error tracking (BYM-190) (#5)
+* fix(design-system): add Tokens.swift + fix VitaColors drift
+
+  - Add DesignSystem/Tokens.swift (VitaTokens) — auto-generated from
+    packages/design-tokens, now lives inside the iOS project
+  - VitaColors.swift: replace all Color(hex:) with VitaTokens.* references
+    Eliminates hardcoded color drift. Glass opacities (0.025/0.04/0.06) kept
+    as-is (no exact token equivalent, intentional)
+
+  New tokens now available: cyan300, indigo400, glowB, glowC,
+  bgSubtle, borderSurface
 
