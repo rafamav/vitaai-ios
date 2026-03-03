@@ -93,7 +93,7 @@ platform :ios do
     match(
       type: "appstore",
       app_identifier: app_identifier,
-      readonly: true
+      readonly: false  # false na primeira vez para criar certificados, depois pode mudar para true
     )
 
     # 4. Build + Archive
