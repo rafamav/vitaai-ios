@@ -34,3 +34,4 @@ Pods/
 *.ipa
 *.dSYM.zip
 build/
+fastlane/keys/

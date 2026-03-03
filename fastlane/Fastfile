@@ -112,8 +112,19 @@ platform :ios do
       }
     )
 
-    # 5. Upload para TestFlight
+    # 5. Upload para TestFlight (usando App Store Connect API Key)
     UI.message("📤 Uploading to TestFlight...")
+
+    # Configurar API Key se disponível (mais seguro que app-specific password)
+    if ENV['ASC_KEY_ID'] && ENV['ASC_ISSUER_ID']
+      app_store_connect_api_key(
+        key_id: ENV['ASC_KEY_ID'],
+        issuer_id: ENV['ASC_ISSUER_ID'],
+        key_filepath: "./fastlane/keys/AuthKey_#{ENV['ASC_KEY_ID']}.p8",
+        in_house: false
+      )
+    end
+
     upload_to_testflight(
       skip_waiting_for_build_processing: true,
       distribute_external: false,

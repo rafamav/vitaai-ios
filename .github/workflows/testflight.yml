@@ -23,15 +23,19 @@ jobs:
           TEAM_ID=${{ secrets.TEAM_ID }}
           MATCH_PASSWORD=${{ secrets.MATCH_PASSWORD }}
           MATCH_KEYCHAIN_PASSWORD=${{ secrets.MATCH_KEYCHAIN_PASSWORD }}
+          ASC_KEY_ID=${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID=${{ secrets.ASC_ISSUER_ID }}
           EOF
-      
+
+      - run: |
+          mkdir -p ./fastlane/keys
+          echo '${{ secrets.ASC_KEY_CONTENT }}' > ./fastlane/keys/AuthKey_${{ secrets.ASC_KEY_ID }}.p8
+
       - run: |
           security create-keychain -p "${{ secrets.MATCH_KEYCHAIN_PASSWORD }}" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "${{ secrets.MATCH_KEYCHAIN_PASSWORD }}" build.keychain
-      
+
       - run: xcodegen generate
-      
-      - env:
-          FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.APP_SPECIFIC_PASSWORD }}
-        run: fastlane beta
+
+      - run: fastlane beta
