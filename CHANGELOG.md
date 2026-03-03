@@ -360,6 +360,17 @@ Implements P3 gamification components ported from Android VitaXpBar.kt,
 
   New tokens now available: cyan300, indigo400, glowB, glowC,
   bgSubtle, borderSurface
+- *(ios)* Wire Insights/Trabalhos nav + upgrade SM-2 to FSRS-5 [BYM-187, BYM-188] (#4)
+* fix(design-system): add Tokens.swift + fix VitaColors drift
+
+  - Add DesignSystem/Tokens.swift (VitaTokens) — auto-generated from
+    packages/design-tokens, now lives inside the iOS project
+  - VitaColors.swift: replace all Color(hex:) with VitaTokens.* references
+    Eliminates hardcoded color drift. Glass opacities (0.025/0.04/0.06) kept
+    as-is (no exact token equivalent, intentional)
+
+  New tokens now available: cyan300, indigo400, glowB, glowC,
+  bgSubtle, borderSurface
 
 ### Miscellaneous
 
@@ -387,6 +398,7 @@ Minimal GitHub Actions workflow for iOS build without Mac.
 
   New tokens now available: cyan300, indigo400, glowB, glowC,
   bgSubtle, borderSurface
+- Update changelog
 - Update changelog
 - Update changelog
 
