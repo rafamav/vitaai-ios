@@ -3,17 +3,80 @@ name: Simulator Preview
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: simulator
+  group: simulator-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  pre-check:
+    name: Pre-check (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect duplicate Swift filenames
+        run: |
+          DUPES=$(find VitaAI -name "*.swift" -exec basename {} \; | sort | uniq -d)
+          if [ -n "$DUPES" ]; then
+            echo "::error::Duplicate Swift filenames — causa build failure:"
+            for f in $DUPES; do
+              find VitaAI -name "$f" | while read p; do echo "  $p"; done
+            done
+            exit 1
+          fi
+          echo "✓ Sem filenames duplicados"
+
+      - name: Check VitaButton API (text: não label:)
+        run: |
+          if grep -rn 'VitaButton(label:' --include="*.swift" VitaAI/; then
+            echo "::error::VitaButton usa 'text:' não 'label:'. Corrigir as chamadas acima."
+            exit 1
+          fi
+          echo "✓ VitaButton API ok"
+
+      - name: Check VitaButton argument order (action: antes de variant:/isEnabled:)
+        run: |
+          # Detecta padrão errado: VitaButton(text: "...", variant: ...)
+          if grep -rn 'VitaButton(text:.*variant:' --include="*.swift" VitaAI/ | grep -v 'action:'; then
+            echo "::error::VitaButton: 'action:' deve preceder 'variant:' e 'isEnabled:'"
+            exit 1
+          fi
+          echo "✓ VitaButton argument order ok"
+
+      - name: Check guard-let in @ViewBuilder
+        run: |
+          # guard let + return dentro de @ViewBuilder não compila
+          if grep -rn -A2 '@ViewBuilder' --include="*.swift" VitaAI/ | grep -q 'guard let.*else'; then
+            echo "::warning::Possível guard-let em @ViewBuilder detectado. Usar if-let em vez disso."
+          fi
+          echo "✓ @ViewBuilder check ok"
+
+      - name: Verify AppContainer registers all new clients
+        run: |
+          # Todo arquivo *Client.swift deve ter correspondência em AppContainer
+          CLIENTS=$(find VitaAI/Core/Network -name "*Client.swift" -exec basename {} .swift \;)
+          MISSING=""
+          for c in $CLIENTS; do
+            if ! grep -q "$c" VitaAI/Core/DI/AppContainer.swift; then
+              MISSING="$MISSING $c"
+            fi
+          done
+          if [ -n "$MISSING" ]; then
+            echo "::error::Clients não registrados no AppContainer:$MISSING"
+            exit 1
+          fi
+          echo "✓ AppContainer registra todos os clients"
+
   screenshots:
     name: Screenshots & App Bundle
     runs-on: macos-14
     timeout-minutes: 30
+    needs: pre-check
 
     steps:
       - name: Checkout
