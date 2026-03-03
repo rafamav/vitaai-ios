@@ -1,85 +1,37 @@
-name: Build & Deploy to TestFlight
+name: Deploy TestFlight
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
-concurrency:
-  group: testflight
-  cancel-in-progress: true
-
 jobs:
-  build:
-    name: Build & Upload
+  deploy:
     runs-on: macos-14
     timeout-minutes: 60
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Select Xcode
-        run: |
-          sudo xcode-select -switch /Applications/Xcode_16.2.app || \
-          sudo xcode-select -switch /Applications/Xcode_15.4.app || \
-          sudo xcode-select -switch $(ls -d /Applications/Xcode*.app | tail -1)
-          xcodebuild -version
-
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Generate Xcode project
-        run: |
-          xcodegen generate --spec project.yml
-          ls -la *.xcodeproj/
-
-      - name: Generate app icon
-        run: |
-          python3 - <<'EOF'
-          import struct, zlib, os
-          def png(w, h, r, g, b):
-              def chunk(t, d):
-                  c = zlib.crc32(t + d) & 0xffffffff
-                  return struct.pack('>I', len(d)) + t + d + struct.pack('>I', c)
-              ihdr = struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0)
-              raw = b''.join(b'\x00' + bytes([r,g,b]*w) for _ in range(h))
-              return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR',ihdr) + chunk(b'IDAT',zlib.compress(raw)) + chunk(b'IEND',b'')
-          os.makedirs('VitaAI/Assets.xcassets/AppIcon.appiconset', exist_ok=True)
-          open('VitaAI/Assets.xcassets/AppIcon.appiconset/icon-1024.png','wb').write(png(1024,1024,22,163,74))
-          print('Icon generated')
+      - uses: actions/checkout@v4
+      
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+      
+      - run: gem install fastlane -NV
+      - run: brew install xcodegen
+      
+      - run: |
+          cat > .env << EOF
+          APPLE_ID=${{ secrets.APPLE_ID }}
+          TEAM_ID=${{ secrets.TEAM_ID }}
+          MATCH_PASSWORD=${{ secrets.MATCH_PASSWORD }}
+          MATCH_KEYCHAIN_PASSWORD=${{ secrets.MATCH_KEYCHAIN_PASSWORD }}
           EOF
-
-      - name: Write API Key
-        run: |
-          mkdir -p ~/.private_keys
-          echo "${{ secrets.APP_STORE_CONNECT_API_KEY }}" > ~/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
-          chmod 600 ~/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
-
-      - name: Archive
-        run: |
-          xcodebuild archive \
-            -project VitaAI.xcodeproj \
-            -scheme VitaAI \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath ${{ github.workspace }}/build/VitaAI.xcarchive \
-            DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            TARGETED_DEVICE_FAMILY=1
-
-      - name: Export IPA
-        run: |
-          /usr/libexec/PlistBuddy -c "Set :teamID ${{ secrets.APPLE_TEAM_ID }}" ExportOptions.plist
-          xcodebuild -exportArchive \
-            -archivePath ${{ github.workspace }}/build/VitaAI.xcarchive \
-            -exportOptionsPlist ExportOptions.plist \
-            -exportPath ${{ github.workspace }}/build/export \
-            -allowProvisioningUpdates \
-            -authenticationKeyID ${{ secrets.APP_STORE_CONNECT_KEY_ID }} \
-            -authenticationKeyIssuerID ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }} \
-            -authenticationKeyPath $HOME/.private_keys/AuthKey_${{ secrets.APP_STORE_CONNECT_KEY_ID }}.p8
-
-      - name: Upload done
-        run: echo "Upload to TestFlight was handled by Export IPA step (method=app-store-connect)"
+      
+      - run: |
+          security create-keychain -p "${{ secrets.MATCH_KEYCHAIN_PASSWORD }}" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "${{ secrets.MATCH_KEYCHAIN_PASSWORD }}" build.keychain
+      
+      - run: xcodegen generate
+      
+      - env:
+          FASTLANE_APPLE_APPLICATION_SPECIFIC_PASSWORD: ${{ secrets.APP_SPECIFIC_PASSWORD }}
+        run: fastlane beta
