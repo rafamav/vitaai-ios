@@ -28,6 +28,15 @@ enum Route: Hashable {
     case simuladoReview(attemptId: String)
     case simuladoDiagnostics
 
+    // MARK: - QBank
+    case qbankHome
+
+    // MARK: - OSCE
+    case osce
+
+    // MARK: - Transcricao
+    case transcricao
+
     // MARK: - Settings sub-screens
     case about
     case appearance

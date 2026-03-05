@@ -75,7 +75,9 @@ struct MainTabView: View {
                                 onNavigateToFlashcardSession:   { deckId in router.navigate(to: .flashcardSession(deckId: deckId)) },
                                 onNavigateToFlashcardStats:     { router.navigate(to: .flashcardStats) },
                                 onNavigateToPdfViewer:          { url in router.navigate(to: .pdfViewer(url: url.absoluteString)) },
-                                onNavigateToSimulados:          { router.navigate(to: .simuladoHome) }
+                                onNavigateToSimulados:          { router.navigate(to: .simuladoHome) },
+                                onNavigateToQBank:              { router.navigate(to: .qbankHome) },
+                                onNavigateToTranscricao:        { router.navigate(to: .transcricao) }
                             )
                             .tag(TabItem.estudos)
 
@@ -198,6 +200,18 @@ struct MainTabView: View {
                     )
                 case .simuladoDiagnostics:
                     SimuladoDiagnosticsScreen(
+                        onBack: { router.goBack() }
+                    )
+                case .qbankHome:
+                    QBankCoordinatorScreen(
+                        onBack: { router.goBack() }
+                    )
+                case .osce:
+                    OsceScreen(
+                        onBack: { router.goBack() }
+                    )
+                case .transcricao:
+                    TranscricaoScreen(
                         onBack: { router.goBack() }
                     )
                 case .canvasConnect:
