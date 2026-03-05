@@ -1,0 +1,32 @@
+#!/bin/sh
+echo "iOS Pre-commit: running SwiftLint..."
+
+# Coletar arquivos Swift staged
+STAGED_SWIFT=$(git diff --cached --name-only --diff-filter=ACM | grep '\.swift$' || true)
+
+if [ -z "$STAGED_SWIFT" ]; then
+    echo "No Swift files staged — skipping SwiftLint"
+    exit 0
+fi
+
+if ! command -v swiftlint > /dev/null 2>&1; then
+    echo "WARNING: SwiftLint not installed locally — CI will enforce on PR"
+    echo "Install: brew install swiftlint"
+    exit 0
+fi
+
+SWIFTLINT_VERSION=$(swiftlint version 2>/dev/null || echo "unknown")
+echo "SwiftLint $SWIFTLINT_VERSION"
+
+# Rodar swiftlint nos arquivos staged
+echo "$STAGED_SWIFT" | xargs swiftlint lint --quiet --strict
+LINT_EXIT=$?
+
+if [ $LINT_EXIT -ne 0 ]; then
+    echo "SwiftLint FAILED — fix errors above before committing"
+    echo "Tip: swiftlint lint --fix to auto-fix some issues"
+    exit 1
+fi
+
+echo "SwiftLint OK"
+exit 0
