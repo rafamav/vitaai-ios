@@ -178,6 +178,9 @@ action deve preceder isEnabled na chamada VitaButton.
   - SimuladoResultScreen: extrair ResultBody + SubjectRow como structs privados
     para resolver "compiler unable to type-check expression" causado por
     let bindings complexos dentro de @ViewBuilder
+- *(ci)* Fix YAML syntax in pre-check job — colon in name field
+YAML interpreta "text: nao label:" como mapping value dentro de name:.
+  Removido caracteres especiais e renomeado steps para evitar o problema.
 
 ### Documentation
 
@@ -476,4 +479,20 @@ Minimal GitHub Actions workflow for iOS build without Mac.
 - Update changelog
 - Update changelog
 - Update changelog
+- Update changelog
+- Add pre-check job + branch protection + CLAUDE.md
+PRE-CHECK JOB (ubuntu, ~30s, antes do build macOS):
+  - Detecta filenames Swift duplicados (causa build failure)
+  - Verifica VitaButton API (text: não label:)
+  - Verifica ordem de argumentos VitaButton
+  - Verifica guard-let em @ViewBuilder
+  - Verifica que todos os *Client.swift estão no AppContainer
+
+  BRANCH PROTECTION:
+  - main agora requer Pre-check (Linux) + Screenshots & App Bundle verdes
+  - PRs com build quebrado não podem ser mergeados
+- Add stale PR bot and PR template
+- stale.yml: auto-mark PRs stale after 7d, close after 14d
+  - PR template: summary, type, DoD checklist, evidence, test plan
+  - Exempt labels: pinned, security, P0
 
