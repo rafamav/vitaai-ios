@@ -204,7 +204,8 @@ actor VitaAPI {
     }
 
     func archiveSimulado(attemptId: String) async throws {
-        let _: EmptyResponse = try await client.post("simulados/\(attemptId)/archive")
+        struct ArchiveBody: Encodable { let status: String }
+        try await client.patch("simulados/\(attemptId)", body: ArchiveBody(status: "archived"))
     }
 
     func getSimuladoDiagnostics(subject: String = "all", period: String = "30d") async throws -> SimuladoDiagnosticsResponse {
