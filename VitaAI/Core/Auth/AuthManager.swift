@@ -67,7 +67,7 @@ final class AuthManager: ObservableObject {
         error = nil
         defer { isLoading = false }
 
-        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/sign-in/email") else {
+        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/mobile-email-login") else {
             error = "URL inválida"; return
         }
         var req = URLRequest(url: url)
@@ -83,7 +83,7 @@ final class AuthManager: ObservableObject {
         error = nil
         defer { isLoading = false }
 
-        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/sign-up/email") else {
+        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/mobile-email-register") else {
             error = "URL inválida"; return
         }
         var req = URLRequest(url: url)
@@ -95,13 +95,12 @@ final class AuthManager: ObservableObject {
     }
 
     func forgotPassword(email: String) async {
-        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/forget-password") else { return }
+        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/mobile-forgot-password") else { return }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try? JSONSerialization.data(withJSONObject: [
             "email": email,
-            "redirectTo": "\(AppConfig.authBaseURL)/reset-password"
         ])
         _ = try? await URLSession.shared.data(for: req)
     }
@@ -117,7 +116,7 @@ final class AuthManager: ObservableObject {
                 let token = json?["token"] as? String
                 let user = json?["user"] as? [String: Any]
                 let name = user?["name"] as? String ?? json?["name"] as? String
-                let image = user?["image"] as? String
+                let image = user?["image"] as? String ?? json?["image"] as? String
                 guard let token else {
                     error = "Credenciais inválidas"; return
                 }

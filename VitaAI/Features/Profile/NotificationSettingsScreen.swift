@@ -19,6 +19,7 @@ private enum NotifKeys {
 
 struct NotificationSettingsScreen: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appContainer) private var container
 
     // Notification type toggles
     @AppStorage(NotifKeys.study)    private var studyEnabled: Bool    = true
@@ -46,6 +47,9 @@ struct NotificationSettingsScreen: View {
 
     // System permission status
     @State private var systemAuthDenied = false
+
+    // Sync debounce task
+    @State private var syncTask: Task<Void, Never>?
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -201,10 +205,15 @@ struct NotificationSettingsScreen: View {
         }
         .task {
             await checkSystemPermission()
+            await loadPushPreferences()
         }
         .onAppear {
             animateEntrance()
         }
+        .onChange(of: studyEnabled) { syncPushPreferences() }
+        .onChange(of: reviewEnabled) { syncPushPreferences() }
+        .onChange(of: deadlineEnabled) { syncPushPreferences() }
+        .onChange(of: updatesEnabled) { syncPushPreferences() }
     }
 
     // MARK: - Helpers
@@ -236,6 +245,38 @@ struct NotificationSettingsScreen: View {
         pickerHour   = parts.count > 0 ? parts[0] : 0
         pickerMinute = parts.count > 1 ? parts[1] : 0
         timePickerTarget = target
+    }
+
+    /// Load push preferences from the backend and apply to local @AppStorage.
+    @MainActor
+    private func loadPushPreferences() async {
+        do {
+            let prefs = try await container.api.getPushPreferences()
+            studyEnabled = prefs.studyReminders
+            reviewEnabled = prefs.reviewReminders
+            deadlineEnabled = prefs.deadlineReminders
+            updatesEnabled = prefs.updates
+        } catch {
+            // Silently fail — keep local defaults if network is unavailable.
+        }
+    }
+
+    /// Debounced sync of push preferences to the backend.
+    /// Mirrors Android: TokenStore saves locally + MedCoachApi.syncPushPreferences().
+    private func syncPushPreferences() {
+        syncTask?.cancel()
+        syncTask = Task {
+            // Debounce 500ms to avoid rapid-fire API calls on quick toggles
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            let prefs = PushPreferences(
+                studyReminders: studyEnabled,
+                reviewReminders: reviewEnabled,
+                deadlineReminders: deadlineEnabled,
+                updates: updatesEnabled
+            )
+            try? await container.api.updatePushPreferences(prefs)
+        }
     }
 
     @MainActor

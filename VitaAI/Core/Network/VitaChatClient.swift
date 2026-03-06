@@ -11,7 +11,7 @@ actor VitaChatClient {
         AsyncThrowingStream { continuation in
             Task {
                 do {
-                    guard let url = URL(string: AppConfig.apiBaseURL + "/ai/chat") else {
+                    guard let url = URL(string: AppConfig.apiBaseURL + "/ai/coach") else {
                         continuation.finish(throwing: APIError.invalidURL)
                         return
                     }
