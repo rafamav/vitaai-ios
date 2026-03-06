@@ -1,6 +1,5 @@
 import Foundation
-import SafariServices
-import UIKit
+import StoreKit
 
 // MARK: - BillingState
 // Mirrors Android: com.bymav.medcoach.ui.screens.billing.BillingState
@@ -17,17 +16,20 @@ struct BillingState {
 
 // MARK: - PaywallViewModel
 // Mirrors Android: PaywallViewModel.kt
-// Strategy: server-side Stripe checkout (same as Android Custom Tab approach).
-// Opens Stripe checkout URL in SFSafariViewController for a seamless in-app experience.
+// Strategy: StoreKit 2 (Apple IAP) only. Stripe checkout removed for iOS.
+// VitaPaywallScreen (the active paywall) uses StoreKitManager directly,
+// but this ViewModel is kept for PaywallScreen compatibility with StoreKit 2.
 
 @Observable
 @MainActor
 final class PaywallViewModel {
     private(set) var state = BillingState()
     private let api: VitaAPI
+    let storeKit: StoreKitManager
 
     init(api: VitaAPI) {
         self.api = api
+        self.storeKit = StoreKitManager()
     }
 
     func loadStatus() async {
@@ -42,40 +44,28 @@ final class PaywallViewModel {
         } catch {
             state.error = "Nao foi possivel carregar o status de assinatura"
         }
+        // Also load StoreKit products
+        await storeKit.loadProducts()
     }
 
+    /// Purchase via StoreKit 2 (Apple IAP).
     func startCheckout() async {
-        state.isLoading = true
-        state.error = nil
-        defer { state.isLoading = false }
-        do {
-            let response = try await api.getCheckoutUrl(plan: "pro")
-            openCheckoutURL(response.url)
-        } catch {
-            state.error = "Nao foi possivel iniciar a assinatura. Tente novamente."
+        guard let product = storeKit.monthlyProduct ?? storeKit.annualProduct else {
+            state.error = "Nao foi possivel carregar os planos disponiveis."
+            return
+        }
+        await storeKit.purchase(product)
+        // After purchase, refresh server-side status
+        if storeKit.isSubscribed {
+            await loadStatus()
         }
     }
 
-    /// Restore purchase = re-check status from server.
-    /// Mirrors Android: PaywallViewModel.restorePurchase() which calls loadStatus().
+    /// Restore purchase via StoreKit 2 AppStore.sync().
     func restorePurchase() async {
-        await loadStatus()
-    }
-
-    // MARK: - Private
-
-    private func openCheckoutURL(_ urlString: String) {
-        guard let url = URL(string: urlString) else { return }
-        // Open Stripe checkout in SFSafariViewController (equivalent to Android Custom Tab).
-        // Present over the key window's root view controller.
-        guard
-            let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-            let root = scene.windows.first?.rootViewController
-        else { return }
-
-        let safari = SFSafariViewController(url: url)
-        safari.preferredControlTintColor = UIColor(VitaColors.accent)
-        safari.dismissButtonStyle = .close
-        root.present(safari, animated: true)
+        await storeKit.restorePurchases()
+        if storeKit.isSubscribed {
+            await loadStatus()
+        }
     }
 }

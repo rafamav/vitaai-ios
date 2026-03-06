@@ -53,7 +53,7 @@ struct PaywallScreen: View {
         }
         .onDisappear {
             // Refresh global subscription status when leaving paywall
-            // (user may have completed Stripe checkout in Safari).
+            // (user may have completed StoreKit purchase).
             Task { await subStatus.refresh() }
         }
     }
