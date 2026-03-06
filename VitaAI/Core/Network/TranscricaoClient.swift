@@ -19,7 +19,7 @@ enum TranscricaoSSEEvent: Sendable {
 // Actor-based SSE client for audio upload + streaming transcription pipeline.
 // Mirrors Android's TranscricaoSseClient pattern: multipart/form-data POST → SSE response.
 //
-// Endpoint: POST /transcricao/process
+// Endpoint: POST /ai/transcribe
 // Events:  { type: "progress", stage, percent }
 //          { type: "complete", transcript, summary, flashcards }
 //          { type: "error", message }
@@ -49,7 +49,7 @@ actor TranscricaoClient {
                                          contentType: "audio/m4a", data: fileData))
                     body.append("--\(boundary)--\r\n".utf8Data)
 
-                    guard let url = URL(string: AppConfig.apiBaseURL + "/transcricao/process") else {
+                    guard let url = URL(string: AppConfig.apiBaseURL + "/ai/transcribe") else {
                         continuation.finish(throwing: APIError.invalidURL)
                         return
                     }
