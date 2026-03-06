@@ -19,6 +19,7 @@ private enum NotifKeys {
 
 struct NotificationSettingsScreen: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.appContainer) private var container
 
     // Notification type toggles
     @AppStorage(NotifKeys.study)    private var studyEnabled: Bool    = true
@@ -187,7 +188,9 @@ struct NotificationSettingsScreen: View {
                 onConfirm: {
                     let formatted = String(format: "%02d:%02d", pickerHour, pickerMinute)
                     switch target {
-                    case .study:      studyTime  = formatted
+                    case .study:
+                        studyTime = formatted
+                        syncToBackend()
                     case .quietStart: quietStart = formatted
                     case .quietEnd:   quietEnd   = formatted
                     }
@@ -205,6 +208,9 @@ struct NotificationSettingsScreen: View {
         .onAppear {
             animateEntrance()
         }
+        .onChange(of: studyEnabled) { _, _ in syncToBackend() }
+        .onChange(of: reviewEnabled) { _, _ in syncToBackend() }
+        .onChange(of: deadlineEnabled) { _, _ in syncToBackend() }
     }
 
     // MARK: - Helpers
@@ -242,6 +248,19 @@ struct NotificationSettingsScreen: View {
     private func checkSystemPermission() async {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         systemAuthDenied = settings.authorizationStatus == .denied
+    }
+
+    /// Sync current push preferences to the backend (mirrors Android syncToBackend).
+    private func syncToBackend() {
+        let prefs = PushPreferencesRequest(
+            flashcardReminders: reviewEnabled,
+            streakAlerts: deadlineEnabled,
+            studyReminders: studyEnabled,
+            reminderTime: studyTime
+        )
+        Task {
+            try? await container.api.syncPushPreferences(prefs)
+        }
     }
 
     private var permissionBanner: some View {

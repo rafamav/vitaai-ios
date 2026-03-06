@@ -27,6 +27,13 @@ struct PushTokenRequest: Codable {
     var platform: String
 }
 
+struct PushPreferencesRequest: Codable {
+    var flashcardReminders: Bool
+    var streakAlerts: Bool
+    var studyReminders: Bool
+    var reminderTime: String
+}
+
 struct ChatRequest: Codable {
     var message: String
     var conversationId: String?

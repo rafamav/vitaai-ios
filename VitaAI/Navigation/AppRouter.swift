@@ -110,6 +110,8 @@ struct MainTabView: View {
                 // Load subscription status once when the main tab appears.
                 // Subsequent refreshes happen when the user opens the paywall.
                 await subStatus.refresh()
+                // Request push notification permission (prompts only if .notDetermined)
+                await PushManager.shared.requestPermission()
             }
             // MARK: - Route destinations
             .navigationDestination(for: Route.self) { route in

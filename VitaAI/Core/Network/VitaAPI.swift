@@ -150,7 +150,7 @@ actor VitaAPI {
     // MARK: - OSCE
 
     func startOsceCase(specialty: String) async throws -> OsceStartResponse {
-        try await client.post("osce/sessions", body: OsceStartRequest(specialty: specialty))
+        try await client.post("ai/osce", body: OsceStartRequest(specialty: specialty))
     }
 
     // MARK: - Push Notifications
@@ -161,6 +161,10 @@ actor VitaAPI {
 
     func unregisterPushToken(token: String) async throws {
         try await client.delete("push/unregister")
+    }
+
+    func syncPushPreferences(_ prefs: PushPreferencesRequest) async throws {
+        let _: EmptyResponse = try await client.post("push/preferences", body: prefs)
     }
 
     // MARK: - Billing
@@ -195,7 +199,11 @@ actor VitaAPI {
     }
 
     func explainQuestion(attemptId: String, questionId: String) async throws -> ExplainResponse {
-        try await client.get("simulados/\(attemptId)/explain/\(questionId)")
+        struct ExplainRequest: Encodable { let questionId: String }
+        return try await client.post(
+            "simulados/\(attemptId)/explain",
+            body: ExplainRequest(questionId: questionId)
+        )
     }
 
     func deleteSimulado(attemptId: String) async throws {
@@ -203,7 +211,11 @@ actor VitaAPI {
     }
 
     func archiveSimulado(attemptId: String) async throws {
-        let _: EmptyResponse = try await client.post("simulados/\(attemptId)/archive")
+        struct ArchiveBody: Encodable { let status: String }
+        let _: EmptyResponse = try await client.patch(
+            "simulados/\(attemptId)",
+            body: ArchiveBody(status: "archived")
+        )
     }
 
     func getSimuladoDiagnostics(subject: String = "all", period: String = "30d") async throws -> SimuladoDiagnosticsResponse {

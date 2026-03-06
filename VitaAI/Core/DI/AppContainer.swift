@@ -53,6 +53,9 @@ final class AppContainer: ObservableObject {
         self.authManager = authManager
         self.subscriptionStatus = SubscriptionStatusProvider(api: api)
 
+        // Wire PushManager with API for token registration
+        PushManager.shared.api = api
+
         // --- SwiftData ModelContainer ---
         // Schema covers all three persistent entity types.
         // isStoredInMemoryOnly = false → on-disk SQLite (default path managed by SwiftData).
