@@ -150,7 +150,7 @@ actor VitaAPI {
     // MARK: - OSCE
 
     func startOsceCase(specialty: String) async throws -> OsceStartResponse {
-        try await client.post("osce/sessions", body: OsceStartRequest(specialty: specialty))
+        try await client.post("ai/osce", body: OsceStartRequest(specialty: specialty))
     }
 
     // MARK: - Push Notifications
