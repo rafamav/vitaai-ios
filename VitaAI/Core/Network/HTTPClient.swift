@@ -79,6 +79,10 @@ actor HTTPClient {
         try await request("POST", path: path, body: body)
     }
 
+    func patch<T: Decodable>(_ path: String, body: (any Encodable)? = nil) async throws -> T {
+        try await request("PATCH", path: path, body: body)
+    }
+
     func delete(_ path: String) async throws {
         let _: EmptyResponse = try await request("DELETE", path: path)
     }

@@ -31,6 +31,7 @@ final class AppContainer: ObservableObject {
 
     let notebookStore: NotebookStore
     let mindMapStore: MindMapStore
+    let gamificationEvents: GamificationEventManager
 
     // MARK: - Init
 
@@ -94,5 +95,6 @@ final class AppContainer: ObservableObject {
         // --- MindMapStore backed by SwiftData ---
         let mindMapRepository = MindMapRepository(context: self.modelContainer.mainContext)
         self.mindMapStore = MindMapStore(repository: mindMapRepository)
+        self.gamificationEvents = GamificationEventManager()
     }
 }

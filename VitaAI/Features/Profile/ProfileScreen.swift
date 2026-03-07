@@ -12,24 +12,43 @@ struct ProfileScreen: View {
     var onNavigateToInsights:      (() -> Void)?
     var onNavigateToTrabalhos:     (() -> Void)?
     var onNavigateToPaywall:       (() -> Void)?
+    var onNavigateToActivity:      (() -> Void)?
 
     @Environment(\.subscriptionStatus) private var subStatus
+    @Environment(\.appContainer) private var container
+    @State private var gamStats: GamificationStatsResponse?
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 20) {
-                // Avatar section
+                // Avatar section with XP ring
                 VStack(spacing: 12) {
-                    if let imageURL = authManager.userImage.flatMap(URL.init(string:)) {
-                        AsyncImage(url: imageURL) { image in
-                            image.resizable().scaledToFill()
-                        } placeholder: {
+                    ZStack {
+                        let xpFrac = gamStats.map { s in
+                            s.xpToNextLevel > 0
+                                ? Double(s.currentLevelXp) / Double(s.xpToNextLevel)
+                                : 0
+                        } ?? 0
+
+                        ProgressRingView(
+                            progress: xpFrac,
+                            size: 92,
+                            strokeWidth: 3.5,
+                            trackColor: VitaColors.surfaceBorder,
+                            progressColor: VitaColors.accent
+                        )
+
+                        if let imageURL = authManager.userImage.flatMap(URL.init(string:)) {
+                            AsyncImage(url: imageURL) { image in
+                                image.resizable().scaledToFill()
+                            } placeholder: {
+                                avatarPlaceholder
+                            }
+                            .frame(width: 76, height: 76)
+                            .clipShape(Circle())
+                        } else {
                             avatarPlaceholder
                         }
-                        .frame(width: 80, height: 80)
-                        .clipShape(Circle())
-                    } else {
-                        avatarPlaceholder
                     }
 
                     if let name = authManager.userName {
@@ -42,6 +61,13 @@ struct ProfileScreen: View {
                                 ProBadge()
                             }
                         }
+                    }
+
+                    // Level + XP label
+                    if let stats = gamStats {
+                        Text("Nivel \(stats.level) · \(stats.currentLevelXp)/\(stats.xpToNextLevel) XP")
+                            .font(VitaTypography.labelSmall)
+                            .foregroundStyle(VitaColors.textTertiary)
                     }
 
                     // Plan status row
@@ -86,6 +112,17 @@ struct ProfileScreen: View {
                             action: { onNavigateToTrabalhos?() }
                         )
                     }
+                }
+                .padding(.horizontal, 20)
+
+                // Activity & Ranking
+                VitaGlassCard {
+                    settingsRow(
+                        icon: "chart.line.uptrend.xyaxis.circle.fill",
+                        title: "Atividade & Ranking",
+                        subtitle: "XP, nivel, sequencia e leaderboard",
+                        action: { onNavigateToActivity?() }
+                    )
                 }
                 .padding(.horizontal, 20)
 
@@ -178,6 +215,11 @@ struct ProfileScreen: View {
                 Spacer().frame(height: 100)
             }
         }
+        .task {
+            do {
+                gamStats = try await container.api.getGamificationStats()
+            } catch { }
+        }
     }
 
     // MARK: - Pro badge
@@ -202,9 +244,9 @@ struct ProfileScreen: View {
         ZStack {
             Circle()
                 .fill(VitaColors.accent.opacity(0.15))
-                .frame(width: 80, height: 80)
+                .frame(width: 76, height: 76)
             Text(authManager.userName?.prefix(1).uppercased() ?? "V")
-                .font(.system(size: 28, weight: .semibold))
+                .font(.system(size: 26, weight: .semibold))
                 .foregroundStyle(VitaColors.accent)
         }
     }

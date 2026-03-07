@@ -20,6 +20,9 @@ enum Route: Hashable {
     case flashcardStats
     case pdfViewer(url: String)
 
+    // MARK: - Atlas 3D
+    case atlas3D
+
     // MARK: - OSCE
     case osce
 
@@ -35,6 +38,10 @@ enum Route: Hashable {
     case about
     case appearance
     case notifications
+
+    // MARK: - Activity / Gamification
+    case activityFeed
+    case leaderboard
 
     // MARK: - Billing
     case paywall

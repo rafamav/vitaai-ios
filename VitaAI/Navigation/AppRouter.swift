@@ -76,7 +76,8 @@ struct MainTabView: View {
                                 onNavigateToFlashcardStats:     { router.navigate(to: .flashcardStats) },
                                 onNavigateToPdfViewer:          { url in router.navigate(to: .pdfViewer(url: url.absoluteString)) },
                                 onNavigateToSimulados:          { router.navigate(to: .simuladoHome) },
-                                onNavigateToOsce:               { router.navigate(to: .osce) }
+                                onNavigateToOsce:               { router.navigate(to: .osce) },
+                                onNavigateToAtlas:              { router.navigate(to: .atlas3D) }
                             )
                             .tag(TabItem.estudos)
 
@@ -92,7 +93,8 @@ struct MainTabView: View {
                                 onNavigateToWebAluno:      { router.navigate(to: .webalunoConnect) },
                                 onNavigateToInsights:      { router.navigate(to: .insights) },
                                 onNavigateToTrabalhos:     { router.navigate(to: .trabalhos) },
-                                onNavigateToPaywall:       { router.navigate(to: .paywall) }
+                                onNavigateToPaywall:       { router.navigate(to: .paywall) },
+                                onNavigateToActivity:      { router.navigate(to: .activityFeed) }
                             )
                             .tag(TabItem.profile)
                         }
@@ -112,6 +114,14 @@ struct MainTabView: View {
                 await subStatus.refresh()
                 // Request push notification permission (prompts only if .notDetermined)
                 await PushManager.shared.requestPermission()
+                // Fire daily_login with XP feedback
+                Task {
+                    let stats = try? await container.api.getGamificationStats()
+                    let previousLevel = stats?.level
+                    if let result = try? await container.api.logActivity(action: "daily_login") {
+                        container.gamificationEvents.handleActivityResponse(result, previousLevel: previousLevel)
+                    }
+                }
             }
             // MARK: - Route destinations
             .navigationDestination(for: Route.self) { route in
@@ -224,8 +234,17 @@ struct MainTabView: View {
                     NotificationSettingsScreen()
                 case .paywall:
                     VitaPaywallScreen(onDismiss: { router.goBack() })
+                case .atlas3D:
+                    AtlasWebViewScreen(onBack: { router.goBack() })
                 case .osce:
                     OsceScreen(onBack: { router.goBack() })
+                case .activityFeed:
+                    ActivityFeedScreen(
+                        onBack: { router.goBack() },
+                        onLeaderboard: { router.navigate(to: .leaderboard) }
+                    )
+                case .leaderboard:
+                    LeaderboardScreen(onBack: { router.goBack() })
                 default:
                     EmptyView()
                 }
@@ -235,6 +254,14 @@ struct MainTabView: View {
             VitaChatScreen()
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+        }
+        .vitaXpToastHost(container.gamificationEvents.xpToast)
+        .overlay {
+            ZStack {
+                VitaLevelUpOverlay(event: container.gamificationEvents.levelUpEvent)
+                VitaBadgeUnlockOverlay(event: container.gamificationEvents.badgeEvent)
+            }
+            .allowsHitTesting(false)
         }
     }
 }

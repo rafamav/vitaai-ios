@@ -225,6 +225,30 @@ actor VitaAPI {
         ])
     }
 
+    // MARK: - Activity / Gamification
+
+    func logActivity(action: String, metadata: [String: String]? = nil) async throws -> LogActivityResponse {
+        try await client.post("activity", body: LogActivityRequest(action: action, metadata: metadata))
+    }
+
+    func getGamificationStats() async throws -> GamificationStatsResponse {
+        try await client.get("activity/stats")
+    }
+
+    func getActivityFeed(limit: Int = 50, offset: Int = 0) async throws -> [ActivityFeedItem] {
+        try await client.get("activity", queryItems: [
+            URLQueryItem(name: "limit", value: String(limit)),
+            URLQueryItem(name: "offset", value: String(offset)),
+        ])
+    }
+
+    func getLeaderboard(period: String = "weekly", limit: Int = 20) async throws -> [LeaderboardEntry] {
+        try await client.get("activity/leaderboard", queryItems: [
+            URLQueryItem(name: "period", value: period),
+            URLQueryItem(name: "limit", value: String(limit)),
+        ])
+    }
+
     /// Verify an Apple App Store transaction server-side after StoreKit 2 purchase.
     func verifyAppleReceipt(transactionId: String, productId: String) async throws -> VerifyAppleReceiptResponse {
         try await client.post(

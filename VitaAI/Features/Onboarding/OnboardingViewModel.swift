@@ -146,7 +146,46 @@ final class OnboardingViewModel {
             goals: selectedGoals,
             dailyStudyMinutes: dailyStudyMinutes
         )
+        // Persist locally first — always succeeds regardless of network
         await tokenStore.saveOnboardingData(data)
+        // POST to backend — fire-and-forget; local save is source of truth for UX
+        await postOnboardingToBackend(data: data)
         isSaving = false
+    }
+
+    // MARK: - Backend Sync
+
+    /// Maps iOS onboarding fields to the backend POST /api/onboarding schema.
+    /// `moment` is inferred from selectedGoals; falls back to "graduacao".
+    /// Non-fatal: errors are logged but do not block the user.
+    private func postOnboardingToBackend(data: OnboardingData) async {
+        guard let token = await tokenStore.token,
+              let url = URL(string: AppConfig.apiBaseURL + "/onboarding") else { return }
+
+        // Derive `moment` from goals: goals may contain "residencia" or "revalida" keywords
+        let lowerGoals = data.goals.map { $0.lowercased() }
+        let moment: String
+        if lowerGoals.contains(where: { $0.contains("residencia") || $0.contains("residência") }) {
+            moment = "residencia"
+        } else if lowerGoals.contains(where: { $0.contains("revalida") || $0.contains("reválida") }) {
+            moment = "revalida"
+        } else {
+            moment = "graduacao"
+        }
+
+        var body: [String: Any] = [
+            "moment": moment,
+            "studyGoal": data.goals.first ?? "study",
+        ]
+        if data.semester > 0 { body["year"] = data.semester }
+        if !data.subjects.isEmpty { body["selectedSubjects"] = data.subjects }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        _ = try? await URLSession.shared.data(for: req)
     }
 }

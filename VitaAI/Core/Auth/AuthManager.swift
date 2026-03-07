@@ -67,7 +67,7 @@ final class AuthManager: ObservableObject {
         error = nil
         defer { isLoading = false }
 
-        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/sign-in/email") else {
+        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/mobile-email-login") else {
             error = "URL inválida"; return
         }
         var req = URLRequest(url: url)

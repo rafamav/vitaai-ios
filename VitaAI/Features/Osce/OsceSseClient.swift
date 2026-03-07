@@ -22,7 +22,7 @@ actor OsceSseClient {
         AsyncThrowingStream { continuation in
             Task {
                 do {
-                    guard let url = URL(string: AppConfig.apiBaseURL + "/osce/sessions/\(attemptId)/answer") else {
+                    guard let url = URL(string: AppConfig.apiBaseURL + "/ai/osce/\(attemptId)/answer") else {
                         continuation.finish(throwing: APIError.invalidURL)
                         return
                     }

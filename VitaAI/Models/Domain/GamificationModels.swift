@@ -124,35 +124,39 @@ enum XpSource {
 }
 
 // MARK: - Level Thresholds
-// Mirrors Android LevelThresholds — 16 tiers with cumulative XP.
+// Mirrors Android LevelThresholds + server gamification.ts — 30 levels.
 
 enum LevelThresholds {
-    static let thresholds: [Int: Int] = [
-        1:  0,
-        2:  100,
-        3:  250,
-        4:  500,
-        5:  850,
-        6:  1_300,
-        7:  1_900,
-        8:  2_650,
-        9:  3_600,
-        10: 4_750,
-        11: 6_200,
-        12: 8_000,
-        13: 10_200,
-        14: 13_000,
-        15: 16_500,
-        16: 20_000,
+    static let thresholds: [Int] = [
+        0, 100, 250, 500, 1_000, 2_000, 3_500, 5_500, 8_000, 11_000,      // 1-10
+        15_000, 20_000, 26_000, 33_000, 41_000, 50_000, 60_000, 72_000,    // 11-18
+        85_000, 100_000, 120_000, 142_000, 168_000, 198_000, 232_000,      // 19-25
+        270_000, 315_000, 365_000, 420_000, 500_000,                        // 26-30
     ]
-    static let maxLevelXp = 50_000
 
     static func level(for totalXp: Int) -> Int {
         var currentLevel = 1
-        for level in 1...16 {
-            guard let threshold = thresholds[level] else { break }
-            if totalXp >= threshold { currentLevel = level }
+        for i in stride(from: thresholds.count - 1, through: 0, by: -1) {
+            if totalXp >= thresholds[i] {
+                currentLevel = i + 1
+                break
+            }
         }
         return currentLevel
+    }
+
+    static func xpForLevel(_ level: Int) -> Int {
+        let idx = max(0, min(level - 1, thresholds.count - 1))
+        return thresholds[idx]
+    }
+
+    static func xpToNextLevel(_ level: Int) -> Int {
+        let currentIdx = max(0, min(level - 1, thresholds.count - 1))
+        let nextIdx = min(currentIdx + 1, thresholds.count - 1)
+        return currentIdx == nextIdx ? 10_000 : thresholds[nextIdx] - thresholds[currentIdx]
+    }
+
+    static func currentLevelXp(totalXp: Int, level: Int) -> Int {
+        return totalXp - xpForLevel(level)
     }
 }

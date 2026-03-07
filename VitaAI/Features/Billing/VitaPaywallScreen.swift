@@ -1,5 +1,12 @@
 import SwiftUI
 import StoreKit
+import SafariServices
+
+// MARK: - Billing Strategy
+// iOS uses StoreKit 2 as primary payment channel (App Store requirement).
+// When StoreKit products fail to load (sandbox/region issues, App Store Connect misconfiguration),
+// a Stripe web-checkout fallback is offered so the user is never blocked.
+// Fallback: POST billing/checkout → open SafariViewController with checkout URL.
 
 // MARK: - Feature List (mirrors Android proFeatures)
 
@@ -18,9 +25,15 @@ struct VitaPaywallScreen: View {
 
     /// Called when the user dismisses / navigates back.
     var onDismiss: (() -> Void)?
+    /// API used for Stripe checkout fallback. Injected so paywall stays testable.
+    var api: VitaAPI? = nil
 
     @State private var storeKit = StoreKitManager()
     @State private var selectedProductID = StoreKitManager.annualProductID
+
+    // Stripe fallback state
+    @State private var isLoadingStripe = false
+    @State private var stripeError: String? = nil
 
     // Staggered entrance animation gates
     @State private var heroVisible     = false
@@ -244,10 +257,24 @@ struct VitaPaywallScreen: View {
                 subscribedBadge
             } else {
                 purchaseButton
+
+                // Stripe fallback: only shown when StoreKit products fail to load
+                if storeKit.products.isEmpty && !storeKit.isLoadingProducts {
+                    stripeWebButton
+                }
+
                 legalLinks
             }
 
             if let error = storeKit.purchaseError {
+                Text(error)
+                    .font(VitaTypography.bodySmall)
+                    .foregroundStyle(VitaColors.dataRed)
+                    .multilineTextAlignment(.center)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            if let error = stripeError {
                 Text(error)
                     .font(VitaTypography.bodySmall)
                     .foregroundStyle(VitaColors.dataRed)
@@ -318,6 +345,35 @@ struct VitaPaywallScreen: View {
         .animation(.easeInOut(duration: 0.2), value: storeKit.isPurchasing)
     }
 
+    /// Stripe web-checkout fallback — shown only when StoreKit products are unavailable.
+    private var stripeWebButton: some View {
+        Button {
+            haptic(.light)
+            Task { await openStripeCheckout() }
+        } label: {
+            HStack(spacing: 6) {
+                if isLoadingStripe {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: VitaColors.textSecondary))
+                        .frame(width: 14, height: 14)
+                } else {
+                    Image(systemName: "globe")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                Text("Assinar pelo site")
+                    .font(VitaTypography.bodySmall)
+            }
+            .foregroundStyle(VitaColors.textSecondary)
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
+            .background(VitaColors.glassBg)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(VitaColors.glassBorder, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .disabled(isLoadingStripe)
+    }
+
     private var legalLinks: some View {
         HStack(spacing: 4) {
             Button {
@@ -364,6 +420,36 @@ struct VitaPaywallScreen: View {
         withAnimation { featuresVisible = true }
         try? await Task.sleep(for: .milliseconds(80))
         withAnimation { ctaVisible = true }
+    }
+
+    /// Fetch Stripe checkout URL from backend and present via SFSafariViewController.
+    /// Mirrors PaywallViewModel.startCheckout() — uses the same SFSafariViewController pattern.
+    private func openStripeCheckout() async {
+        guard let api else {
+            stripeError = "Checkout via web não disponível."
+            return
+        }
+        isLoadingStripe = true
+        stripeError = nil
+        defer { isLoadingStripe = false }
+        do {
+            let response = try await api.getCheckoutUrl(plan: "pro")
+            guard let url = URL(string: response.url) else {
+                stripeError = "URL de checkout inválida."
+                return
+            }
+            guard
+                let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                let root  = scene.windows.first?.rootViewController
+            else { return }
+
+            let safari = SFSafariViewController(url: url)
+            safari.preferredControlTintColor = UIColor(VitaColors.accent)
+            safari.dismissButtonStyle = .close
+            root.present(safari, animated: true)
+        } catch {
+            stripeError = "Não foi possível abrir o checkout. Tente novamente."
+        }
     }
 }
 
