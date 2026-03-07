@@ -18,6 +18,8 @@ struct QBankUiState {
     // Home
     var progress: QBankProgressResponse = .init()
     var progressLoading = true
+    var recentSessions: [QBankSessionSummary] = []
+    var isCreatingSmartSession = false
 
     // Config
     var filters: QBankFiltersResponse = .init()
@@ -124,12 +126,52 @@ final class QBankViewModel {
         Task {
             state.progressLoading = true
             do {
-                state.progress = try await api.getQBankProgress()
+                async let progressTask = api.getQBankProgress()
+                async let sessionsTask = api.getQBankSessions(limit: 5)
+                state.progress = try await progressTask
+                let sessionsResponse = try? await sessionsTask
+                state.recentSessions = sessionsResponse?.sessions ?? []
                 state.error = nil
             } catch {
                 state.error = "Erro ao carregar progresso"
             }
             state.progressLoading = false
+        }
+    }
+
+    func startSmartStudy() {
+        Task {
+            state.isCreatingSmartSession = true
+            state.error = nil
+            do {
+                let req = QBankCreateSessionRequest(
+                    questionCount: 40,
+                    institutionIds: nil,
+                    years: nil,
+                    difficulties: nil,
+                    topicIds: nil,
+                    disciplineIds: nil,
+                    onlyResidence: nil,
+                    onlyUnanswered: true,
+                    title: nil,
+                    status: "wrong"
+                )
+                let session = try await api.createQBankSession(request: req)
+                state.session = session
+                state.currentQuestionIndex = 0
+                state.sessionAnswers = [:]
+                state.sessionDetails = [:]
+                state.selectedAlternativeId = nil
+                state.answerResult = nil
+                state.showFeedback = false
+                state.questionStartDate = Date()
+                state.elapsedSeconds = 0
+                state.activeScreen = .session
+                await loadCurrentQuestion()
+            } catch {
+                state.error = "Erro ao criar sessão inteligente: \(error.localizedDescription)"
+            }
+            state.isCreatingSmartSession = false
         }
     }
 
@@ -210,7 +252,8 @@ final class QBankViewModel {
                     disciplineIds: state.selectedDisciplineIds.isEmpty ? nil : Array(state.selectedDisciplineIds),
                     onlyResidence: state.onlyResidence ? true : nil,
                     onlyUnanswered: state.onlyUnanswered ? true : nil,
-                    title: nil
+                    title: nil,
+                    status: nil
                 )
                 let session = try await api.createQBankSession(request: req)
                 state.session = session
@@ -384,6 +427,32 @@ final class QBankViewModel {
         state.currentQuestionDetail = nil
         state.elapsedSeconds = 0
         loadFilters()
+    }
+
+    func resumeSession(_ summary: QBankSessionSummary) {
+        // Convert summary to a session and start it
+        let session = QBankSession(
+            id: summary.id,
+            title: summary.title,
+            questionIds: [], // will be loaded
+            totalQuestions: summary.totalQuestions,
+            currentIndex: summary.currentIndex,
+            correctCount: summary.correctCount,
+            createdAt: summary.createdAt
+        )
+        state.session = session
+        state.currentQuestionIndex = summary.currentIndex
+        state.sessionAnswers = [:]
+        state.sessionDetails = [:]
+        state.selectedAlternativeId = nil
+        state.answerResult = nil
+        state.showFeedback = false
+        state.questionStartDate = Date()
+        state.elapsedSeconds = 0
+        state.activeScreen = .session
+        // For now, go to config to start a new session instead
+        // since we'd need the full question IDs to resume
+        goToDisciplines()
     }
 
     func clearError() { state.error = nil }
