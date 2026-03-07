@@ -431,6 +431,13 @@ Implements P3 gamification components ported from Android VitaXpBar.kt,
   - VitaAPI.swift: +verifyAppleReceipt(transactionId:productId:) endpoint
   - AppRouter.swift: .paywall route now renders VitaPaywallScreen (was PaywallScreen/Stripe)
   - Product IDs: com.bymav.vitaai.monthly + com.bymav.vitaai.annual
+- Wire iOS push notifications end-to-end
+- Add AppDelegate adaptor to forward APNs device tokens to PushManager
+  - Wire PushManager.api in AppContainer for token registration
+  - Add syncPushPreferences() to VitaAPI + PushPreferencesRequest model
+  - Add backend sync to NotificationSettingsScreen (mirrors Android fix)
+  - Request push permission on login via MainTabView .task
+- *(ios)* QBank progressive UI, activity tracking, atlas webview, billing
 
 ### Miscellaneous
 
@@ -495,4 +502,5 @@ PRE-CHECK JOB (ubuntu, ~30s, antes do build macOS):
 - stale.yml: auto-mark PRs stale after 7d, close after 14d
   - PR template: summary, type, DoD checklist, evidence, test plan
   - Exempt labels: pinned, security, P0
+- Update changelog
 
