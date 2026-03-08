@@ -135,6 +135,10 @@ actor VitaAPI {
         try await client.post("webaluno/connect", body: WebalunoConnectRequest(sessionCookie: sessionCookie, instanceUrl: instanceUrl))
     }
 
+    func disconnectWebaluno() async throws {
+        try await client.delete("webaluno/connect")
+    }
+
     func syncWebaluno() async throws -> WebalunoSyncResponse {
         try await client.post("webaluno/sync")
     }
@@ -275,6 +279,34 @@ actor VitaAPI {
             URLQueryItem(name: "period", value: period),
             URLQueryItem(name: "limit", value: String(limit)),
         ])
+    }
+
+    // MARK: - Google Calendar
+
+    func getGoogleCalendarStatus() async throws -> GoogleCalendarStatusResponse {
+        try await client.get("google/calendar/status")
+    }
+
+    func syncGoogleCalendar() async throws -> GoogleCalendarSyncResponse {
+        try await client.post("google/calendar/sync")
+    }
+
+    func disconnectGoogleCalendar() async throws {
+        try await client.delete("google/calendar/connect")
+    }
+
+    // MARK: - Google Drive
+
+    func getGoogleDriveStatus() async throws -> GoogleDriveStatusResponse {
+        try await client.get("google/drive/status")
+    }
+
+    func syncGoogleDrive() async throws -> GoogleDriveSyncResponse {
+        try await client.post("google/drive/sync")
+    }
+
+    func disconnectGoogleDrive() async throws {
+        try await client.delete("google/drive/connect")
     }
 
     /// Verify an Apple App Store transaction server-side after StoreKit 2 purchase.
