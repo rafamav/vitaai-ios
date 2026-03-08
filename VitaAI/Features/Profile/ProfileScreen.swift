@@ -4,15 +4,17 @@ struct ProfileScreen: View {
     let authManager: AuthManager
 
     // Navigation callbacks injected by AppRouter
-    var onNavigateToAbout:         (() -> Void)?
-    var onNavigateToAppearance:    (() -> Void)?
-    var onNavigateToNotifications: (() -> Void)?
-    var onNavigateToCanvasConnect: (() -> Void)?
-    var onNavigateToWebAluno:      (() -> Void)?
-    var onNavigateToInsights:      (() -> Void)?
-    var onNavigateToTrabalhos:     (() -> Void)?
-    var onNavigateToPaywall:       (() -> Void)?
-    var onNavigateToActivity:      (() -> Void)?
+    var onNavigateToAbout:                (() -> Void)?
+    var onNavigateToAppearance:           (() -> Void)?
+    var onNavigateToNotifications:        (() -> Void)?
+    var onNavigateToCanvasConnect:        (() -> Void)?
+    var onNavigateToWebAluno:             (() -> Void)?
+    var onNavigateToGoogleCalendar:       (() -> Void)?
+    var onNavigateToGoogleDrive:          (() -> Void)?
+    var onNavigateToInsights:             (() -> Void)?
+    var onNavigateToTrabalhos:            (() -> Void)?
+    var onNavigateToPaywall:              (() -> Void)?
+    var onNavigateToActivity:             (() -> Void)?
 
     @Environment(\.subscriptionStatus) private var subStatus
     @Environment(\.appContainer) private var container
@@ -154,6 +156,20 @@ struct ProfileScreen: View {
                             title: "WebAluno",
                             subtitle: "Conectar portal",
                             action: { onNavigateToWebAluno?() }
+                        )
+                        Divider().background(VitaColors.glassBorder)
+                        settingsRow(
+                            icon: "calendar",
+                            title: "Google Calendar",
+                            subtitle: "Sincronizar eventos",
+                            action: { onNavigateToGoogleCalendar?() }
+                        )
+                        Divider().background(VitaColors.glassBorder)
+                        settingsRow(
+                            icon: "externaldrive",
+                            title: "Google Drive",
+                            subtitle: "Importar arquivos",
+                            action: { onNavigateToGoogleDrive?() }
                         )
                     }
                 }

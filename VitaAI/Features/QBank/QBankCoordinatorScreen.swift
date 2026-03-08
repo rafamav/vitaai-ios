@@ -59,6 +59,69 @@ struct QBankCoordinatorScreen: View {
     }
 }
 
+// MARK: - Convex Glass Modifier
+
+private struct ConvexGlassModifier: ViewModifier {
+    var isCyan: Bool = false
+
+    func body(content: Content) -> some View {
+        content
+            .background(
+                ZStack {
+                    if isCyan {
+                        Circle().fill(Color(red: 0.04, green: 0.10, blue: 0.12))
+                        Circle().fill(
+                            RadialGradient(
+                                stops: [
+                                    .init(color: Color(red: 0.13, green: 0.83, blue: 0.93).opacity(0.25), location: 0),
+                                    .init(color: Color(red: 0.13, green: 0.83, blue: 0.93).opacity(0.05), location: 0.5),
+                                    .init(color: Color.black.opacity(0.20), location: 1),
+                                ],
+                                center: UnitPoint(x: 0.5, y: 0.25),
+                                startRadius: 0,
+                                endRadius: 40
+                            )
+                        )
+                    } else {
+                        Circle().fill(Color(red: 0.086, green: 0.106, blue: 0.094))
+                        Circle().fill(
+                            RadialGradient(
+                                stops: [
+                                    .init(color: Color.white.opacity(0.10), location: 0),
+                                    .init(color: Color.white.opacity(0.02), location: 0.5),
+                                    .init(color: Color.black.opacity(0.20), location: 1),
+                                ],
+                                center: UnitPoint(x: 0.5, y: 0.25),
+                                startRadius: 0,
+                                endRadius: 40
+                            )
+                        )
+                    }
+                }
+            )
+            .overlay(
+                Circle().stroke(
+                    isCyan ? Color(red: 0.13, green: 0.83, blue: 0.93).opacity(0.2) : Color.white.opacity(0.12),
+                    lineWidth: 1
+                )
+            )
+            .shadow(color: Color.black.opacity(0.4), radius: 3, y: 2)
+            .clipShape(Circle())
+    }
+}
+
+private struct ConvexGlassCircle<Content: View>: View {
+    let size: CGFloat
+    var isCyan: Bool = false
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .frame(width: size, height: size)
+            .modifier(ConvexGlassModifier(isCyan: isCyan))
+    }
+}
+
 // MARK: - Home content (thin wrapper that calls into the shared VM)
 
 private struct QBankHomeContent: View {
@@ -89,21 +152,94 @@ private struct QBankHomeContent: View {
                 Spacer()
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 16) {
-                        QBankStatsCardView(progress: vm.state.progress)
+                    LazyVStack(spacing: 20) {
+                        // Stats row
+                        QBankStatsRow(progress: vm.state.progress)
                             .padding(.top, 8)
 
-                        VitaButton(text: "Nova Sessão de Estudo", action: {
-                            vm.goToDisciplines()
-                        })
+                        // Action CTAs
+                        VStack(spacing: 10) {
+                            QBankActionCTA(
+                                icon: "play.fill",
+                                title: "Nova Sessão",
+                                subtitle: "Configure filtros e pratique com questões de provas reais",
+                                isCyan: false
+                            ) {
+                                vm.goToDisciplines()
+                            }
+
+                            if vm.state.progress.totalAnswered > 0 {
+                                QBankActionCTA(
+                                    icon: "brain",
+                                    title: "Estudo Inteligente",
+                                    subtitle: "Prioriza questões erradas e não vistas para otimizar seu estudo",
+                                    isCyan: true,
+                                    isLoading: vm.state.isCreatingSmartSession
+                                ) {
+                                    vm.startSmartStudy()
+                                }
+                            }
+                        }
                         .padding(.horizontal, 16)
 
-                        if !vm.state.progress.byDifficulty.isEmpty {
-                            QBankDifficultyCardView(items: vm.state.progress.byDifficulty)
+                        // Quick access
+                        HStack(spacing: 10) {
+                            QBankQuickAccessButton(icon: "clock.arrow.circlepath", label: "Histórico") {
+                                // TODO: navigate to history
+                            }
+                            QBankQuickAccessButton(icon: "bookmark", label: "Listas") {
+                                // TODO: navigate to lists
+                            }
+                        }
+                        .padding(.horizontal, 16)
+
+                        // Recent sessions
+                        if !vm.state.recentSessions.isEmpty {
+                            VStack(alignment: .leading, spacing: 10) {
+                                QBankSectionHeader(title: "Sessões Recentes")
+                                    .padding(.horizontal, 16)
+                                ForEach(vm.state.recentSessions) { session in
+                                    QBankSessionRow(session: session) {
+                                        vm.resumeSession(session)
+                                    }
+                                    .padding(.horizontal, 16)
+                                }
+                            }
                         }
 
+                        // Difficulty
+                        if !vm.state.progress.byDifficulty.isEmpty {
+                            VStack(alignment: .leading, spacing: 10) {
+                                QBankSectionHeader(title: "Desempenho por Dificuldade")
+                                    .padding(.horizontal, 16)
+                                QBankDifficultyCard(items: vm.state.progress.byDifficulty)
+                                    .padding(.horizontal, 16)
+                            }
+                        }
+
+                        // Topics
                         if !vm.state.progress.byTopic.isEmpty {
-                            QBankTopicProgressCardView(items: Array(vm.state.progress.byTopic.prefix(8)))
+                            VStack(alignment: .leading, spacing: 10) {
+                                QBankSectionHeader(title: "Desempenho por Tema")
+                                    .padding(.horizontal, 16)
+                                ForEach(Array(vm.state.progress.byTopic.prefix(10))) { topic in
+                                    QBankTopicRow(topic: topic)
+                                        .padding(.horizontal, 16)
+                                }
+                                if vm.state.progress.byTopic.count > 10 {
+                                    Text("e mais \(vm.state.progress.byTopic.count - 10) temas...")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(VitaColors.textTertiary)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.top, 2)
+                                }
+                            }
+                        }
+
+                        // Empty state
+                        if vm.state.progress.totalAnswered == 0 {
+                            QBankEmptyState()
+                                .padding(.horizontal, 16)
                         }
 
                         if let error = vm.state.error {
@@ -120,6 +256,361 @@ private struct QBankHomeContent: View {
         }
         .background(VitaColors.surface.ignoresSafeArea())
         .onAppear { vm.loadHomeData() }
+    }
+}
+
+// MARK: - Stats Row (3 cards with convex glass circles)
+
+private struct QBankStatsRow: View {
+    let progress: QBankProgressResponse
+
+    private var accuracyColor: Color {
+        let acc = Int(progress.accuracy * 100)
+        if acc >= 70 { return VitaColors.dataGreen }
+        if acc >= 50 { return VitaColors.dataAmber }
+        if acc > 0 { return VitaColors.dataRed }
+        return VitaColors.textPrimary
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            statCard(
+                icon: "book",
+                value: formatNumber(progress.totalAvailable),
+                label: "Disponíveis"
+            )
+            statCard(
+                icon: "target",
+                value: formatNumber(progress.totalAnswered),
+                label: "Respondidas"
+            )
+            statCard(
+                icon: "trophy",
+                value: "\(Int(progress.accuracy * 100))%",
+                label: "Acerto",
+                valueColor: accuracyColor
+            )
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private func statCard(icon: String, value: String, label: String, valueColor: Color? = nil) -> some View {
+        VStack(spacing: 8) {
+            ConvexGlassCircle(size: 32) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.9))
+            }
+            Text(value)
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .foregroundStyle(valueColor ?? VitaColors.textPrimary)
+                .tracking(-0.5)
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(VitaColors.textTertiary)
+                .textCase(.uppercase)
+                .tracking(0.8)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 14).fill(VitaColors.glassBg)
+                LinearGradient(
+                    colors: [VitaColors.accent.opacity(0.05), .clear],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+        )
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(VitaColors.glassBorder, lineWidth: 1))
+    }
+
+    private func formatNumber(_ n: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = Locale(identifier: "pt_BR")
+        return formatter.string(from: NSNumber(value: n)) ?? "\(n)"
+    }
+}
+
+// MARK: - Action CTA (Nova Sessao / Estudo Inteligente)
+
+private struct QBankActionCTA: View {
+    let icon: String
+    let title: String
+    let subtitle: String
+    var isCyan: Bool = false
+    var isLoading: Bool = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                ConvexGlassCircle(size: 44, isCyan: isCyan) {
+                    if isLoading {
+                        ProgressView()
+                            .tint(isCyan ? VitaColors.accent : .white)
+                            .scaleEffect(0.7)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(isCyan ? VitaColors.accent : Color.white.opacity(0.9))
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(VitaColors.textPrimary)
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(VitaColors.textTertiary)
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(VitaColors.textTertiary)
+            }
+            .padding(14)
+            .background(VitaColors.glassBg)
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(VitaColors.glassBorder, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+        .disabled(isLoading)
+    }
+}
+
+// MARK: - Quick Access Button
+
+private struct QBankQuickAccessButton: View {
+    let icon: String
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 10) {
+                ConvexGlassCircle(size: 32) {
+                    Image(systemName: icon)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.9))
+                }
+                Text(label)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(VitaColors.textPrimary)
+                Spacer()
+            }
+            .padding(12)
+            .background(VitaColors.glassBg)
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(VitaColors.glassBorder, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Section Header (9px uppercase)
+
+private struct QBankSectionHeader: View {
+    let title: String
+    var body: some View {
+        Text(title)
+            .font(.system(size: 9, weight: .medium))
+            .foregroundStyle(VitaColors.textTertiary)
+            .textCase(.uppercase)
+            .tracking(0.8)
+    }
+}
+
+// MARK: - Session Row (with convex glass status circle)
+
+private struct QBankSessionRow: View {
+    let session: QBankSessionSummary
+    let action: () -> Void
+
+    private var pct: Int {
+        session.totalQuestions > 0 ? Int(Double(session.correctCount) / Double(session.totalQuestions) * 100) : 0
+    }
+    private var progressWidth: Double {
+        if session.isActive {
+            return session.totalQuestions > 0 ? Double(session.currentIndex) / Double(session.totalQuestions) : 0
+        }
+        return Double(pct) / 100
+    }
+    private var barColor: Color {
+        session.isActive ? VitaColors.dataAmber : VitaColors.dataGreen
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                ConvexGlassCircle(size: 40) {
+                    Image(systemName: session.isActive ? "clock" : "checkmark.circle")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(session.isActive ? VitaColors.dataAmber : VitaColors.dataGreen)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(session.title ?? "Sessão de \(session.totalQuestions) questões")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(VitaColors.textPrimary)
+                        .lineLimit(1)
+                        .tracking(-0.1)
+
+                    Text(session.isActive
+                        ? "\(session.currentIndex)/\(session.totalQuestions) respondidas"
+                        : "\(session.correctCount)/\(session.totalQuestions) corretas (\(pct)%)"
+                    )
+                    .font(.system(size: 10))
+                    .foregroundStyle(VitaColors.textTertiary)
+
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 2).fill(VitaColors.surfaceElevated)
+                            RoundedRectangle(cornerRadius: 2).fill(barColor)
+                                .frame(width: max(geo.size.width * CGFloat(progressWidth), 2))
+                        }
+                    }
+                    .frame(height: 3)
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(VitaColors.textTertiary)
+            }
+            .padding(14)
+            .background(VitaColors.glassBg)
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(VitaColors.glassBorder, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Difficulty Card (single card with all difficulties)
+
+private struct QBankDifficultyCard: View {
+    let items: [QBankProgressByDifficulty]
+
+    var body: some View {
+        VStack(spacing: 14) {
+            ForEach(items) { item in
+                let pct = Int(item.accuracy * 100)
+                let col: Color = pct >= 70 ? VitaColors.dataGreen : pct >= 50 ? VitaColors.dataAmber : VitaColors.dataRed
+                VStack(spacing: 6) {
+                    HStack {
+                        Text(item.difficulty.difficultyLabel)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(VitaColors.textPrimary)
+                            .tracking(-0.1)
+                        Spacer()
+                        Text("\(item.correct)/\(item.answered)")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(VitaColors.textTertiary)
+                        Text("(\(pct)%)")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(VitaColors.textSecondary)
+                    }
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 3).fill(VitaColors.surfaceElevated)
+                            RoundedRectangle(cornerRadius: 3).fill(col)
+                                .frame(width: max(geo.size.width * CGFloat(item.accuracy).clamped(to: 0...1), 2))
+                                .animation(.easeOut(duration: 0.6), value: item.accuracy)
+                        }
+                    }
+                    .frame(height: 5)
+                }
+            }
+        }
+        .padding(16)
+        .background(VitaColors.glassBg)
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(VitaColors.glassBorder, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+}
+
+// MARK: - Topic Row (individual card per topic)
+
+private struct QBankTopicRow: View {
+    let topic: QBankProgressByTopic
+
+    private var pct: Int { Int(topic.accuracy * 100) }
+    private var col: Color {
+        pct >= 70 ? VitaColors.dataGreen : pct >= 50 ? VitaColors.dataAmber : VitaColors.dataRed
+    }
+
+    var body: some View {
+        VStack(spacing: 6) {
+            HStack {
+                Text(topic.topicTitle)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(VitaColors.textPrimary)
+                    .lineLimit(1)
+                    .tracking(-0.1)
+                Spacer()
+                Text("\(topic.correct)/\(topic.answered)")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(VitaColors.textTertiary)
+                Text("\(pct)%")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(col)
+            }
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2).fill(VitaColors.surfaceElevated)
+                    RoundedRectangle(cornerRadius: 2).fill(col)
+                        .frame(width: max(geo.size.width * CGFloat(topic.accuracy).clamped(to: 0...1), 2))
+                        .animation(.easeOut(duration: 0.6), value: topic.accuracy)
+                }
+            }
+            .frame(height: 4)
+        }
+        .padding(12)
+        .background(VitaColors.glassBg)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(VitaColors.glassBorder, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+// MARK: - Empty State
+
+private struct QBankEmptyState: View {
+    var body: some View {
+        VStack(spacing: 10) {
+            ConvexGlassCircle(size: 40) {
+                Image(systemName: "book")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.9))
+            }
+            Text("Comece a praticar")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(VitaColors.textPrimary)
+                .tracking(-0.1)
+            Text("Inicie uma sessão de questões para acompanhar seu desempenho aqui")
+                .font(.system(size: 11))
+                .foregroundStyle(VitaColors.textTertiary)
+                .multilineTextAlignment(.center)
+                .lineSpacing(2)
+        }
+        .padding(28)
+        .frame(maxWidth: .infinity)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 16).fill(VitaColors.glassBg)
+                LinearGradient(
+                    colors: [VitaColors.accent.opacity(0.05), .clear],
+                    startPoint: .top, endPoint: .bottom
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 16))
+            }
+        )
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(VitaColors.glassBorder, lineWidth: 1))
     }
 }
 
@@ -468,7 +959,7 @@ private struct QBankConfigContent: View {
                         .padding(.vertical, 12)
                     } else {
                         VitaButton(
-                            label: "Iniciar Sessão (\(vm.state.questionCount) questões)",
+                            text: "Iniciar Sessão (\(vm.state.questionCount) questões)",
                             action: { vm.createSession() }
                         )
                         .padding(.horizontal, 16)
@@ -1045,7 +1536,7 @@ private struct QBankResultContent: View {
 
                 VStack(spacing: 10) {
                     VitaButton(text: "Nova Sessão", action: onNewSession)
-                    VitaButton(text: "Voltar ao Início", variant: .secondary, action: onBack)
+                    VitaButton(text: "Voltar ao Início", action: onBack, variant: .secondary)
                 }
                 .padding(.horizontal, 24)
 
@@ -1110,133 +1601,7 @@ private struct QBankResultReviewRow: View {
     }
 }
 
-// MARK: - Reusable stat card views (for coordinator home screen)
-
-struct QBankStatsCardView: View {
-    let progress: QBankProgressResponse
-
-    private var accuracy: Int { Int(progress.accuracy * 100) }
-    private var accuracyColor: Color {
-        accuracy >= 70 ? VitaColors.dataGreen : accuracy >= 50 ? VitaColors.dataAmber : VitaColors.dataRed
-    }
-    private var remaining: Int { max(0, progress.totalAvailable - progress.totalAnswered) }
-
-    var body: some View {
-        VStack(spacing: 16) {
-            HStack(spacing: 24) {
-                ZStack {
-                    Circle().stroke(VitaColors.glassBorder, lineWidth: 8).frame(width: 90, height: 90)
-                    Circle()
-                        .trim(from: 0, to: CGFloat(progress.accuracy).clamped(to: 0...1))
-                        .stroke(accuracyColor, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                        .frame(width: 90, height: 90)
-                        .rotationEffect(.degrees(-90))
-                        .animation(.easeOut(duration: 0.8), value: progress.accuracy)
-                    VStack(spacing: 0) {
-                        Text("\(accuracy)%").font(.system(size: 20, weight: .bold)).foregroundStyle(accuracyColor)
-                        Text("acerto").font(.system(size: 9)).foregroundStyle(VitaColors.textTertiary)
-                    }
-                }
-                VStack(alignment: .leading, spacing: 8) {
-                    QBankStatRow(label: "Disponíveis",  value: "\(progress.totalAvailable)", color: VitaColors.textPrimary)
-                    QBankStatRow(label: "Respondidas",  value: "\(progress.totalAnswered)",  color: VitaColors.accent)
-                    QBankStatRow(label: "Corretas",     value: "\(progress.totalCorrect)",   color: VitaColors.dataGreen)
-                    QBankStatRow(label: "Restantes",    value: "\(remaining)",               color: VitaColors.textSecondary)
-                }
-                Spacer()
-            }
-        }
-        .padding(16)
-        .background(VitaColors.glassBg)
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(VitaColors.glassBorder, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .padding(.horizontal, 16)
-    }
-}
-
-struct QBankStatRow: View {
-    let label: String
-    let value: String
-    let color: Color
-    var body: some View {
-        HStack {
-            Text(label).font(.system(size: 11)).foregroundStyle(VitaColors.textTertiary)
-            Spacer()
-            Text(value).font(.system(size: 12, weight: .semibold)).foregroundStyle(color)
-        }
-        .frame(maxWidth: 160)
-    }
-}
-
-struct QBankDifficultyCardView: View {
-    let items: [QBankProgressByDifficulty]
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Por Dificuldade")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(VitaColors.textPrimary)
-            ForEach(items) { item in
-                let pct = item.accuracy
-                let col: Color = pct >= 0.7 ? VitaColors.dataGreen : pct >= 0.5 ? VitaColors.dataAmber : VitaColors.dataRed
-                VStack(spacing: 4) {
-                    HStack {
-                        Text(item.difficulty.difficultyLabel).font(.system(size: 12, weight: .medium)).foregroundStyle(VitaColors.textPrimary)
-                        Spacer()
-                        Text("\(item.answered) questões").font(.system(size: 10)).foregroundStyle(VitaColors.textTertiary)
-                        Text("· \(Int(pct * 100))%").font(.system(size: 11, weight: .semibold)).foregroundStyle(col)
-                    }
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 3).fill(VitaColors.glassBorder)
-                            RoundedRectangle(cornerRadius: 3).fill(col)
-                                .frame(width: geo.size.width * CGFloat(pct).clamped(to: 0...1))
-                                .animation(.easeOut(duration: 0.6), value: pct)
-                        }
-                    }
-                    .frame(height: 6)
-                }
-            }
-        }
-        .padding(16)
-        .background(VitaColors.glassBg)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(VitaColors.glassBorder, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .padding(.horizontal, 16)
-    }
-}
-
-struct QBankTopicProgressCardView: View {
-    let items: [QBankProgressByTopic]
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Por Tópico (Top \(items.count))")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(VitaColors.textPrimary)
-            ForEach(items) { item in
-                let pct = item.accuracy
-                let col: Color = pct >= 0.7 ? VitaColors.dataGreen : pct >= 0.5 ? VitaColors.dataAmber : VitaColors.dataRed
-                HStack(spacing: 10) {
-                    Text(item.topicTitle).font(.system(size: 11)).foregroundStyle(VitaColors.textPrimary).frame(width: 120, alignment: .leading).lineLimit(2)
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 2).fill(VitaColors.glassBorder)
-                            RoundedRectangle(cornerRadius: 2).fill(col)
-                                .frame(width: geo.size.width * CGFloat(pct).clamped(to: 0...1))
-                                .animation(.easeOut(duration: 0.6), value: pct)
-                        }
-                    }
-                    .frame(height: 5)
-                    Text("\(Int(pct * 100))%").font(.system(size: 10, weight: .semibold)).foregroundStyle(col).frame(width: 32, alignment: .trailing)
-                }
-            }
-        }
-        .padding(16)
-        .background(VitaColors.glassBg)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(VitaColors.glassBorder, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .padding(.horizontal, 16)
-    }
-}
+// (Old stats/difficulty/topic views removed — replaced by convex glass versions above)
 
 // MARK: - QBank Badge
 
@@ -1310,6 +1675,125 @@ struct QBankHTMLText: UIViewRepresentable {
                 }
             }
         }
+    }
+}
+
+// MARK: - Config Screen Helpers
+
+struct QBankSectionTitle: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        Text(text)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(VitaColors.textPrimary)
+    }
+}
+
+struct QBankChip: View {
+    let label: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(isSelected ? VitaColors.accent : VitaColors.textSecondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(isSelected ? VitaColors.accent.opacity(0.12) : VitaColors.glassBg)
+                .overlay(
+                    Capsule().stroke(
+                        isSelected ? VitaColors.accent.opacity(0.3) : VitaColors.glassBorder,
+                        lineWidth: 1
+                    )
+                )
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct QBankFlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = arrangeSubviews(proposal: proposal, subviews: subviews)
+        return result.size
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = arrangeSubviews(proposal: ProposedViewSize(width: bounds.width, height: nil), subviews: subviews)
+        for (index, position) in result.positions.enumerated() {
+            subviews[index].place(at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y), proposal: .unspecified)
+        }
+    }
+
+    private func arrangeSubviews(proposal: ProposedViewSize, subviews: Subviews) -> (size: CGSize, positions: [CGPoint]) {
+        let maxWidth = proposal.width ?? .infinity
+        var positions: [CGPoint] = []
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var maxX: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if x + size.width > maxWidth && x > 0 {
+                x = 0
+                y += rowHeight + spacing
+                rowHeight = 0
+            }
+            positions.append(CGPoint(x: x, y: y))
+            rowHeight = max(rowHeight, size.height)
+            x += size.width + spacing
+            maxX = max(maxX, x - spacing)
+        }
+
+        return (CGSize(width: maxX, height: y + rowHeight), positions)
+    }
+}
+
+struct QBankConfigToggleRow: View {
+    let icon: String
+    let title: String
+    let description: String
+    let isOn: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                    .foregroundStyle(isOn ? VitaColors.accent : VitaColors.textTertiary)
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(VitaColors.textPrimary)
+                    Text(description)
+                        .font(.system(size: 11))
+                        .foregroundStyle(VitaColors.textTertiary)
+                }
+
+                Spacer()
+
+                Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(isOn ? VitaColors.accent : VitaColors.textTertiary.opacity(0.4))
+            }
+            .padding(12)
+            .background(isOn ? VitaColors.accent.opacity(0.06) : VitaColors.glassBg)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isOn ? VitaColors.accent.opacity(0.2) : VitaColors.glassBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
     }
 }
 

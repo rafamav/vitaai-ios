@@ -11,6 +11,8 @@ enum Route: Hashable {
     case profile
     case canvasConnect
     case webalunoConnect
+    case googleCalendarConnect
+    case googleDriveConnect
     case vitaChat(prompt: String? = nil)
     case notebookList
     case notebookEditor(notebookId: String)

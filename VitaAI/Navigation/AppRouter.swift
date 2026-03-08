@@ -86,15 +86,17 @@ struct MainTabView: View {
 
                             ProfileScreen(
                                 authManager: authManager,
-                                onNavigateToAbout:         { router.navigate(to: .about) },
-                                onNavigateToAppearance:    { router.navigate(to: .appearance) },
-                                onNavigateToNotifications: { router.navigate(to: .notifications) },
-                                onNavigateToCanvasConnect: { router.navigate(to: .canvasConnect) },
-                                onNavigateToWebAluno:      { router.navigate(to: .webalunoConnect) },
-                                onNavigateToInsights:      { router.navigate(to: .insights) },
-                                onNavigateToTrabalhos:     { router.navigate(to: .trabalhos) },
-                                onNavigateToPaywall:       { router.navigate(to: .paywall) },
-                                onNavigateToActivity:      { router.navigate(to: .activityFeed) }
+                                onNavigateToAbout:          { router.navigate(to: .about) },
+                                onNavigateToAppearance:     { router.navigate(to: .appearance) },
+                                onNavigateToNotifications:  { router.navigate(to: .notifications) },
+                                onNavigateToCanvasConnect:  { router.navigate(to: .canvasConnect) },
+                                onNavigateToWebAluno:       { router.navigate(to: .webalunoConnect) },
+                                onNavigateToGoogleCalendar: { router.navigate(to: .googleCalendarConnect) },
+                                onNavigateToGoogleDrive:    { router.navigate(to: .googleDriveConnect) },
+                                onNavigateToInsights:       { router.navigate(to: .insights) },
+                                onNavigateToTrabalhos:      { router.navigate(to: .trabalhos) },
+                                onNavigateToPaywall:        { router.navigate(to: .paywall) },
+                                onNavigateToActivity:       { router.navigate(to: .activityFeed) }
                             )
                             .tag(TabItem.profile)
                         }
@@ -220,6 +222,14 @@ struct MainTabView: View {
                 case .webalunoConnect:
                     // WebAlunoConnectScreen handles the WebView as an internal sheet
                     WebAlunoConnectScreen(
+                        onBack: { router.goBack() }
+                    )
+                case .googleCalendarConnect:
+                    GoogleCalendarConnectScreen(
+                        onBack: { router.goBack() }
+                    )
+                case .googleDriveConnect:
+                    GoogleDriveConnectScreen(
                         onBack: { router.goBack() }
                     )
                 case .insights:
