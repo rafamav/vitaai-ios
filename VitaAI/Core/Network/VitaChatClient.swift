@@ -36,37 +36,38 @@ actor VitaChatClient {
                         return
                     }
 
-                    var eventType = ""
-                    var eventData = ""
-
                     for try await line in bytes.lines {
-                        if line.hasPrefix("event:") {
-                            eventType = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
-                        } else if line.hasPrefix("data:") {
-                            eventData = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                        guard line.hasPrefix("data:") else { continue }
 
-                            switch eventType {
-                            case "text_delta":
-                                if let data = eventData.data(using: .utf8),
-                                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                                   let text = json["text"] as? String {
-                                    continuation.yield(.textDelta(text))
-                                }
-                            case "message_stop":
-                                let convId = (try? JSONSerialization.jsonObject(with: eventData.data(using: .utf8) ?? Data()) as? [String: Any])?["conversationId"] as? String
-                                continuation.yield(.messageStop(conversationId: convId))
-                                continuation.finish()
-                                return
-                            case "error":
-                                continuation.yield(.error(eventData))
-                                continuation.finish()
-                                return
-                            default:
-                                break
+                        let eventData = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+
+                        guard let rawData = eventData.data(using: .utf8),
+                              let json = try? JSONSerialization.jsonObject(with: rawData) as? [String: Any],
+                              let type = json["type"] as? String else {
+                            continue
+                        }
+
+                        switch type {
+                        case "text_delta":
+                            if let content = json["content"] as? String {
+                                continuation.yield(.textDelta(content))
                             }
-
-                            eventType = ""
-                            eventData = ""
+                        case "tool_progress":
+                            if let content = json["content"] as? String {
+                                continuation.yield(.toolProgress(content))
+                            }
+                        case "message_stop":
+                            let convId = json["conversationId"] as? String
+                            continuation.yield(.messageStop(conversationId: convId))
+                            continuation.finish()
+                            return
+                        case "error":
+                            let content = json["content"] as? String ?? "Unknown error"
+                            continuation.yield(.error(content))
+                            continuation.finish()
+                            return
+                        default:
+                            break
                         }
                     }
 

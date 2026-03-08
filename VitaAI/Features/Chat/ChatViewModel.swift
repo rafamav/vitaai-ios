@@ -66,7 +66,15 @@ final class ChatViewModel {
             ) {
                 switch event {
                 case .textDelta(let chunk):
-                    messages[idx].content += chunk
+                    // If a progress indicator was showing, replace it; otherwise append
+                    if messages[idx].content.hasPrefix("⏳") {
+                        messages[idx].content = chunk
+                    } else {
+                        messages[idx].content += chunk
+                    }
+
+                case .toolProgress(let text):
+                    messages[idx].content = "⏳ \(text)"
 
                 case .messageStop(let convId):
                     if let convId {

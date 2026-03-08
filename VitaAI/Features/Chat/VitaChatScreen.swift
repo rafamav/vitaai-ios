@@ -384,6 +384,69 @@ private struct SuggestionChip: View {
     }
 }
 
+// MARK: - Studio Actions Menu
+
+private struct StudioActionsMenu: View {
+    let onSelect: (String) -> Void
+    @Binding var isPresented: Bool
+
+    private struct StudioAction {
+        let icon: String
+        let label: String
+        let prompt: String
+    }
+
+    private let actions: [StudioAction] = [
+        StudioAction(icon: "brain.head.profile", label: "Gerar Flashcards",   prompt: "Gere flashcards sobre "),
+        StudioAction(icon: "doc.text",           label: "Gerar Resumo",       prompt: "Faca um resumo completo sobre "),
+        StudioAction(icon: "list.clipboard",     label: "Gerar Quiz",         prompt: "Gere um quiz sobre ")
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(actions, id: \.label) { action in
+                Button {
+                    isPresented = false
+                    onSelect(action.prompt)
+                } label: {
+                    HStack(spacing: 12) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(VitaColors.accent.opacity(0.12))
+                                .frame(width: 32, height: 32)
+                            Image(systemName: action.icon)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundStyle(VitaColors.accent)
+                        }
+                        Text(action.label)
+                            .font(VitaTypography.bodyMedium)
+                            .foregroundStyle(VitaColors.textPrimary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if action.label != actions.last?.label {
+                    Divider()
+                        .background(VitaColors.surfaceBorder)
+                        .padding(.horizontal, 14)
+                }
+            }
+        }
+        .padding(.vertical, 6)
+        .background(VitaColors.surfaceElevated)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(VitaColors.glassBorder, lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.35), radius: 16, x: 0, y: 8)
+    }
+}
+
 // MARK: - Input Bar
 
 private struct ChatInputBar: View {
@@ -391,6 +454,7 @@ private struct ChatInputBar: View {
     var isInputFocused: FocusState<Bool>.Binding
 
     @State private var isListening: Bool = false
+    @State private var showPlusMenu: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -398,6 +462,38 @@ private struct ChatInputBar: View {
                 .background(VitaColors.surfaceBorder)
 
             HStack(spacing: 10) {
+                // Plus button — Studio actions
+                Button {
+                    showPlusMenu.toggle()
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(showPlusMenu ? VitaColors.accent.opacity(0.18) : VitaColors.surfaceCard)
+                            .frame(width: 34, height: 34)
+                        Image(systemName: showPlusMenu ? "xmark" : "plus")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(showPlusMenu ? VitaColors.accent : VitaColors.textSecondary)
+                            .animation(.easeInOut(duration: 0.15), value: showPlusMenu)
+                    }
+                }
+                .buttonStyle(.plain)
+                .overlay(alignment: .bottomLeading) {
+                    if showPlusMenu {
+                        StudioActionsMenu(
+                            onSelect: { prompt in
+                                viewModel.inputText = prompt
+                                isInputFocused.wrappedValue = true
+                            },
+                            isPresented: $showPlusMenu
+                        )
+                        .frame(width: 230)
+                        .offset(x: 0, y: -148)
+                        .zIndex(100)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .bottomLeading)))
+                    }
+                }
+                .animation(.easeOut(duration: 0.18), value: showPlusMenu)
+
                 TextField(
                     isListening ? "Ouvindo..." : "Pergunte para a Vita...",
                     text: Binding(
