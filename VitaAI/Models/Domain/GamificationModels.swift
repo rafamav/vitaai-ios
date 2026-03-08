@@ -18,6 +18,8 @@ struct UserProgress {
     var totalChatMessages: Int = 0
     var totalNotesCreated: Int = 0
     var dailyXp: Int = 0
+    // dailyGoal: populated from server (GamificationStatsResponse or AppConfigService).
+    // Default 50 matches server gamification.ts fallback.
     var dailyGoal: Int = 50
     var dailyLoginClaimed: Bool = false
 
@@ -87,73 +89,108 @@ struct XpEvent {
 }
 
 // MARK: - XpSource
+/// XP reward sources — matches server gamification.ts.
+/// XP values are fetched from GET /api/config/app via AppConfigService.
+/// Fallback constants are used offline or before first fetch.
 
-/// XP reward sources — mirrors Android XpSource enum.
 enum XpSource {
     case flashcardReview
     case flashcardEasy
+    case questionAnswered
+    case questionAnsweredWrong
     case chatMessage
     case noteCreated
     case pdfAnnotated
     case dailyLogin
     case deckComplete
+    case simuladoComplete
+    case qbankSessionComplete
+    case osceCompleted
+    case studySessionEnd
 
     var label: String {
         switch self {
-        case .flashcardReview: return "Flashcard"
-        case .flashcardEasy:   return "Flashcard"
-        case .chatMessage:     return "Chat"
-        case .noteCreated:     return "Nota"
-        case .pdfAnnotated:    return "PDF"
-        case .dailyLogin:      return "Login diário"
-        case .deckComplete:    return "Deck completo"
+        case .flashcardReview:       return "Flashcard"
+        case .flashcardEasy:         return "Flashcard"
+        case .questionAnswered:      return "Questao"
+        case .questionAnsweredWrong: return "Questao"
+        case .chatMessage:           return "Chat"
+        case .noteCreated:           return "Nota"
+        case .pdfAnnotated:          return "PDF"
+        case .dailyLogin:            return "Login diário"
+        case .deckComplete:          return "Deck completo"
+        case .simuladoComplete:      return "Simulado"
+        case .qbankSessionComplete:  return "QBank"
+        case .osceCompleted:         return "OSCE"
+        case .studySessionEnd:       return "Sessao"
         }
     }
 
-    var xp: Int {
+    /// Typed key for AppConfigService lookup.
+    var rewardKey: XpRewardKey {
         switch self {
-        case .flashcardReview: return 10
-        case .flashcardEasy:   return 15
-        case .chatMessage:     return 5
-        case .noteCreated:     return 20
-        case .pdfAnnotated:    return 15
-        case .dailyLogin:      return 25
-        case .deckComplete:    return 50
+        case .flashcardReview:       return .flashcardReview
+        case .flashcardEasy:         return .flashcardEasy
+        case .questionAnswered:      return .questionAnswered
+        case .questionAnsweredWrong: return .questionAnsweredWrong
+        case .chatMessage:           return .chatMessage
+        case .noteCreated:           return .noteCreated
+        case .pdfAnnotated:          return .pdfAnnotated
+        case .dailyLogin:            return .dailyLogin
+        case .deckComplete:          return .deckComplete
+        case .simuladoComplete:      return .simuladoComplete
+        case .qbankSessionComplete:  return .qbankSessionComplete
+        case .osceCompleted:         return .osceCompleted
+        case .studySessionEnd:       return .studySessionEnd
         }
+    }
+
+    /// XP value from remote config (AppConfigService), with fallback to local constants.
+    /// Callable from any concurrency context — reads the thread-safe static snapshot.
+    /// NOTE: The server is the authoritative source. This value is only used for
+    /// display/preview — actual XP awarded always comes from the server response
+    /// (LogActivityResponse.xpAwarded).
+    var xp: Int {
+        AppConfigService.xp(for: rewardKey)
     }
 }
 
 // MARK: - Level Thresholds
-// Mirrors Android LevelThresholds + server gamification.ts — 30 levels.
+// 1000 levels using formula floor(50 * n^1.5).
+// Matches server gamification.ts — single source of truth.
 
 enum LevelThresholds {
-    static let thresholds: [Int] = [
-        0, 100, 250, 500, 1_000, 2_000, 3_500, 5_500, 8_000, 11_000,      // 1-10
-        15_000, 20_000, 26_000, 33_000, 41_000, 50_000, 60_000, 72_000,    // 11-18
-        85_000, 100_000, 120_000, 142_000, 168_000, 198_000, 232_000,      // 19-25
-        270_000, 315_000, 365_000, 420_000, 500_000,                        // 26-30
-    ]
+    static let maxLevel = 1000
+
+    static func threshold(_ level: Int) -> Int {
+        if level <= 1 { return 0 }
+        return Int(floor(50.0 * pow(Double(level), 1.5)))
+    }
 
     static func level(for totalXp: Int) -> Int {
-        var currentLevel = 1
-        for i in stride(from: thresholds.count - 1, through: 0, by: -1) {
-            if totalXp >= thresholds[i] {
-                currentLevel = i + 1
-                break
+        // Binary search for efficiency with 1000 levels
+        var lo = 0
+        var hi = maxLevel - 1
+        while lo <= hi {
+            let mid = (lo + hi) / 2
+            if threshold(mid + 1) <= totalXp {
+                lo = mid + 1
+            } else {
+                hi = mid - 1
             }
         }
-        return currentLevel
+        return max(1, lo + 1)
     }
 
     static func xpForLevel(_ level: Int) -> Int {
-        let idx = max(0, min(level - 1, thresholds.count - 1))
-        return thresholds[idx]
+        return threshold(max(1, min(level, maxLevel)))
     }
 
     static func xpToNextLevel(_ level: Int) -> Int {
-        let currentIdx = max(0, min(level - 1, thresholds.count - 1))
-        let nextIdx = min(currentIdx + 1, thresholds.count - 1)
-        return currentIdx == nextIdx ? 10_000 : thresholds[nextIdx] - thresholds[currentIdx]
+        let currentXp = xpForLevel(level)
+        let nextLevel = min(level + 1, maxLevel)
+        let nextXp = xpForLevel(nextLevel)
+        return level >= maxLevel ? 10_000 : nextXp - currentXp
     }
 
     static func currentLevelXp(totalXp: Int, level: Int) -> Int {

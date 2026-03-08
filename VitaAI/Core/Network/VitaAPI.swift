@@ -225,6 +225,40 @@ actor VitaAPI {
         ])
     }
 
+    // MARK: - QBank
+
+    func getQBankProgress() async throws -> QBankProgressResponse {
+        try await client.get("qbank/progress")
+    }
+
+    func getQBankFilters() async throws -> QBankFiltersResponse {
+        try await client.get("qbank/filters")
+    }
+
+    func createQBankSession(request: QBankCreateSessionRequest) async throws -> QBankSession {
+        try await client.post("qbank/sessions", body: request)
+    }
+
+    func getQBankQuestion(id: Int) async throws -> QBankQuestionDetail {
+        try await client.get("qbank/questions/\(id)")
+    }
+
+    func answerQBankQuestion(id: Int, request: QBankAnswerRequest) async throws -> QBankAnswerResponse {
+        try await client.post("qbank/questions/\(id)/answer", body: request)
+    }
+
+    func getQBankSessions(limit: Int = 5) async throws -> QBankSessionsResponse {
+        try await client.get("qbank/sessions", queryItems: [
+            URLQueryItem(name: "limit", value: String(limit)),
+        ])
+    }
+
+    // MARK: - App Config (remote gamification config — single source of truth)
+
+    func fetchAppConfig() async throws -> AppConfigResponse {
+        try await client.get("config/app")
+    }
+
     // MARK: - Activity / Gamification
 
     func logActivity(action: String, metadata: [String: String]? = nil) async throws -> LogActivityResponse {

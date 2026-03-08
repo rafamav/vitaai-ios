@@ -131,6 +131,7 @@ struct QBankCreateSessionRequest: Encodable {
     let onlyResidence: Bool?
     let onlyUnanswered: Bool?
     let title: String?
+    let status: String?
 }
 
 struct QBankSession: Decodable, Identifiable {
@@ -175,6 +176,24 @@ struct QBankProgressByTopic: Decodable, Identifiable {
     var accuracy: Double {
         answered > 0 ? Double(correct) / Double(answered) : 0
     }
+}
+
+// MARK: - Sessions List
+
+struct QBankSessionsResponse: Decodable {
+    var sessions: [QBankSessionSummary] = []
+}
+
+struct QBankSessionSummary: Decodable, Identifiable {
+    var id: String = ""
+    var title: String? = nil
+    var totalQuestions: Int = 0
+    var currentIndex: Int = 0
+    var correctCount: Int = 0
+    var completedAt: String? = nil
+    var createdAt: String = ""
+
+    var isActive: Bool { completedAt == nil }
 }
 
 // MARK: - Query Filters (ViewModel-side helper)
