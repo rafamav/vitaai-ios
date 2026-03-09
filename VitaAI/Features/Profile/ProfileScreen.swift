@@ -7,6 +7,7 @@ struct ProfileScreen: View {
     var onNavigateToAbout:         (() -> Void)?
     var onNavigateToAppearance:    (() -> Void)?
     var onNavigateToNotifications: (() -> Void)?
+    var onNavigateToConnections:   (() -> Void)?
     var onNavigateToCanvasConnect: (() -> Void)?
     var onNavigateToWebAluno:      (() -> Void)?
     var onNavigateToInsights:      (() -> Void)?
@@ -141,21 +142,12 @@ struct ProfileScreen: View {
 
                 // Integrations group
                 VitaGlassCard {
-                    VStack(spacing: 0) {
-                        settingsRow(
-                            icon: "building.columns",
-                            title: "Canvas LMS",
-                            subtitle: "Conectar faculdade",
-                            action: { onNavigateToCanvasConnect?() }
-                        )
-                        Divider().background(VitaColors.glassBorder)
-                        settingsRow(
-                            icon: "graduationcap",
-                            title: "WebAluno",
-                            subtitle: "Conectar portal",
-                            action: { onNavigateToWebAluno?() }
-                        )
-                    }
+                    settingsRow(
+                        icon: "link",
+                        title: "Integracoes",
+                        subtitle: "Canvas, WebAluno, Google Calendar e Drive",
+                        action: { onNavigateToConnections?() }
+                    )
                 }
                 .padding(.horizontal, 20)
 
