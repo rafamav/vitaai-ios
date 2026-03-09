@@ -1801,6 +1801,6 @@ struct QBankConfigToggleRow: View {
 
 extension CGFloat {
     func clamped(to range: ClosedRange<CGFloat>) -> CGFloat {
-        max(range.lowerBound, min(self, range.upperBound))
+        Swift.max(range.lowerBound, Swift.min(self, range.upperBound))
     }
 }
