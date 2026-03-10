@@ -76,3 +76,24 @@ struct Assignment: Codable, Identifiable {
     var courseName: String = ""
     var courseId: String = ""
 }
+
+/// Request body for the canvas/ingest endpoint.
+/// `scrapedJson` carries the raw JSON string produced by the in-page scraping script.
+/// `nativeCookies` carries the session cookie string captured from the WKWebView cookie store,
+/// used by the server for background sync without re-authentication.
+struct CanvasIngestRequest: Encodable {
+    var instanceUrl: String
+    var scrapedJson: String
+    var nativeCookies: String?
+}
+
+/// Response from canvas/ingest — mirrors CanvasSyncResponse shape.
+struct CanvasIngestResponse: Codable {
+    var success: Bool = false
+    var courses: Int = 0
+    var files: Int = 0
+    var assignments: Int = 0
+    var calendarEvents: Int = 0
+    var errors: [String] = []
+    var error: String?
+}

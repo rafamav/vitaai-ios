@@ -25,6 +25,18 @@ actor VitaAPI {
         try await client.delete("canvas/connect")
     }
 
+    /// Ingests Canvas data scraped from the WebView.
+    /// `scrapedJson` is the raw JSON string from the in-page scraping script.
+    /// `nativeCookies` is the session cookie string captured from WKWebView for background sync.
+    func canvasIngest(instanceUrl: String, scrapedJson: String, nativeCookies: String?) async throws -> CanvasIngestResponse {
+        let body = CanvasIngestRequest(
+            instanceUrl: instanceUrl,
+            scrapedJson: scrapedJson,
+            nativeCookies: nativeCookies
+        )
+        return try await client.post("canvas/ingest", body: body)
+    }
+
     // MARK: - Canvas Data
 
     func getCourses() async throws -> CoursesResponse {

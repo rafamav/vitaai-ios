@@ -59,6 +59,21 @@ struct CanvasConnectScreen: View {
                 viewModel?.dismissMessages()
             }
         }
+        .sheet(isPresented: Binding(
+            get: { viewModel?.state.showingWebViewSheet ?? false },
+            set: { if !$0 { viewModel?.closeWebViewSheet() } }
+        )) {
+            if let vm = viewModel {
+                CanvasWebViewScreen(
+                    instanceUrl: vm.state.instanceUrlInput,
+                    onBack: { vm.closeWebViewSheet() },
+                    onDataScraped: { json, url, cookies in
+                        vm.connectWithScrapedData(json: json, instanceUrl: url, nativeCookies: cookies)
+                    }
+                )
+                .ignoresSafeArea()
+            }
+        }
     }
 
     // MARK: - Main content
@@ -224,62 +239,124 @@ struct CanvasConnectScreen: View {
 
     @ViewBuilder
     private func connectForm(vm: CanvasConnectViewModel) -> some View {
-        // Instructions card
-        VitaGlassCard {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Conectar Canvas LMS")
-                    .font(VitaTypography.titleSmall)
-                    .fontWeight(.semibold)
-                    .foregroundColor(VitaColors.textPrimary)
+        // Primary action: login via WebView (recommended)
+        webViewConnectCard(vm: vm)
 
-                Text(
-                    "Para conectar, você precisa do token de acesso do Canvas. " +
-                    "Acesse seu Canvas → Configurações → Token de Acesso → Gerar novo token."
+        // Divider
+        HStack(spacing: 12) {
+            Rectangle()
+                .frame(height: 1)
+                .foregroundColor(VitaColors.surfaceBorder)
+            Text("ou use token")
+                .font(VitaTypography.labelSmall)
+                .foregroundColor(VitaColors.textTertiary)
+            Rectangle()
+                .frame(height: 1)
+                .foregroundColor(VitaColors.surfaceBorder)
+        }
+        .padding(.vertical, 4)
+
+        // Manual token form
+        tokenConnectCard(vm: vm)
+    }
+
+    // MARK: - WebView connect card
+
+    private func webViewConnectCard(vm: CanvasConnectViewModel) -> some View {
+        VitaGlassCard {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(VitaColors.accent.opacity(0.12))
+                            .frame(width: 44, height: 44)
+                        Image(systemName: "safari.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(VitaColors.accent)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Entrar com conta Canvas")
+                            .font(VitaTypography.titleSmall)
+                            .fontWeight(.semibold)
+                            .foregroundColor(VitaColors.textPrimary)
+                        Text("Recomendado — login com Google")
+                            .font(VitaTypography.labelSmall)
+                            .foregroundColor(VitaColors.textSecondary)
+                    }
+
+                    Spacer()
+                }
+
+                // Instance URL input (shared between both methods)
+                VitaInput(
+                    value: Binding(
+                        get: { vm.state.instanceUrlInput },
+                        set: { vm.updateInstanceUrlInput($0) }
+                    ),
+                    label: "URL da Instituicao",
+                    placeholder: "https://suauni.instructure.com",
+                    leadingSystemImage: "link",
+                    keyboardType: .URL
                 )
-                .font(VitaTypography.bodySmall)
-                .foregroundColor(VitaColors.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
+
+                VitaButton(
+                    text: vm.state.isIngestingWebView ? "Processando dados..." : "Entrar no Canvas",
+                    action: { vm.openWebViewSheet() },
+                    variant: .primary,
+                    size: .lg,
+                    isEnabled: !vm.state.isIngestingWebView,
+                    isLoading: vm.state.isIngestingWebView,
+                    leadingSystemImage: vm.state.isIngestingWebView ? nil : "arrow.right.circle.fill"
+                )
+                .frame(maxWidth: .infinity)
             }
             .padding(16)
         }
+    }
 
-        // Instance URL
-        VitaInput(
-            value: Binding(
-                get: { vm.state.instanceUrlInput },
-                set: { vm.updateInstanceUrlInput($0) }
-            ),
-            label: "URL da Instituição",
-            placeholder: "https://suauni.instructure.com",
-            leadingSystemImage: "link",
-            keyboardType: .URL
-        )
+    // MARK: - Token connect card
 
-        // Token
-        VitaInput(
-            value: Binding(
-                get: { vm.state.tokenInput },
-                set: { vm.updateTokenInput($0) }
-            ),
-            label: "Token de Acesso",
-            placeholder: "Cole seu token aqui",
-            leadingSystemImage: "key",
-            isSecure: true,
-            submitLabel: .go,
-            onSubmit: { vm.connect() }
-        )
+    private func tokenConnectCard(vm: CanvasConnectViewModel) -> some View {
+        VitaGlassCard {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Token de Acesso")
+                        .font(VitaTypography.titleSmall)
+                        .fontWeight(.semibold)
+                        .foregroundColor(VitaColors.textPrimary)
+                    Text("Canvas → Configuracoes → Token de Acesso → Gerar novo token")
+                        .font(VitaTypography.bodySmall)
+                        .foregroundColor(VitaColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
-        // Connect button
-        VitaButton(
-            text: vm.state.isConnecting ? "Conectando..." : "Conectar Canvas",
-            action: { vm.connect() },
-            variant: .primary,
-            size: .lg,
-            isEnabled: !vm.state.isConnecting && !vm.state.tokenInput.trimmingCharacters(in: .whitespaces).isEmpty,
-            isLoading: vm.state.isConnecting,
-            leadingSystemImage: vm.state.isConnecting ? nil : "graduationcap"
-        )
-        .frame(maxWidth: .infinity)
+                VitaInput(
+                    value: Binding(
+                        get: { vm.state.tokenInput },
+                        set: { vm.updateTokenInput($0) }
+                    ),
+                    label: "Token de Acesso",
+                    placeholder: "Cole seu token aqui",
+                    leadingSystemImage: "key",
+                    isSecure: true,
+                    submitLabel: .go,
+                    onSubmit: { vm.connect() }
+                )
+
+                VitaButton(
+                    text: vm.state.isConnecting ? "Conectando..." : "Conectar com Token",
+                    action: { vm.connect() },
+                    variant: .secondary,
+                    size: .lg,
+                    isEnabled: !vm.state.isConnecting && !vm.state.tokenInput.trimmingCharacters(in: .whitespaces).isEmpty,
+                    isLoading: vm.state.isConnecting,
+                    leadingSystemImage: vm.state.isConnecting ? nil : "key.fill"
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .padding(16)
+        }
     }
 
     // MARK: - Info row

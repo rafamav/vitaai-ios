@@ -17,6 +17,10 @@ struct CanvasConnectViewState {
     var isConnecting: Bool = false
     var isSyncing: Bool = false
     var isDisconnecting: Bool = false
+    var isIngestingWebView: Bool = false
+
+    // Sheet
+    var showingWebViewSheet: Bool = false
 
     // Messages
     var error: String? = nil
@@ -155,6 +159,50 @@ final class CanvasConnectViewModel {
             } catch {
                 state.isDisconnecting = false
                 state.error = "Falha ao desconectar"
+            }
+        }
+    }
+
+    // MARK: - WebView connect
+
+    func openWebViewSheet() {
+        state.showingWebViewSheet = true
+        state.error = nil
+        state.successMessage = nil
+    }
+
+    func closeWebViewSheet() {
+        state.showingWebViewSheet = false
+    }
+
+    /// Called by CanvasWebViewScreen after successful scraping.
+    /// Sends the scraped JSON and session cookies to the server via canvas/ingest.
+    func connectWithScrapedData(json: String, instanceUrl: String, nativeCookies: String?) {
+        Task {
+            state.showingWebViewSheet = false
+            state.isIngestingWebView = true
+            state.error = nil
+            state.successMessage = nil
+            do {
+                let result = try await api.canvasIngest(
+                    instanceUrl: instanceUrl,
+                    scrapedJson: json,
+                    nativeCookies: nativeCookies
+                )
+                state.isIngestingWebView = false
+                if result.success {
+                    state.isConnected = true
+                    state.status = "active"
+                    state.instanceUrl = instanceUrl
+                    state.successMessage = "Canvas conectado! \(result.courses) disciplinas importadas."
+                    // Refresh status to get lastSyncAt
+                    await loadStatus()
+                } else {
+                    state.error = result.error ?? "Falha ao processar dados do Canvas"
+                }
+            } catch {
+                state.isIngestingWebView = false
+                state.error = "Erro ao enviar dados. Verifique sua internet."
             }
         }
     }
