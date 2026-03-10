@@ -123,6 +123,89 @@ final class EstudosViewModel {
     var isLoading = true
     var error: String? = nil
 
+    // MARK: - Academic Center (Webaluno)
+
+    /// All grades loaded from the Webaluno API for all semesters.
+    var allGrades: [WebalunoGrade] = []
+    /// Distinct semesters extracted from allGrades, sorted descending (most recent first).
+    var availableSemesters: [String] = []
+    /// Currently selected semester pill. nil = show all grades.
+    var selectedSemester: String? = nil
+    /// Whether the Webaluno integration is connected and has data.
+    var webalunoConnected: Bool = false
+    /// Loading flag for the Webaluno grades fetch (separate from main Canvas isLoading).
+    var isLoadingAcademic: Bool = false
+
+    /// GPA computed from filteredGrades.finalGrade values.
+    var averageGrade: Double? {
+        let values = filteredGrades.compactMap(\.finalGrade)
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
+    }
+
+    /// Average attendance computed from filteredGrades.
+    var averageAttendance: Double? {
+        let values = filteredGrades.compactMap(\.attendance)
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
+    }
+
+    /// Grades filtered by selectedSemester (or all grades when nil).
+    var filteredGrades: [WebalunoGrade] {
+        guard let sem = selectedSemester else { return allGrades }
+        return allGrades.filter { $0.semester == sem }
+    }
+
+    /// Resolves the professor name for a subject from the schedule (best-effort).
+    func professorForSubject(_ subjectName: String) -> String? {
+        nil // Schedule professor resolution not yet implemented on iOS
+    }
+
+    func selectSemester(_ semester: String) {
+        selectedSemester = semester
+    }
+
+    func loadWebalunoData() async {
+        guard !isLoadingAcademic else { return }
+        isLoadingAcademic = true
+        defer { isLoadingAcademic = false }
+
+        do {
+            async let statusTask = api.getWebalunoStatus()
+            async let gradesTask = api.getWebalunoGrades()
+
+            let (statusResp, gradesResp) = try await (statusTask, gradesTask)
+
+            webalunoConnected = statusResp.connected
+            let grades = gradesResp.grades
+
+            // Extract distinct semesters sorted descending (most recent first).
+            let rawSemesters = grades.compactMap(\.semester).filter { !$0.isEmpty }
+            let sortedSemesters = Array(Set(rawSemesters)).sorted { a, b in
+                // Format "1/2024" — sort by year desc then by semester number desc.
+                let partsA = a.split(separator: "/")
+                let partsB = b.split(separator: "/")
+                if partsA.count == 2, partsB.count == 2,
+                   let yearA = Int(partsA[1]), let yearB = Int(partsB[1]),
+                   let semA = Int(partsA[0]), let semB = Int(partsB[0]) {
+                    if yearA != yearB { return yearA > yearB }
+                    return semA > semB
+                }
+                return a > b
+            }
+
+            allGrades = grades
+            availableSemesters = sortedSemesters
+
+            // Auto-select the most recent semester on first load.
+            if selectedSemester == nil {
+                selectedSemester = sortedSemesters.first
+            }
+        } catch {
+            print("[EstudosViewModel] Webaluno load failed: \(error)")
+        }
+    }
+
     // Selected course filter for PDFs tab
     var selectedCourseId: String? = nil
 
@@ -195,6 +278,9 @@ final class EstudosViewModel {
         loadMock()
         isLoading = false
 
+        // Load Webaluno data in parallel with Canvas data.
+        async let webalunoTask: Void = loadWebalunoData()
+
         do {
             async let progressTask  = api.getProgress()
             async let coursesTask   = api.getCourses()
@@ -234,6 +320,9 @@ final class EstudosViewModel {
             print("[EstudosViewModel] API fallback: \(error)")
             self.error = error.localizedDescription
         }
+
+        // Await webaluno (it handles its own errors internally).
+        await webalunoTask
     }
 
     func selectTab(_ tab: EstudosTab) {

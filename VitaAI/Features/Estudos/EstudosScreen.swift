@@ -78,6 +78,28 @@ private struct EstudosContent: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
+            // Academic Header + Semester Navigator — mirrors Android AcademicHeader
+            if viewModel.isLoadingAcademic && viewModel.allGrades.isEmpty {
+                AcademicHeaderSkeleton()
+                    .transition(.opacity)
+            } else if viewModel.webalunoConnected || !viewModel.allGrades.isEmpty {
+                AcademicHeaderView(
+                    averageGrade: viewModel.averageGrade,
+                    averageAttendance: viewModel.averageAttendance,
+                    studyStreakDays: viewModel.streakDays
+                )
+                .transition(.move(edge: .top).combined(with: .opacity))
+
+                if viewModel.availableSemesters.count > 1 {
+                    SemesterNavigatorView(
+                        semesters: viewModel.availableSemesters,
+                        selectedSemester: viewModel.selectedSemester,
+                        onSemesterSelected: { viewModel.selectSemester($0) }
+                    )
+                    .transition(.opacity)
+                }
+            }
+
             // 4-tab bar (Disciplinas | Notebooks | Flashcards | PDFs)
             EstudosTabBar(selectedTab: $viewModel.selectedTab)
 
@@ -94,6 +116,8 @@ private struct EstudosContent: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.canvasConnected)
+        .animation(.easeInOut(duration: 0.25), value: viewModel.webalunoConnected)
+        .animation(.easeInOut(duration: 0.25), value: viewModel.allGrades.isEmpty)
     }
 }
 
@@ -102,22 +126,33 @@ private extension EstudosContent {
     var tabContent: some View {
         switch viewModel.selectedTab {
         case .disciplinas:
-            DisciplinasTab(
-                viewModel: viewModel,
-                onCourseClick: { courseId, colorIndex in
-                    if let navigate = onNavigateToCourseDetail {
-                        navigate(courseId, colorIndex)
-                    } else {
-                        // Fallback: switch to PDFs tab filtered by course
-                        viewModel.selectCourse(courseId)
-                    }
-                },
-                onNavigateToSimulados: onNavigateToSimulados,
-                onNavigateToOsce: onNavigateToOsce,
-                onNavigateToAtlas: onNavigateToAtlas,
-                onNavigateToProvas: onNavigateToProvas,
-                onRefresh: { await viewModel.load() }
-            )
+            if viewModel.webalunoConnected || !viewModel.allGrades.isEmpty {
+                // Webaluno connected — show academic grade cards (Academic Center)
+                AcademicDisciplinasTab(
+                    grades: viewModel.filteredGrades,
+                    isLoading: viewModel.isLoadingAcademic && viewModel.allGrades.isEmpty,
+                    professorResolver: { viewModel.professorForSubject($0) },
+                    onRefresh: { await viewModel.loadWebalunoData() }
+                )
+            } else {
+                // Fallback to Canvas course list (no Webaluno connected)
+                DisciplinasTab(
+                    viewModel: viewModel,
+                    onCourseClick: { courseId, colorIndex in
+                        if let navigate = onNavigateToCourseDetail {
+                            navigate(courseId, colorIndex)
+                        } else {
+                            // Fallback: switch to PDFs tab filtered by course
+                            viewModel.selectCourse(courseId)
+                        }
+                    },
+                    onNavigateToSimulados: onNavigateToSimulados,
+                    onNavigateToOsce: onNavigateToOsce,
+                    onNavigateToAtlas: onNavigateToAtlas,
+                    onNavigateToProvas: onNavigateToProvas,
+                    onRefresh: { await viewModel.load() }
+                )
+            }
 
         case .notebooks:
             NotebooksTab(
@@ -815,6 +850,419 @@ private struct CourseGridCell: View {
             }
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Academic Center: Header Skeleton
+
+private struct AcademicHeaderSkeleton: View {
+    @State private var shimmer = false
+
+    var body: some View {
+        HStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 20)
+                .fill(VitaColors.surfaceCard)
+                .frame(width: 40, height: 40)
+
+            VStack(alignment: .leading, spacing: 6) {
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(VitaColors.surfaceCard)
+                    .frame(width: 120, height: 12)
+                RoundedRectangle(cornerRadius: 4)
+                    .fill(VitaColors.surfaceCard)
+                    .frame(width: 180, height: 10)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .opacity(shimmer ? 0.4 : 0.9)
+        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: shimmer)
+        .onAppear { shimmer = true }
+    }
+}
+
+// MARK: - Academic Center: Header
+
+private struct AcademicHeaderView: View {
+    let averageGrade: Double?
+    let averageAttendance: Double?
+    let studyStreakDays: Int
+
+    var body: some View {
+        HStack(spacing: 8) {
+            AcademicStatPill(
+                icon: "star.fill",
+                label: "CRA",
+                value: averageGrade.map { String(format: "%.1f", $0) } ?? "--",
+                iconColor: VitaColors.dataAmber
+            )
+            AcademicStatPill(
+                icon: "checkmark.circle.fill",
+                label: "Presença",
+                value: averageAttendance.map { "\(Int($0))%" } ?? "--",
+                iconColor: attendanceTint(averageAttendance)
+            )
+            AcademicStatPill(
+                icon: "flame.fill",
+                label: "Sequência",
+                value: "\(studyStreakDays)d",
+                iconColor: VitaColors.dataRed
+            )
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
+
+    private func attendanceTint(_ att: Double?) -> Color {
+        guard let att else { return VitaColors.textSecondary }
+        if att >= 75 { return VitaColors.dataGreen }
+        if att >= 60 { return VitaColors.dataAmber }
+        return VitaColors.dataRed
+    }
+}
+
+private struct AcademicStatPill: View {
+    let icon: String
+    let label: String
+    let value: String
+    let iconColor: Color
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundStyle(iconColor)
+            Text(value)
+                .font(VitaTypography.titleSmall)
+                .fontWeight(.bold)
+                .foregroundStyle(VitaColors.textPrimary)
+            Text(label)
+                .font(VitaTypography.labelSmall)
+                .foregroundStyle(VitaColors.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(VitaColors.surfaceCard)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(VitaColors.surfaceBorder, lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Academic Center: Semester Navigator
+
+private struct SemesterNavigatorView: View {
+    let semesters: [String]
+    let selectedSemester: String?
+    let onSemesterSelected: (String) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(semesters, id: \.self) { semester in
+                    let isSelected = semester == selectedSemester
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        onSemesterSelected(semester)
+                    } label: {
+                        Text(formatSemesterLabel(semester))
+                            .font(VitaTypography.labelMedium)
+                            .fontWeight(isSelected ? .semibold : .regular)
+                            .foregroundStyle(isSelected ? VitaColors.black : VitaColors.textSecondary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(isSelected ? VitaColors.accent : VitaColors.surfaceCard)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .animation(.easeInOut(duration: 0.2), value: isSelected)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 6)
+        }
+    }
+
+    private func formatSemesterLabel(_ raw: String) -> String {
+        let parts = raw.split(separator: "/")
+        if parts.count == 2 {
+            return "\(parts[0])° / \(parts[1])"
+        }
+        return raw
+    }
+}
+
+// MARK: - Academic Center: Disciplinas Tab (Webaluno connected)
+
+private struct AcademicDisciplinasTab: View {
+    let grades: [WebalunoGrade]
+    let isLoading: Bool
+    let professorResolver: (String) -> String?
+    var onRefresh: (() async -> Void)?
+
+    private static let semProgress = semesterTimeProgress()
+
+    var body: some View {
+        if isLoading {
+            AcademicGradesSkeleton()
+        } else if grades.isEmpty {
+            AcademicEmptyState()
+        } else {
+            ScrollView(showsIndicators: false) {
+                LazyVStack(spacing: 10) {
+                    ForEach(grades) { grade in
+                        SubjectGradeCard(
+                            grade: grade,
+                            professor: professorResolver(grade.subjectName),
+                            semProgress: Self.semProgress
+                        )
+                        .padding(.horizontal, 16)
+                    }
+                }
+                .padding(.top, 12)
+                .padding(.bottom, 100)
+            }
+            .refreshable { await onRefresh?() }
+        }
+    }
+}
+
+private struct AcademicGradesSkeleton: View {
+    @State private var shimmer = false
+
+    var body: some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 10) {
+                ForEach(0..<4, id: \.self) { _ in
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(VitaColors.surfaceCard)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 160)
+                        .opacity(shimmer ? 0.4 : 0.9)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+        }
+        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: shimmer)
+        .onAppear { shimmer = true }
+    }
+}
+
+private struct AcademicEmptyState: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "graduationcap.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(VitaColors.accent.opacity(0.6))
+            Text("Nenhuma disciplina")
+                .font(VitaTypography.titleMedium)
+                .fontWeight(.medium)
+                .foregroundStyle(VitaColors.textPrimary)
+            Text("As disciplinas do Webaluno aparecerão aqui após a sincronização.")
+                .font(VitaTypography.bodySmall)
+                .foregroundStyle(VitaColors.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+            Spacer()
+        }
+        .padding(.bottom, 100)
+    }
+}
+
+// MARK: - Academic Center: Subject Grade Card
+
+private struct SubjectGradeCard: View {
+    let grade: WebalunoGrade
+    let professor: String?
+    let semProgress: Double
+
+    private var isInProgress: Bool {
+        let s = grade.status?.lowercased() ?? ""
+        return s != "aprovado" && s != "approved" && s != "reprovado" && s != "failed"
+    }
+
+    private var sColor: Color {
+        subjectColor(for: grade.subjectName)
+    }
+
+    var body: some View {
+        VitaGlassCard {
+            VStack(alignment: .leading, spacing: 0) {
+                // Header: subject icon + name + code + status badge
+                HStack(alignment: .top, spacing: 10) {
+                    // Subject icon
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(sColor.opacity(0.12))
+                            .frame(width: 40, height: 40)
+                        Image(systemName: subjectIcon(for: grade.subjectName))
+                            .font(.system(size: 18))
+                            .foregroundStyle(sColor)
+                    }
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(grade.subjectName)
+                            .font(VitaTypography.bodyLarge)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(VitaColors.textPrimary)
+                            .lineLimit(2)
+                        if let code = grade.subjectCode, !code.isEmpty {
+                            Text(code)
+                                .font(VitaTypography.labelSmall)
+                                .foregroundStyle(VitaColors.textTertiary)
+                        }
+                    }
+
+                    Spacer()
+
+                    StatusBadgeView(status: grade.status)
+                }
+
+                // Professor row
+                if let prof = professor, !prof.isEmpty {
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(VitaColors.textTertiary)
+                        Text(prof)
+                            .font(VitaTypography.labelSmall)
+                            .foregroundStyle(VitaColors.textSecondary)
+                            .lineLimit(1)
+                    }
+                    .padding(.top, 6)
+                }
+
+                // Grade chips: N1 | N2 | N3 | Final
+                HStack(spacing: 8) {
+                    GradeChipView(label: "N1", value: grade.grade1)
+                    GradeChipView(label: "N2", value: grade.grade2)
+                    GradeChipView(label: "N3", value: grade.grade3)
+                    GradeChipView(label: "Final", value: grade.finalGrade, isFinal: true)
+                }
+                .padding(.top, 12)
+
+                // Semester time progress bar (in-progress subjects only)
+                if isInProgress {
+                    VStack(spacing: 4) {
+                        HStack {
+                            Image(systemName: "calendar")
+                                .font(.system(size: 11))
+                                .foregroundStyle(VitaColors.textTertiary)
+                            Text("Progresso do semestre")
+                                .font(VitaTypography.labelSmall)
+                                .foregroundStyle(VitaColors.textSecondary)
+                            Spacer()
+                            Text("\(Int(semProgress * 100))%")
+                                .font(VitaTypography.labelSmall)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(sColor)
+                        }
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(VitaColors.surfaceBorder)
+                                    .frame(height: 4)
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(sColor.opacity(0.85))
+                                    .frame(width: geo.size.width * semProgress, height: 4)
+                            }
+                        }
+                        .frame(height: 4)
+                    }
+                    .padding(.top, 12)
+                }
+
+                // Attendance as secondary info
+                if let att = grade.attendance {
+                    let attColor: Color = att >= 75 ? VitaColors.dataGreen : (att >= 60 ? VitaColors.dataAmber : VitaColors.dataRed)
+                    HStack(spacing: 4) {
+                        if att < 75 {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(VitaColors.dataRed)
+                        }
+                        Text("Presença: \(Int(att))%")
+                            .font(VitaTypography.labelSmall)
+                            .foregroundStyle(VitaColors.textSecondary)
+                        Spacer()
+                        Text(att >= 75 ? "Regular" : "Atenção")
+                            .font(VitaTypography.labelSmall)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(attColor)
+                    }
+                    .padding(.top, 8)
+                }
+            }
+            .padding(16)
+        }
+    }
+}
+
+private struct GradeChipView: View {
+    let label: String
+    let value: Double?
+    var isFinal: Bool = false
+
+    private var bgColor: Color {
+        guard let v = value else { return VitaColors.surfaceBorder.opacity(0.5) }
+        if v >= 7.0 { return VitaColors.dataGreen.opacity(0.15) }
+        if v >= 5.0 { return VitaColors.dataAmber.opacity(0.15) }
+        return VitaColors.dataRed.opacity(0.15)
+    }
+
+    private var textColor: Color {
+        guard let v = value else { return VitaColors.textTertiary }
+        if v >= 7.0 { return VitaColors.dataGreen }
+        if v >= 5.0 { return VitaColors.dataAmber }
+        return VitaColors.dataRed
+    }
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(label)
+                .font(VitaTypography.labelSmall)
+                .fontWeight(isFinal ? .bold : .regular)
+                .foregroundStyle(textColor.opacity(0.7))
+            Text(value.map { String(format: "%.1f", $0) } ?? "-")
+                .font(VitaTypography.titleSmall)
+                .fontWeight(.bold)
+                .foregroundStyle(textColor)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .background(bgColor)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+private struct StatusBadgeView: View {
+    let status: String?
+
+    private var config: (label: String, bg: Color, fg: Color) {
+        switch status?.lowercased() {
+        case "aprovado", "approved":
+            return ("Aprovado", VitaColors.dataGreen.opacity(0.15), VitaColors.dataGreen)
+        case "reprovado", "failed":
+            return ("Reprovado", VitaColors.dataRed.opacity(0.15), VitaColors.dataRed)
+        default:
+            return ("Em curso", VitaColors.accent.opacity(0.12), VitaColors.accent)
+        }
+    }
+
+    var body: some View {
+        Text(config.label)
+            .font(VitaTypography.labelSmall)
+            .fontWeight(.semibold)
+            .foregroundStyle(config.fg)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(config.bg)
+            .clipShape(Capsule())
     }
 }
 
