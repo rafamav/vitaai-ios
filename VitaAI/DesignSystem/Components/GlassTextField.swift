@@ -21,9 +21,9 @@ struct GlassTextField: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .background(VitaColors.glassBg)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .clipShape(RoundedRectangle(cornerRadius: VitaTokens.Components.GlassCard.radius))
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: VitaTokens.Components.GlassCard.radius)
                 .stroke(VitaColors.glassBorder, lineWidth: 1)
         )
     }

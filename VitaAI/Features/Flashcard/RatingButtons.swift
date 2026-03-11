@@ -22,10 +22,10 @@ struct RatingButtonsView: View {
     var onRate: (ReviewRating) -> Void
 
     // Data colors — match Android RatingButtons.kt and web globals.css
-    private let colorAgain = Color(hex: 0xF87171)   // --data-red   dark
-    private let colorHard  = Color(hex: 0xFBBF24)   // --data-amber dark
-    private let colorGood  = Color(hex: 0x4ADE80)   // --data-green dark
-    private let colorEasy  = Color(hex: 0x60A5FA)   // --data-blue  dark
+    private let colorAgain = VitaTokens.DarkColors.dataRed
+    private let colorHard  = VitaTokens.DarkColors.dataAmber
+    private let colorGood  = VitaTokens.DarkColors.dataGreen
+    private let colorEasy  = VitaTokens.DarkColors.dataBlue
 
     private func options() -> [RatingOption] {
         let fmt = FsrsScheduler.formatInterval

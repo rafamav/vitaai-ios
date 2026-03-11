@@ -7,13 +7,15 @@ struct VitaGlassCard<Content: View>: View {
         self.content = content()
     }
 
+    private let cornerRadius: CGFloat = VitaTokens.Components.GlassCard.radius  // 14
+
     var body: some View {
         content
             .frame(maxWidth: .infinity)
             .background(VitaColors.glassBg)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             .overlay(
-                RoundedRectangle(cornerRadius: 18)
+                RoundedRectangle(cornerRadius: cornerRadius)
                     .stroke(VitaColors.glassBorder, lineWidth: 1)
             )
             .overlay(alignment: .top) {
@@ -21,7 +23,7 @@ struct VitaGlassCard<Content: View>: View {
                 Capsule()
                     .fill(
                         LinearGradient(
-                            colors: [.clear, Color.white.opacity(0.06), .clear],
+                            colors: [.clear, VitaColors.glassHighlight, .clear],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
@@ -29,5 +31,6 @@ struct VitaGlassCard<Content: View>: View {
                     .frame(height: 1)
                     .padding(.horizontal, 24)
             }
+            .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
     }
 }

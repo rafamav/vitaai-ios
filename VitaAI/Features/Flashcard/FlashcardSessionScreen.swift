@@ -15,7 +15,7 @@ struct FlashcardSessionScreen: View {
 
     // Progress bar gradient — matches web/Android
     private let progressGradient = LinearGradient(
-        colors: [VitaColors.accent, Color(hex: 0x3B82F6)],
+        colors: [VitaColors.accent, VitaColors.dataBlue],
         startPoint: .leading,
         endPoint: .trailing
     )

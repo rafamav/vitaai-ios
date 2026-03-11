@@ -1,7 +1,7 @@
 import SwiftUI
 
 private let presetColors: [Color] = [
-    Color(hex: 0x22D3EE),  // cyan/teal
+    VitaTokens.PrimitiveColors.gold400,  // gold (accent)
     Color(hex: 0xEF4444),  // red
     Color(hex: 0x22C55E),  // green
     Color(hex: 0x3B82F6),  // blue
@@ -90,7 +90,7 @@ struct ColorPickerView: View {
         }
         .padding(16)
         .background(
-            Color(hex: 0x0A0E14).opacity(0.97)
+            VitaColors.surfaceElevated.opacity(0.97)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16)

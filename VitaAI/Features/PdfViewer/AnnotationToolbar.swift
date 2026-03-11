@@ -21,7 +21,7 @@ struct AnnotationToolbar: View {
     @State private var showColorPicker: Bool = false
     @State private var showShapeMenu: Bool = false
 
-    private let surfaceBg = Color(hex: 0x1A1A2E).opacity(0.97)
+    private let surfaceBg = VitaColors.surfaceElevated.opacity(0.97)
     private let borderColor = Color.white.opacity(0.08)
 
     var body: some View {
