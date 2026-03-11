@@ -5,10 +5,10 @@ import SwiftUI
 /// XP progress bar showing level progress and daily goal.
 ///
 /// Renders two animated horizontal bars:
-/// - **Level bar** (8pt, cyan gradient): progress through current level (800ms ease-out cubic)
+/// - **Level bar** (8pt, gold gradient): progress through current level (800ms ease-out cubic)
 /// - **Daily bar** (4pt, amber): daily XP goal progress (600ms, 100ms delay)
 ///
-/// Mirrors Android VitaXpBar.kt — teal gradient + EaseOutCubic timing.
+/// Mirrors Android VitaXpBar.kt — gold gradient + EaseOutCubic timing.
 ///
 /// Usage:
 /// ```swift
@@ -65,7 +65,7 @@ struct VitaXpBar: View {
                     .fill(VitaColors.surfaceBorder)
                     .frame(height: 8)
 
-                // Animated fill — cyan gradient
+                // Animated fill — gold gradient
                 RoundedRectangle(cornerRadius: 4)
                     .fill(
                         LinearGradient(

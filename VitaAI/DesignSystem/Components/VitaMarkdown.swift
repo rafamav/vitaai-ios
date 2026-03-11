@@ -5,7 +5,7 @@ import SwiftUI
 // Native SwiftUI Markdown renderer using AttributedString (iOS 15+).
 // Supports: H1-H3, bold, italic, inline code, code blocks, ordered/unordered lists,
 // blockquotes, links, strikethrough, horizontal rules.
-// Styled for VitaAI dark theme (cyan accent, glass surfaces).
+// Styled for VitaAI dark theme (gold accent, glass surfaces).
 //
 // Android reference: VitaMarkdown.kt (Markwon library — same feature set ported natively).
 

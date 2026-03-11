@@ -86,7 +86,7 @@ private struct _VitaXpToastHost: View {
 
 // MARK: - _VitaXpToastPill
 
-/// The visual pill shown for "+25 XP" toasts. Teal-tinted with sparkle icon.
+/// The visual pill shown for "+25 XP" toasts. Gold-tinted with sparkle icon.
 private struct _VitaXpToastPill: View {
     let event: XpEvent
 
@@ -111,7 +111,7 @@ private struct _VitaXpToastPill: View {
             ZStack {
                 // Material blur base
                 Capsule().fill(.ultraThinMaterial)
-                // Teal tint overlay (0.15 alpha — mirrors Android)
+                // Gold tint overlay (0.15 alpha — mirrors Android)
                 Capsule().fill(VitaColors.accent.opacity(0.15))
             }
         )

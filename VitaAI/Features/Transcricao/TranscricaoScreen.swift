@@ -135,7 +135,7 @@ private struct IdlePhase: View {
         VStack(spacing: 24) {
             Spacer()
 
-            // Mic button with ambient glow — matches Android KastTeal 96dp style
+            // Mic button with ambient glow — matches Android 96dp style
             Button(action: onStart) {
                 ZStack {
                     // Outer ambient glow

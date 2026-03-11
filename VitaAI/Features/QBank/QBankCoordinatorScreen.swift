@@ -62,19 +62,19 @@ struct QBankCoordinatorScreen: View {
 // MARK: - Convex Glass Modifier
 
 private struct ConvexGlassModifier: ViewModifier {
-    var isCyan: Bool = false
+    var isAccented: Bool = false
 
     func body(content: Content) -> some View {
         content
             .background(
                 ZStack {
-                    if isCyan {
-                        Circle().fill(Color(red: 0.04, green: 0.10, blue: 0.12))
+                    if isAccented {
+                        Circle().fill(VitaColors.surfaceElevated)
                         Circle().fill(
                             RadialGradient(
                                 stops: [
-                                    .init(color: Color(red: 0.13, green: 0.83, blue: 0.93).opacity(0.25), location: 0),
-                                    .init(color: Color(red: 0.13, green: 0.83, blue: 0.93).opacity(0.05), location: 0.5),
+                                    .init(color: VitaColors.accent.opacity(0.25), location: 0),
+                                    .init(color: VitaColors.accent.opacity(0.05), location: 0.5),
                                     .init(color: Color.black.opacity(0.20), location: 1),
                                 ],
                                 center: UnitPoint(x: 0.5, y: 0.25),
@@ -83,7 +83,7 @@ private struct ConvexGlassModifier: ViewModifier {
                             )
                         )
                     } else {
-                        Circle().fill(Color(red: 0.086, green: 0.106, blue: 0.094))
+                        Circle().fill(VitaColors.surfaceElevated)
                         Circle().fill(
                             RadialGradient(
                                 stops: [
@@ -101,7 +101,7 @@ private struct ConvexGlassModifier: ViewModifier {
             )
             .overlay(
                 Circle().stroke(
-                    isCyan ? Color(red: 0.13, green: 0.83, blue: 0.93).opacity(0.2) : Color.white.opacity(0.12),
+                    isAccented ? VitaColors.accent.opacity(0.2) : Color.white.opacity(0.12),
                     lineWidth: 1
                 )
             )
@@ -112,13 +112,13 @@ private struct ConvexGlassModifier: ViewModifier {
 
 private struct ConvexGlassCircle<Content: View>: View {
     let size: CGFloat
-    var isCyan: Bool = false
+    var isAccented: Bool = false
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         content()
             .frame(width: size, height: size)
-            .modifier(ConvexGlassModifier(isCyan: isCyan))
+            .modifier(ConvexGlassModifier(isAccented: isAccented))
     }
 }
 
@@ -163,7 +163,7 @@ private struct QBankHomeContent: View {
                                 icon: "play.fill",
                                 title: "Nova Sessão",
                                 subtitle: "Configure filtros e pratique com questões de provas reais",
-                                isCyan: false
+                                isAccented: false
                             ) {
                                 vm.goToDisciplines()
                             }
@@ -173,7 +173,7 @@ private struct QBankHomeContent: View {
                                     icon: "brain",
                                     title: "Estudo Inteligente",
                                     subtitle: "Prioriza questões erradas e não vistas para otimizar seu estudo",
-                                    isCyan: true,
+                                    isAccented: true,
                                     isLoading: vm.state.isCreatingSmartSession
                                 ) {
                                     vm.startSmartStudy()
@@ -340,22 +340,22 @@ private struct QBankActionCTA: View {
     let icon: String
     let title: String
     let subtitle: String
-    var isCyan: Bool = false
+    var isAccented: Bool = false
     var isLoading: Bool = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 14) {
-                ConvexGlassCircle(size: 44, isCyan: isCyan) {
+                ConvexGlassCircle(size: 44, isAccented: isAccented) {
                     if isLoading {
                         ProgressView()
-                            .tint(isCyan ? VitaColors.accent : .white)
+                            .tint(isAccented ? VitaColors.accent : .white)
                             .scaleEffect(0.7)
                     } else {
                         Image(systemName: icon)
                             .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(isCyan ? VitaColors.accent : Color.white.opacity(0.9))
+                            .foregroundStyle(isAccented ? VitaColors.accent : Color.white.opacity(0.9))
                     }
                 }
 

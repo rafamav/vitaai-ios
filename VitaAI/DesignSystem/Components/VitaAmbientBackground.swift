@@ -13,7 +13,7 @@ struct VitaAmbientBackground<Content: View>: View {
                 .ignoresSafeArea()
 
             Canvas { context, size in
-                // Light 1: top-left, primary cyan glow
+                // Light 1: top-left, primary gold glow
                 let center1 = CGPoint(x: size.width * 0.08, y: size.height * 0.12)
                 let gradient1 = Gradient(colors: [
                     VitaColors.ambientPrimary.opacity(0.11),
@@ -36,7 +36,7 @@ struct VitaAmbientBackground<Content: View>: View {
                     )
                 }
 
-                // Light 2: bottom-right, secondary cyan
+                // Light 2: bottom-right, secondary gold
                 let center2 = CGPoint(x: size.width * 0.85, y: size.height * 0.78)
                 let gradient2 = Gradient(colors: [
                     VitaColors.ambientSecondary.opacity(0.07),
@@ -59,7 +59,7 @@ struct VitaAmbientBackground<Content: View>: View {
                     )
                 }
 
-                // Light 3: center, deep subtle fill
+                // Light 3: center, deep subtle gold fill
                 let center3 = CGPoint(x: size.width * 0.50, y: size.height * 0.40)
                 let gradient3 = Gradient(colors: [
                     VitaColors.ambientTertiary.opacity(0.05),

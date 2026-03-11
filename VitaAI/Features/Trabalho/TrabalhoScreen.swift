@@ -251,7 +251,7 @@ private struct GradeRow: View {
 
     private var gradeColor: Color {
         let pct = grade.maxValue > 0 ? grade.value / grade.maxValue : 0
-        if pct >= 0.7 { return Color(hex: 0x22C55E) }
+        if pct >= 0.7 { return VitaColors.dataGreen }
         if pct >= 0.5 { return Color.yellow }
         return Color.red
     }

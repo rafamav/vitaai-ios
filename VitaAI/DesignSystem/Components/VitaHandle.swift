@@ -16,11 +16,11 @@ struct VitaHandle: View {
     var onDragEnd: () -> Void = {}
     var onTap: () -> Void = {}
 
-    // Custom green-tinted dark palette — intentionally local.
+    // Custom warm dark palette — intentionally local.
     // TODO: promote to design-tokens once agreed (see Android VitaHandle.kt TODOs).
-    private static let bgDark   = Color(hex: 0x0D1210)
-    private static let bgMid    = Color(hex: 0x111916)
-    private static let bgLight  = Color(hex: 0x1A2520)
+    private static let bgDark   = Color(hex: 0x1A1412)
+    private static let bgMid    = Color(hex: 0x1E1814)
+    private static let bgLight  = Color(hex: 0x2A2620)
 
     @State private var glowOpacity: Double = 0.08
     @GestureState private var dragOffset: CGFloat = 0
