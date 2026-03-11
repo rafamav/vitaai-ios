@@ -18,7 +18,7 @@ enum VitaTokens {
         static let borderSurface = Color(red: 0.102, green: 0.125, blue: 0.157)
         static let text = Color(red: 1.000, green: 1.000, blue: 1.000).opacity(0.85)
         static let textSecondary = Color(red: 1.000, green: 1.000, blue: 1.000).opacity(0.55)
-        static let textMuted = Color(red: 1.000, green: 1.000, blue: 1.000).opacity(0.25)
+        static let textMuted = Color(red: 1.000, green: 1.000, blue: 1.000).opacity(0.35)     // was 0.25 — contrast bump (SHIELD feedback)
         static let dataBlue = Color(red: 0.376, green: 0.647, blue: 0.980)
         static let dataGreen = Color(red: 0.290, green: 0.871, blue: 0.502)
         static let dataAmber = Color(red: 0.984, green: 0.749, blue: 0.141)

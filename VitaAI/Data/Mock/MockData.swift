@@ -68,6 +68,19 @@ enum MockData {
         ]
     }
 
+    static func continueStudying() -> ContinueStudyingItem {
+        ContinueStudyingItem(
+            subject: "Anatomia Humana II",
+            sessionType: "Flashcards",
+            progress: 0.42,
+            cardsDone: 19,
+            cardsTotal: 45,
+            streakDays: 12,
+            daysUntilExam: 3,
+            studyInsight: "Voce acerta 92% quando revisa antes de dormir"
+        )
+    }
+
     static func studyTip() -> String {
         let tips = [
             "Técnica Pomodoro: 25min de foco, 5min de pausa. Após 4 ciclos, 15min de pausa longa.",

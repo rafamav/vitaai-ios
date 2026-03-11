@@ -45,4 +45,9 @@ enum VitaColors {
     static let dataAmber  = VitaTokens.PrimitiveColors.amber500     // #f59e0b
     static let dataBlue   = VitaTokens.PrimitiveColors.blue400      // #60a5fa
     static let dataIndigo = VitaTokens.PrimitiveColors.indigo400    // #a78bfa (card back accent)
+
+    // Hero card badge colors — ContinueStudyingCard (SHIELD design feedback)
+    static let badgeStreak  = Color(red: 0.510, green: 0.784, blue: 0.549)   // (130,200,140)/255 — green streak
+    static let badgeUrgency = Color(red: 1.000, green: 0.471, blue: 0.314)   // (255,120,80)/255  — red-orange urgency
+    static let ctaGold      = Color(red: 0.784, green: 0.627, blue: 0.314)   // (200,160,80)/255  — CTA button gradient start
 }

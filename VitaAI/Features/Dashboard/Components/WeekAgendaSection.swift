@@ -5,7 +5,7 @@ struct WeekAgendaSection: View {
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
+            HStack(spacing: 10) {
                 ForEach(days) { day in
                     VStack(spacing: 6) {
                         Text(day.label)
@@ -31,11 +31,11 @@ struct WeekAgendaSection: View {
                         .frame(height: 24)
                     }
                     .frame(width: 70)
-                    .padding(.vertical, 10)
+                    .padding(.vertical, 12)
                     .glassCard(cornerRadius: 12)
                 }
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 16)
         }
     }
 }

@@ -12,6 +12,7 @@ final class DashboardViewModel {
     var studyModules: [StudyModule] = []
     var studyTip: String = ""
     var suggestions: [VitaSuggestion] = []
+    var continueStudying: ContinueStudyingItem?
     var isLoading = true
     var error: String?
 
@@ -65,5 +66,6 @@ final class DashboardViewModel {
         studyModules = MockData.studyModules()
         studyTip = MockData.studyTip()
         suggestions = MockData.vitaSuggestions()
+        continueStudying = MockData.continueStudying()
     }
 }
