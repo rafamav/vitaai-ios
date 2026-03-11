@@ -1,0 +1,12 @@
+/* VitaAI — pt-BR (default language) */
+
+/* ContinueStudyingCard */
+"continue_studying_title" = "Continuar Estudando";
+"continue_studying_cta"   = "CONTINUAR ESTUDANDO";
+"progress_cards_format"   = "%d de %d cards";
+"streak_days_format"      = "%d dias";
+"exam_days_format"        = "Prova em %d dias";
+"study_insight_night_review" = "Voce acerta 92%% quando revisa antes de dormir";
+
+/* DashboardScreen section headers */
+"section_upcoming_exams"  = "Proximas Provas";

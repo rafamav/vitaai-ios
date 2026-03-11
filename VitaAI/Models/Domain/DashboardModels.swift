@@ -38,3 +38,16 @@ struct VitaSuggestion: Identifiable {
     let label: String
     let prompt: String
 }
+
+// MARK: - Hero Card Model
+
+struct ContinueStudyingItem {
+    let subject: String        // ex: "Anatomia Humana II"
+    let sessionType: String    // ex: "Flashcards"
+    let progress: Double       // 0.0 – 1.0
+    let cardsDone: Int
+    let cardsTotal: Int
+    let streakDays: Int
+    let daysUntilExam: Int?    // nil = sem prova proxima
+    let studyInsight: String   // insight personalizado
+}

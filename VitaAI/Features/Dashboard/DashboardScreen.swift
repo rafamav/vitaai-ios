@@ -60,9 +60,16 @@ struct DashboardScreen: View {
                     .padding(.horizontal, 20)
                 }
 
+                // Hero Card — Continue Studying
+                if let item = viewModel.continueStudying {
+                    ContinueStudyingCard(item: item, onContinue: {
+                        onNavigateToFlashcards?()
+                    })
+                }
+
                 // Upcoming Exams
                 if !viewModel.upcomingExams.isEmpty {
-                    SectionHeader(title: "Próximas Provas")
+                    SectionHeader(title: "Proximas Provas")
                     UpcomingExamsRow(exams: viewModel.upcomingExams)
                 }
 
