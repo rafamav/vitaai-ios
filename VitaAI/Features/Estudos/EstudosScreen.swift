@@ -78,7 +78,18 @@ private struct EstudosContent: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            // 4-tab bar (Disciplinas | Notebooks | Flashcards | PDFs)
+            // Quick Stats Row — matches mockup top stats (Media, Resolvidas, Streak)
+            EstudosQuickStats(viewModel: viewModel)
+                .padding(.horizontal, 16)
+                .padding(.top, viewModel.canvasConnected ? 8 : 4)
+                .padding(.bottom, 8)
+
+            // Continue Hero Card — matches mockup "Continuar Estudando" section
+            EstudosContinueCard()
+                .padding(.horizontal, 16)
+                .padding(.bottom, 14)
+
+            // Tab bar: pill style (Disciplinas | Notebooks | Flashcards | PDFs)
             EstudosTabBar(selectedTab: $viewModel.selectedTab)
 
             // Body
@@ -161,7 +172,81 @@ private extension EstudosContent {
     }
 }
 
-// MARK: - Tab Bar
+// MARK: - Quick Stats Row (matches mockup top quick stats)
+
+private struct EstudosQuickStats: View {
+    let viewModel: EstudosViewModel
+
+    var body: some View {
+        HStack(spacing: 8) {
+            // Media — gold color
+            statCard(
+                value: "\(Int(viewModel.avgAccuracy * 100))%",
+                label: NSLocalizedString("Media", comment: ""),
+                valueColor: VitaColors.accent.opacity(0.85)
+            )
+            // Resolvidas — white
+            statCard(
+                value: viewModel.flashcardsDue > 999
+                    ? "\(viewModel.flashcardsDue / 1000)k"
+                    : "\(viewModel.flashcardsDue)",
+                label: NSLocalizedString("Resolvidas", comment: ""),
+                valueColor: Color.white.opacity(0.70)
+            )
+            // Streak — amber/orange with flame icon
+            streakCard
+        }
+    }
+
+    private func statCard(value: String, label: String, valueColor: Color) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(valueColor)
+            Text(label)
+                .font(.system(size: 8, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.25))
+                .textCase(.uppercase)
+                .kerning(0.5)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(Color.white.opacity(0.04))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var streakCard: some View {
+        VStack(spacing: 2) {
+            HStack(alignment: .center, spacing: 3) {
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color(red: 1.0, green: 0.71, blue: 0.39).opacity(0.80))
+                Text("\(viewModel.streakDays)")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(Color(red: 1.0, green: 0.71, blue: 0.39).opacity(0.85))
+            }
+            Text(NSLocalizedString("Streak", comment: ""))
+                .font(.system(size: 8, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.25))
+                .textCase(.uppercase)
+                .kerning(0.5)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(Color.white.opacity(0.04))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+// MARK: - Tab Bar (pill style — matches mockup etabs)
 
 private struct EstudosTabBar: View {
     @Binding var selectedTab: EstudosTab
@@ -173,33 +258,37 @@ private struct EstudosTabBar: View {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         selectedTab = tab
                     }
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 } label: {
-                    VStack(spacing: 6) {
-                        Text(tab.title)
-                            .font(VitaTypography.labelMedium)
-                            .fontWeight(selectedTab == tab ? .semibold : .regular)
-                            .foregroundStyle(
-                                selectedTab == tab
-                                    ? VitaColors.accent
-                                    : VitaColors.textSecondary
-                            )
-
-                        Rectangle()
-                            .fill(selectedTab == tab ? VitaColors.accent : Color.clear)
-                            .frame(height: 2)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .animation(.easeInOut(duration: 0.2), value: selectedTab)
+                    Text(tab.title)
+                        .font(.system(size: 11, weight: selectedTab == tab ? .semibold : .medium))
+                        .foregroundStyle(
+                            selectedTab == tab
+                                ? Color.white.opacity(0.90)
+                                : Color.white.opacity(0.35)
+                        )
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(
+                            selectedTab == tab
+                                ? VitaColors.accent.opacity(0.20)
+                                : Color.clear
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .animation(.easeInOut(duration: 0.2), value: selectedTab)
                 }
                 .buttonStyle(.plain)
             }
         }
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(VitaColors.glassBorder)
-                .frame(height: 1)
-        }
+        .padding(3)
+        .background(Color.white.opacity(0.04))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.06), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 16)
+        .padding(.bottom, 14)
     }
 }
 
@@ -241,6 +330,83 @@ private struct CanvasConnectBanner: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
         }
+    }
+}
+
+// MARK: - Continue Hero Card (matches mockup "Continuar Estudando")
+
+private struct EstudosContinueCard: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            // Top row: play icon + info + progress count
+            HStack(spacing: 12) {
+                // Play button
+                ZStack {
+                    Circle()
+                        .fill(Color.white.opacity(0.06))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(Color.white.opacity(0.50))
+                }
+
+                // Title + subtitle + progress bar
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Anatomia · QBank")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.85))
+                    Text("42 questoes restantes")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.white.opacity(0.45))
+                    // Progress bar
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.white.opacity(0.06))
+                                .frame(height: 4)
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(LinearGradient(
+                                    colors: [VitaColors.accent.opacity(0.50), Color(red: 1.0, green: 0.78, blue: 0.47).opacity(0.35)],
+                                    startPoint: .leading, endPoint: .trailing
+                                ))
+                                .frame(width: geo.size.width * 0.68, height: 4)
+                        }
+                    }
+                    .frame(height: 4)
+                    .padding(.top, 4)
+                }
+
+                Text("34/50")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.50))
+                    .frame(minWidth: 36, alignment: .trailing)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+
+            // CTA button
+            Button(action: {}) {
+                Text(NSLocalizedString("Continuar Estudando", comment: ""))
+                    .font(.system(size: 12, weight: .bold))
+                    .textCase(.uppercase)
+                    .tracking(0.5)
+                    .foregroundStyle(Color(red: 0.10, green: 0.08, blue: 0.05).opacity(0.95))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(VitaColors.goldGradient)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
+        }
+        .background(Color.white.opacity(0.04))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.white.opacity(0.07), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 }
 

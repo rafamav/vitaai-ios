@@ -38,3 +38,30 @@ struct VitaSuggestion: Identifiable {
     let label: String
     let prompt: String
 }
+
+// Evento de agenda do dia (usado no WeekAgendaSection)
+struct AgendaEvent: Identifiable {
+    let id = UUID()
+    let title: String
+    let time: String
+    let colorTag: AgendaEventColor
+}
+
+enum AgendaEventColor {
+    case green, blue, orange, gold
+}
+
+// Mini player — continuação de estudo ativo
+struct MiniPlayerData {
+    let subject: String       // "Anatomia"
+    let tool: String          // "Flashcards"
+    let completed: Int        // 34
+    let total: Int            // 50
+}
+
+// Disciplina fraca — seção "Atenção Necessária"
+struct WeakSubject: Identifiable {
+    let id = UUID()
+    let name: String
+    let score: Double  // 0.0 – 1.0
+}

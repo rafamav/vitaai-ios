@@ -48,7 +48,13 @@ struct MainTabView: View {
                             title: router.selectedTab.rawValue,
                             userName: authManager.userName,
                             userImageURL: authManager.userImage.flatMap(URL.init(string:)),
-                            onAvatarTap: { router.selectedTab = .profile }
+                            userLevel: nil,
+                            userStreak: 7,
+                            userCourse: NSLocalizedString("Medicina", comment: ""),
+                            userSemester: NSLocalizedString("5.º Semestre", comment: ""),
+                            onAvatarTap: { router.selectedTab = .historico },
+                            onNotificationsTap: {},
+                            onMenuTap: { router.selectedTab = .historico }
                         )
 
                         TabView(selection: $router.selectedTab) {
@@ -83,23 +89,18 @@ struct MainTabView: View {
                             )
                             .tag(TabItem.estudos)
 
-                            AgendaScreen()
-                                .tag(TabItem.agenda)
-
-                            ProfileScreen(
-                                authManager: authManager,
-                                onNavigateToAbout:         { router.navigate(to: .about) },
-                                onNavigateToAppearance:    { router.navigate(to: .appearance) },
-                                onNavigateToNotifications: { router.navigate(to: .notifications) },
-                                onNavigateToConnections:   { router.navigate(to: .connections) },
-                                onNavigateToCanvasConnect: { router.navigate(to: .canvasConnect) },
-                                onNavigateToWebAluno:      { router.navigate(to: .webalunoConnect) },
-                                onNavigateToInsights:      { router.navigate(to: .insights) },
-                                onNavigateToTrabalhos:     { router.navigate(to: .trabalhos) },
-                                onNavigateToPaywall:       { router.navigate(to: .paywall) },
-                                onNavigateToActivity:      { router.navigate(to: .activityFeed) }
+                            // Faculdade — Canvas courses, schedule, grades (matches mockup page-faculdade)
+                            FaculdadeScreen(
+                                onNavigateToCanvasConnect:  { router.navigate(to: .canvasConnect) },
+                                onNavigateToWebAluno:       { router.navigate(to: .webalunoConnect) },
+                                onNavigateToCourseDetail:   { courseId, colorIdx in router.navigate(to: .courseDetail(courseId: courseId, colorIndex: colorIdx)) },
+                                onNavigateToPdfViewer:      { url in router.navigate(to: .pdfViewer(url: url.absoluteString)) }
                             )
-                            .tag(TabItem.profile)
+                            .tag(TabItem.faculdade)
+
+                            // Historico — Insights + Activity (matches mockup page-historico)
+                            InsightsScreen()
+                                .tag(TabItem.historico)
                         }
                         .tabViewStyle(.page(indexDisplayMode: .never))
                     }

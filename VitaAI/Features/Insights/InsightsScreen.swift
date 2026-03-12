@@ -102,6 +102,19 @@ private struct InsightsContentView: View {
                     InsightsSkeleton()
                 }
 
+                // ── XP ring hero (always shown — mock data) ──────────────────────
+                XpRingHeroCard(streakDays: vm.streakDays)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 8)
+                    .staggerTransition(visible: overviewVisible)
+
+                // ── Meta Semanal expandível ──────────────────────────────────────
+                MetaSemanalCard()
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+                    .staggerTransition(visible: statsVisible)
+
                 // ── Overview hero card ──────────────────────────────────────────
                 if let stats = vm.studyStats {
                     OverviewCard(
@@ -210,6 +223,11 @@ private struct InsightsContentView: View {
 
                 // ── Upcoming exams ─────────────────────────────────────────────
                 ExamsSection(exams: vm.upcomingExams)
+                    .padding(.top, 8)
+
+                // ── Conquistas / Badges grid ────────────────────────────────────
+                ConquistasSection()
+                    .padding(.horizontal, 16)
                     .padding(.top, 8)
 
                 Spacer().frame(height: 100)
@@ -482,34 +500,35 @@ private struct StatsGrid: View {
         else if vm.avgAccuracy >= 50 { accuracySubtitle = "Razoável" }
         else { accuracySubtitle = "Precisa melhorar" }
 
+        // Colors match mockup stats grid: horas=gold, acerto=green, questoes=purple, cards=tan
         return [
             InsightsStatItem(
-                label: "PRECISÃO",
-                value: "\(Int(vm.avgAccuracy))%",
-                subtitle: accuracySubtitle,
-                icon: "target",
-                valueColor: accuracyColor
-            ),
-            InsightsStatItem(
-                label: "SEQUÊNCIA",
-                value: "\(vm.streakDays)d",
-                subtitle: "dias seguidos",
-                icon: "flame.fill",
-                valueColor: VitaColors.textTertiary
-            ),
-            InsightsStatItem(
-                label: "HORAS",
-                value: String(format: "%.1fh", vm.totalHours),
+                label: "Este Mes",
+                value: String(format: "%.0fh", vm.totalHours),
                 subtitle: "de estudo",
                 icon: "clock.fill",
-                valueColor: VitaColors.textTertiary
+                valueColor: VitaColors.accent
             ),
             InsightsStatItem(
-                label: "FLASHCARDS",
+                label: "Acerto",
+                value: "\(Int(vm.avgAccuracy))%",
+                subtitle: accuracySubtitle,
+                icon: "checkmark.circle.fill",
+                valueColor: VitaColors.dataGreen
+            ),
+            InsightsStatItem(
+                label: "Questoes",
+                value: "\(vm.totalCards > 0 ? vm.totalCards : 0)",
+                subtitle: "respondidas",
+                icon: "list.bullet.clipboard.fill",
+                valueColor: Color(red: 0.63, green: 0.55, blue: 0.78)
+            ),
+            InsightsStatItem(
+                label: "Cards",
                 value: "\(vm.totalCards)",
                 subtitle: "\(vm.flashcardsDue) pendentes",
-                icon: "brain.fill",
-                valueColor: VitaColors.textTertiary
+                icon: "square.stack.fill",
+                valueColor: Color(red: 0.78, green: 0.67, blue: 0.51)
             ),
         ]
     }
@@ -530,28 +549,34 @@ private struct SmallStatCard: View {
     let stat: InsightsStatItem
 
     var body: some View {
+        // Matches mockup stats 2x2 grid style (padding:12px 14px, icon badge + value + label)
         VitaGlassCard {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 4) {
+            HStack(spacing: 6) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(stat.valueColor.opacity(0.10))
+                        .frame(width: 28, height: 28)
                     Image(systemName: stat.icon)
-                        .font(.system(size: 10))
-                        .foregroundStyle(VitaColors.textTertiary)
-                    Text(stat.label)
-                        .font(.system(size: 9))
-                        .textCase(.uppercase)
-                        .tracking(0.8)
-                        .foregroundStyle(VitaColors.textTertiary)
+                        .font(.system(size: 14))
+                        .foregroundStyle(stat.valueColor.opacity(0.60))
                 }
-                Text(stat.value)
-                    .font(.system(size: 24, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(VitaColors.textPrimary)
-                Text(stat.subtitle)
-                    .font(VitaTypography.labelSmall)
-                    .foregroundStyle(stat.valueColor)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(stat.value)
+                        .font(.system(size: 17, weight: .bold))
+                        .monospacedDigit()
+                        .foregroundStyle(stat.valueColor.opacity(0.88))
+                        .lineLimit(1)
+                    Text(stat.label)
+                        .font(.system(size: 7, weight: .medium))
+                        .textCase(.uppercase)
+                        .tracking(0.3)
+                        .foregroundStyle(Color.white.opacity(0.20))
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
         }
         .accessibilityLabel("\(stat.label): \(stat.value), \(stat.subtitle)")
     }
@@ -940,6 +965,413 @@ private struct InsightsEmptyCard: View {
                     .multilineTextAlignment(.center)
             }
             .padding(.vertical, 24)
+        }
+    }
+}
+
+// MARK: - XP Ring Hero Card
+
+private struct XpRingHeroCard: View {
+    let streakDays: Int
+
+    // Mock data — will be replaced by real API data
+    private let level = 3
+    private let currentXP = 475
+    private let nextLevelXP = 500
+    private let levelLabel = "Nivel 4"
+
+    private var xpProgress: Double {
+        let levelBase = 400
+        let levelRange = nextLevelXP - levelBase
+        let userProgress = currentXP - levelBase
+        guard levelRange > 0 else { return 1.0 }
+        return Double(userProgress) / Double(levelRange)
+    }
+
+    // Week day streak dots
+    private let weekLetters = ["S", "T", "Q", "Q", "S", "S", "D"]
+    private let streakDaysCompleted = [true, true, true, true, true, false, true]
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 20)
+                .fill(VitaColors.glassBg)
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(VitaColors.glassBorder, lineWidth: 1)
+
+            // Subtle radial glow behind ring
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [VitaColors.accent.opacity(0.10), Color.clear],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 60
+                    )
+                )
+                .frame(width: 120, height: 120)
+                .offset(y: -10)
+
+            VStack(spacing: 0) {
+                // Level ring
+                ZStack {
+                    Circle()
+                        .stroke(Color.white.opacity(0.03), lineWidth: 5)
+                        .frame(width: 82, height: 82)
+
+                    Circle()
+                        .trim(from: 0, to: CGFloat(min(max(xpProgress, 0), 1)))
+                        .stroke(
+                            LinearGradient(
+                                colors: [VitaColors.accentLight.opacity(0.70), VitaColors.accentDark.opacity(0.45)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            style: StrokeStyle(lineWidth: 5.5, lineCap: .round)
+                        )
+                        .frame(width: 82, height: 82)
+                        .rotationEffect(.degrees(-90))
+                        .shadow(color: VitaColors.accent.opacity(0.25), radius: 6)
+
+                    VStack(spacing: 2) {
+                        Text("\(level)")
+                            .font(.system(size: 28, weight: .black))
+                            .foregroundStyle(VitaColors.accent.opacity(0.92))
+                            .monospacedDigit()
+                        Text("nivel")
+                            .font(.system(size: 7, weight: .medium))
+                            .textCase(.uppercase)
+                            .tracking(1.5)
+                            .foregroundStyle(Color.white.opacity(0.22))
+                    }
+                }
+                .padding(.top, 20)
+
+                // XP text
+                HStack(alignment: .firstTextBaseline, spacing: 3) {
+                    Text("\(currentXP)")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.72))
+                    Text("XP")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.white.opacity(0.25))
+                }
+                .padding(.top, 10)
+
+                // XP progress bar
+                GeometryReader { geo in
+                    let pct = CGFloat(min(max(xpProgress, 0), 1))
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(Color.white.opacity(0.04))
+                            .frame(height: 4)
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(LinearGradient(
+                                colors: [VitaColors.accent.opacity(0.65), VitaColors.accentLight.opacity(0.25)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ))
+                            .frame(width: geo.size.width * pct, height: 4)
+                    }
+                }
+                .frame(width: 120, height: 4)
+                .padding(.top, 6)
+
+                Text("\(nextLevelXP - currentXP) XP para \(levelLabel)")
+                    .font(.system(size: 9))
+                    .foregroundStyle(Color.white.opacity(0.20))
+                    .padding(.top, 4)
+
+                // Divider
+                Rectangle()
+                    .fill(Color.white.opacity(0.04))
+                    .frame(height: 1)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+
+                // Streak row
+                HStack(spacing: 10) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        let displayStreak = streakDays > 0 ? streakDays : 7
+                        Text("\(displayStreak)")
+                            .font(.system(size: 20, weight: .black))
+                            .foregroundStyle(VitaColors.accent.opacity(0.85))
+                        Text("dias")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.30))
+                    }
+
+                    Rectangle()
+                        .fill(Color.white.opacity(0.06))
+                        .frame(width: 1, height: 14)
+
+                    HStack(spacing: 3) {
+                        ForEach(Array(weekLetters.enumerated()), id: \.offset) { i, letter in
+                            let done = i < streakDaysCompleted.count ? streakDaysCompleted[i] : false
+                            ZStack {
+                                Circle()
+                                    .fill(done ? VitaColors.accent.opacity(0.65) : Color.white.opacity(0.05))
+                                    .frame(width: 22, height: 22)
+                                Text(letter)
+                                    .font(.system(size: 7, weight: .semibold))
+                                    .foregroundStyle(done ? Color(red: 20/255, green: 16/255, blue: 10/255) : Color.white.opacity(0.22))
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 12)
+            }
+        }
+    }
+}
+
+// MARK: - Meta Semanal Card
+
+private struct MetaSemanalCard: View {
+    @State private var expanded = false
+
+    private struct DayHours: Identifiable {
+        let id = UUID()
+        let name: String
+        let hours: Double
+        let maxHours: Double = 3.0
+    }
+
+    private let days: [DayHours] = [
+        DayHours(name: "Seg", hours: 2.5),
+        DayHours(name: "Ter", hours: 1.5),
+        DayHours(name: "Qua", hours: 3.0),
+        DayHours(name: "Qui", hours: 2.0),
+        DayHours(name: "Sex", hours: 1.5),
+        DayHours(name: "Sab", hours: 1.5),
+        DayHours(name: "Dom", hours: 0.0),
+    ]
+
+    private let currentHours = 12.0
+    private let goalHours = 15.0
+
+    private var progress: Double { min(currentHours / goalHours, 1.0) }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header row — tap to expand
+            Button {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    expanded.toggle()
+                }
+            } label: {
+                VStack(spacing: 8) {
+                    HStack {
+                        HStack(spacing: 7) {
+                            Image(systemName: "chart.bar.fill")
+                                .font(.system(size: 13))
+                                .foregroundStyle(VitaColors.dataGreen.opacity(0.55))
+                            Text("Meta Semanal")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.45))
+                        }
+
+                        Spacer()
+
+                        HStack(spacing: 5) {
+                            Text("\(Int(currentHours))h")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(Color.white.opacity(0.72))
+                            Text("/ \(Int(goalHours))h")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Color.white.opacity(0.18))
+
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.18))
+                                .rotationEffect(.degrees(expanded ? 180 : 0))
+                        }
+                    }
+
+                    // Progress bar
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 1.5)
+                                .fill(Color.white.opacity(0.04))
+                                .frame(height: 3)
+                            RoundedRectangle(cornerRadius: 1.5)
+                                .fill(LinearGradient(
+                                    colors: [VitaColors.dataGreen.opacity(0.52), VitaColors.dataGreen.opacity(0.15)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ))
+                                .frame(width: geo.size.width * CGFloat(progress), height: 3)
+                        }
+                    }
+                    .frame(height: 3)
+                }
+                .padding(14)
+            }
+            .buttonStyle(.plain)
+
+            // Expanded day breakdown
+            if expanded {
+                VStack(spacing: 6) {
+                    ForEach(days) { day in
+                        let pct = day.hours > 0 ? min(day.hours / day.maxHours, 1.0) : 0.0
+                        HStack(spacing: 10) {
+                            Text(day.name)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.35))
+                                .frame(width: 24)
+
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    RoundedRectangle(cornerRadius: 2)
+                                        .fill(Color.white.opacity(0.04))
+                                        .frame(height: 5)
+                                    if pct > 0 {
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(VitaColors.dataGreen.opacity(0.55))
+                                            .frame(width: geo.size.width * CGFloat(pct), height: 5)
+                                    }
+                                }
+                            }
+                            .frame(height: 5)
+
+                            Text(day.hours > 0 ? String(format: "%.1fh", day.hours) : "—")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Color.white.opacity(day.hours > 0 ? 0.45 : 0.18))
+                                .frame(width: 28, alignment: .trailing)
+                                .monospacedDigit()
+                        }
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 12)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .background(VitaColors.glassBg)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(VitaColors.glassBorder, lineWidth: 1)
+        )
+    }
+}
+
+// MARK: - Conquistas Section
+
+private struct BadgeItem: Identifiable {
+    let id = UUID()
+    let title: String
+    let subtitle: String
+    let icon: String
+    let iconColor: Color
+    let locked: Bool
+}
+
+private let mockBadges: [BadgeItem] = [
+    BadgeItem(title: "Streak 7",   subtitle: "7 dias consecutivos",  icon: "flame.fill",              iconColor: VitaColors.accent,     locked: false),
+    BadgeItem(title: "100 Quest",  subtitle: "100 questoes feitas",   icon: "book.fill",               iconColor: VitaColors.accent,     locked: false),
+    BadgeItem(title: "50 Cards",   subtitle: "50 flashcards",         icon: "rectangle.on.rectangle",  iconColor: VitaColors.accent,     locked: false),
+    BadgeItem(title: "Chat Pro",   subtitle: "Conversa com VITA",     icon: "bubble.left.fill",        iconColor: VitaColors.accent,     locked: false),
+    BadgeItem(title: "Nota 9+",    subtitle: "Nota 9+ em prova",      icon: "star.fill",               iconColor: VitaColors.accent,     locked: false),
+    BadgeItem(title: "80% Acc",    subtitle: "80% de acerto",         icon: "target",                  iconColor: VitaColors.accent,     locked: false),
+    BadgeItem(title: "Streak 30",  subtitle: "30 dias seguidos",      icon: "lock.fill",               iconColor: VitaColors.textTertiary, locked: true),
+    BadgeItem(title: "500 Quest",  subtitle: "500 questoes",          icon: "lock.fill",               iconColor: VitaColors.textTertiary, locked: true),
+    BadgeItem(title: "Nivel 10",   subtitle: "Alcance nivel 10",      icon: "lock.fill",               iconColor: VitaColors.textTertiary, locked: true),
+]
+
+private struct ConquistasSection: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Conquistas")
+                    .font(VitaTypography.labelLarge)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(VitaColors.textPrimary)
+                Spacer()
+                Text("6 / 25")
+                    .font(VitaTypography.labelSmall)
+                    .foregroundStyle(VitaColors.accent)
+            }
+
+            // 3-col grid via chunked VStack (avoids LazyVGrid-in-LazyVStack height issue)
+            VStack(spacing: 10) {
+                let rows = mockBadges.chunked(into: 3)
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    HStack(spacing: 10) {
+                        ForEach(row) { badge in
+                            BadgeCell(badge: badge)
+                                .frame(maxWidth: .infinity)
+                        }
+                        // Fill empty slots in last row
+                        if row.count < 3 {
+                            ForEach(0..<(3 - row.count), id: \.self) { _ in
+                                Color.clear.frame(maxWidth: .infinity)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(14)
+            .background(VitaColors.glassBg)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(VitaColors.glassBorder, lineWidth: 1)
+            )
+        }
+    }
+}
+
+private struct BadgeCell: View {
+    let badge: BadgeItem
+
+    var body: some View {
+        VStack(spacing: 5) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(
+                        badge.locked
+                        ? Color.white.opacity(0.02)
+                        : LinearGradient(
+                            colors: [VitaColors.accent.opacity(0.18), VitaColors.accentDark.opacity(0.06)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                          )
+                    )
+                    .frame(width: 52, height: 52)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(
+                                badge.locked ? Color.white.opacity(0.04) : VitaColors.accent.opacity(0.14),
+                                lineWidth: 1
+                            )
+                    )
+                    .shadow(
+                        color: badge.locked ? Color.clear : VitaColors.accent.opacity(0.08),
+                        radius: 4
+                    )
+
+                Image(systemName: badge.icon)
+                    .font(.system(size: badge.locked ? 18 : 22))
+                    .foregroundStyle(badge.locked ? Color.white.opacity(0.22) : badge.iconColor.opacity(0.72))
+            }
+
+            Text(badge.title)
+                .font(.system(size: 8, weight: .medium))
+                .foregroundStyle(badge.locked ? Color.white.opacity(0.18) : Color.white.opacity(0.38))
+                .lineLimit(1)
+        }
+        .opacity(badge.locked ? 0.25 : 1.0)
+    }
+}
+
+// MARK: - Array chunked helper (file-scoped)
+
+private extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        guard size > 0 else { return [self] }
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0..<Swift.min($0 + size, count)])
         }
     }
 }

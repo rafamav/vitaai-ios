@@ -391,6 +391,7 @@ private struct ChatInputBar: View {
     var isInputFocused: FocusState<Bool>.Binding
 
     @State private var isListening: Bool = false
+    @State private var showToolsSheet: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -398,6 +399,24 @@ private struct ChatInputBar: View {
                 .background(VitaColors.surfaceBorder)
 
             HStack(spacing: 10) {
+                // "+" tools button
+                Button {
+                    showToolsSheet = true
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(VitaColors.glassBg)
+                            .frame(width: 34, height: 34)
+                            .overlay(
+                                Circle().stroke(VitaColors.glassBorder, lineWidth: 1)
+                            )
+                        Image(systemName: "plus")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(VitaColors.textSecondary)
+                    }
+                }
+                .buttonStyle(.plain)
+
                 TextField(
                     isListening ? "Ouvindo..." : "Pergunte para a Vita...",
                     text: Binding(
@@ -449,6 +468,143 @@ private struct ChatInputBar: View {
             .padding(.bottom, 12)
         }
         .background(VitaColors.surface)
+        .sheet(isPresented: $showToolsSheet) {
+            ChatToolsSheet(isPresented: $showToolsSheet, viewModel: viewModel)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(VitaColors.surfaceElevated)
+        }
+    }
+}
+
+// MARK: - Chat Tools Sheet
+
+private struct ChatToolItem: Identifiable {
+    let id = UUID()
+    let label: String
+    let icon: String
+    let color: Color
+    let prompt: String?
+}
+
+private let chatToolsVitaStudio: [ChatToolItem] = [
+    ChatToolItem(label: "Flashcards IA", icon: "rectangle.on.rectangle.angled",  color: VitaColors.accent,     prompt: "Crie flashcards sobre o conteúdo que estudei."),
+    ChatToolItem(label: "Resumo IA",     icon: "doc.text.fill",                   color: VitaColors.dataBlue,   prompt: "Faça um resumo do conteúdo."),
+    ChatToolItem(label: "Quiz IA",       icon: "questionmark.circle.fill",         color: VitaColors.dataIndigo, prompt: "Monte um quiz para testar meu conhecimento."),
+]
+
+private let chatToolsFerramentas: [ChatToolItem] = [
+    ChatToolItem(label: "Camera",        icon: "camera.fill",         color: VitaColors.textSecondary, prompt: nil),
+    ChatToolItem(label: "Galeria",       icon: "photo.fill",          color: VitaColors.textSecondary, prompt: nil),
+    ChatToolItem(label: "Arquivos",      icon: "doc.fill",            color: VitaColors.textSecondary, prompt: nil),
+    ChatToolItem(label: "Banco Quest.",  icon: "list.bullet.clipboard", color: VitaColors.dataGreen,   prompt: "Quero resolver questões do banco."),
+    ChatToolItem(label: "Simulado",      icon: "checkmark.square.fill", color: VitaColors.dataAmber,   prompt: "Quero fazer um simulado."),
+    ChatToolItem(label: "Flashcards",    icon: "rectangle.on.rectangle", color: VitaColors.accent,    prompt: "Quero revisar flashcards."),
+]
+
+private struct ChatToolsSheet: View {
+    @Binding var isPresented: Bool
+    let viewModel: ChatViewModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            // Drag handle area + title
+            HStack {
+                Text("Ferramentas")
+                    .font(VitaTypography.titleSmall)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(VitaColors.textPrimary)
+                Spacer()
+                Button {
+                    isPresented = false
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(VitaColors.textTertiary)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 4)
+
+            // Vita Studio section
+            ToolSection(title: "Vita Studio", items: chatToolsVitaStudio) { item in
+                applyTool(item)
+            }
+
+            // Ferramentas section
+            ToolSection(title: "Ferramentas", items: chatToolsFerramentas) { item in
+                applyTool(item)
+            }
+
+            Spacer()
+        }
+        .padding(.top, 12)
+    }
+
+    private func applyTool(_ item: ChatToolItem) {
+        if let prompt = item.prompt {
+            viewModel.inputText = prompt
+        }
+        isPresented = false
+    }
+}
+
+private struct ToolSection: View {
+    let title: String
+    let items: [ChatToolItem]
+    let onTap: (ChatToolItem) -> Void
+
+    let columns = [
+        GridItem(.flexible()),
+        GridItem(.flexible()),
+        GridItem(.flexible()),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 10, weight: .semibold))
+                .textCase(.uppercase)
+                .tracking(0.8)
+                .foregroundStyle(VitaColors.textTertiary)
+                .padding(.horizontal, 20)
+
+            LazyVGrid(columns: columns, spacing: 10) {
+                ForEach(items) { item in
+                    Button {
+                        onTap(item)
+                    } label: {
+                        VStack(spacing: 8) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(item.color.opacity(0.12))
+                                    .frame(width: 48, height: 48)
+                                Image(systemName: item.icon)
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(item.color.opacity(0.80))
+                            }
+                            Text(item.label)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(VitaColors.textSecondary)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(VitaColors.glassBg)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(VitaColors.glassBorder, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+        }
     }
 }
 

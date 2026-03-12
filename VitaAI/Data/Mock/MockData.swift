@@ -52,10 +52,10 @@ enum MockData {
 
     static func studyModules() -> [StudyModule] {
         [
-            StudyModule(name: "Flashcards", icon: "book.pages", count: 23, color: VitaColors.accent),
-            StudyModule(name: "Simulados", icon: "questionmark.circle", count: 5, color: VitaColors.accent),
-            StudyModule(name: "PDFs", icon: "book", count: 48, color: VitaColors.accent),
-            StudyModule(name: "Materiais", icon: "folder", count: 124, color: VitaColors.accent),
+            StudyModule(name: "Questoes",   icon: "doc.text.fill",         count: 120, color: VitaColors.accent),
+            StudyModule(name: "Flashcards", icon: "rectangle.stack.fill",  count: 23,  color: VitaColors.accent),
+            StudyModule(name: "Simulados",  icon: "list.bullet.clipboard", count: 5,   color: VitaColors.accent),
+            StudyModule(name: "Atlas 3D",   icon: "staroflife.fill",       count: 0,   color: VitaColors.accent),
         ]
     }
 
@@ -65,6 +65,25 @@ enum MockData {
             VitaSuggestion(label: "Revisar flashcards", prompt: "Me ajude a revisar os flashcards pendentes de Anatomia"),
             VitaSuggestion(label: "Resumo do dia", prompt: "Faça um resumo do que preciso estudar hoje"),
             VitaSuggestion(label: "Dicas de estudo", prompt: "Quais técnicas de estudo são mais eficazes para memorização?"),
+        ]
+    }
+
+    static func todayAgendaEvents() -> [AgendaEvent] {
+        [
+            AgendaEvent(title: NSLocalizedString("Medicina Legal, Deontologia e Etica", comment: ""), time: "09:00", colorTag: .green),
+            AgendaEvent(title: NSLocalizedString("Praticas Interprofissionais", comment: ""), time: "14:00", colorTag: .blue),
+        ]
+    }
+
+    static func miniPlayer() -> MiniPlayerData {
+        MiniPlayerData(subject: "Anatomia", tool: "Flashcards", completed: 34, total: 50)
+    }
+
+    static func weakSubjects() -> [WeakSubject] {
+        [
+            WeakSubject(name: "Bioquimica",   score: 0.64),
+            WeakSubject(name: "Farmacologia", score: 0.68),
+            WeakSubject(name: "Histologia",   score: 0.71),
         ]
     }
 
