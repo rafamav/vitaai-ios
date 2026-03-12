@@ -4,9 +4,9 @@ struct UpcomingExamsRow: View {
     let exams: [UpcomingExam]
 
     var body: some View {
-        // Mockup: lista vertical dentro de glass card — .provas style
+        // Mockup: lista vertical dentro de glass card — .provas style (gap:10px, no dividers)
         VStack(spacing: 0) {
-            ForEach(Array(exams.enumerated()), id: \.element.id) { index, exam in
+            ForEach(exams) { exam in
                 HStack(spacing: 10) {
                     // Subject icon (matches mockup prova-ico with 3D asset)
                     GlassAssetImage(
@@ -33,12 +33,6 @@ struct UpcomingExamsRow: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
-
-                if index < exams.count - 1 {
-                    Divider()
-                        .background(Color.white.opacity(0.04))
-                        .padding(.horizontal, 14)
-                }
             }
         }
         .background(Color.white.opacity(0.04))
@@ -58,33 +52,34 @@ private struct ExamUrgencyBadge: View {
         "\(daysUntil) \(NSLocalizedString("dias", comment: ""))"
     }
 
+    // Mockup CSS: urgent=rgba(200,120,80,*), warn=rgba(200,160,80,*), ok=rgba(180,160,100,*)
     private var bgColor: Color {
         if daysUntil <= 4 {
-            return Color(red: 255/255, green: 100/255, blue: 80/255).opacity(0.12)
+            return Color(red: 200/255, green: 120/255, blue: 80/255).opacity(0.15)
         } else if daysUntil <= 10 {
-            return Color(red: 255/255, green: 180/255, blue: 80/255).opacity(0.10)
+            return Color(red: 200/255, green: 160/255, blue: 80/255).opacity(0.12)
         } else {
-            return Color(red: 130/255, green: 200/255, blue: 140/255).opacity(0.10)
+            return Color(red: 180/255, green: 160/255, blue: 100/255).opacity(0.10)
         }
     }
 
     private var textColor: Color {
         if daysUntil <= 4 {
-            return Color(red: 255/255, green: 140/255, blue: 120/255).opacity(0.85)
+            return Color(red: 220/255, green: 160/255, blue: 120/255).opacity(0.90)
         } else if daysUntil <= 10 {
-            return Color(red: 255/255, green: 200/255, blue: 130/255).opacity(0.80)
+            return Color(red: 220/255, green: 180/255, blue: 120/255).opacity(0.85)
         } else {
-            return Color(red: 160/255, green: 220/255, blue: 170/255).opacity(0.80)
+            return Color(red: 200/255, green: 180/255, blue: 130/255).opacity(0.80)
         }
     }
 
     private var borderColor: Color {
         if daysUntil <= 4 {
-            return Color(red: 255/255, green: 100/255, blue: 80/255).opacity(0.10)
+            return Color(red: 200/255, green: 120/255, blue: 80/255).opacity(0.12)
         } else if daysUntil <= 10 {
-            return Color(red: 255/255, green: 180/255, blue: 80/255).opacity(0.08)
+            return Color(red: 200/255, green: 160/255, blue: 80/255).opacity(0.10)
         } else {
-            return Color(red: 130/255, green: 200/255, blue: 140/255).opacity(0.08)
+            return Color(red: 180/255, green: 160/255, blue: 100/255).opacity(0.08)
         }
     }
 

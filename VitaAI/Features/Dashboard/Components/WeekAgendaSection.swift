@@ -61,37 +61,35 @@ struct WeekAgendaSection: View {
             // Eventos do dia dentro de glass card
             if !todayEvents.isEmpty {
                 VStack(spacing: 0) {
-                    ForEach(Array(todayEvents.enumerated()), id: \.element.id) { index, event in
+                    ForEach(todayEvents) { event in
                         HStack(spacing: 10) {
-                            // Colored icon box
+                            // All agenda icons are gold per mockup (.agenda-ico.green/.orange all same gold)
                             ZStack {
                                 RoundedRectangle(cornerRadius: 8)
-                                    .fill(event.colorTag.backgroundColor)
+                                    .fill(VitaColors.accent.opacity(0.12))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(VitaColors.accent.opacity(0.08), lineWidth: 1)
+                                    )
                                     .frame(width: 28, height: 28)
                                 Image(systemName: event.colorTag.iconName)
                                     .font(.system(size: 12, weight: .medium))
-                                    .foregroundStyle(event.colorTag.iconColor)
+                                    .foregroundStyle(VitaColors.accent.opacity(0.85))
                             }
 
                             Text(event.title)
-                                .font(.system(size: 13, weight: .regular))
-                                .foregroundStyle(Color.white.opacity(0.75))
+                                .font(.system(size: 12, weight: .regular))
+                                .foregroundStyle(Color.white.opacity(0.65))
                                 .lineLimit(1)
 
                             Spacer()
 
                             Text(event.time)
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(Color.white.opacity(0.45))
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.40))
                         }
                         .padding(.horizontal, 12)
                         .padding(.vertical, 12)
-
-                        if index < todayEvents.count - 1 {
-                            Divider()
-                                .background(Color.white.opacity(0.04))
-                                .padding(.horizontal, 12)
-                        }
                     }
                 }
                 .background(Color.white.opacity(0.04))
