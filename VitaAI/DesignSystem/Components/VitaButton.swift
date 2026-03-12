@@ -1,6 +1,9 @@
 import SwiftUI
 
 // MARK: - VitaButton Variants & Sizes
+// Gold theme: primary uses goldGradient from VitaColors.
+// Matches mockup .ob-cta: background linear-gradient(135deg, rgba(200,160,80,0.75), rgba(220,180,100,0.65))
+// Text on primary: dark (rgba(26,20,18,0.95)) for contrast on gold background.
 
 enum VitaButtonVariant {
     case primary
@@ -80,25 +83,16 @@ struct VitaButton: View {
     private var isInteractable: Bool { isEnabled && !isLoading }
 
     private var foregroundColor: Color {
-        let effective = isInteractable
         switch variant {
         case .primary:
-            return effective ? VitaColors.black : VitaColors.black.opacity(0.38)
+            // Dark text on gold background (contrast) — rgba(26,20,18,0.95) from mockup
+            return isInteractable
+                ? Color(red: 0.102, green: 0.078, blue: 0.071).opacity(0.95)
+                : Color(red: 0.102, green: 0.078, blue: 0.071).opacity(0.38)
         case .secondary, .ghost:
-            return effective ? VitaColors.accent : VitaColors.accent.opacity(0.38)
+            return isInteractable ? VitaColors.goldText : VitaColors.goldText.opacity(0.38)
         case .danger:
-            return effective ? VitaColors.white : VitaColors.white.opacity(0.38)
-        }
-    }
-
-    private var backgroundColor: Color {
-        switch variant {
-        case .primary:
-            return isInteractable ? VitaColors.accent : VitaColors.accent.opacity(0.38)
-        case .secondary, .ghost:
-            return .clear
-        case .danger:
-            return isInteractable ? Self.dangerColor : Self.dangerColor.opacity(0.38)
+            return isInteractable ? VitaColors.white : VitaColors.white.opacity(0.38)
         }
     }
 
@@ -106,8 +100,8 @@ struct VitaButton: View {
         switch variant {
         case .secondary:
             return isInteractable
-                ? VitaColors.accent.opacity(0.5)
-                : VitaColors.accent.opacity(0.2)
+                ? VitaColors.accent.opacity(0.50)
+                : VitaColors.accent.opacity(0.20)
         default:
             return .clear
         }
@@ -135,10 +129,27 @@ struct VitaButton: View {
             .padding(.vertical, size.verticalPadding)
             .frame(minHeight: max(size.height, 44))
         }
-        .background(backgroundColor)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .background {
+            switch variant {
+            case .primary:
+                // Gold gradient from mockup .ob-cta
+                if isInteractable {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(VitaColors.goldGradient)
+                } else {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(VitaColors.accent.opacity(0.30))
+                }
+            case .secondary, .ghost:
+                Color.clear
+            case .danger:
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isInteractable ? Self.dangerColor : Self.dangerColor.opacity(0.38))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: 12)
                 .stroke(borderColor, lineWidth: 1)
         )
         .disabled(!isInteractable)

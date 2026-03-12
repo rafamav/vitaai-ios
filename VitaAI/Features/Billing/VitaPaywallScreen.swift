@@ -73,7 +73,7 @@ struct VitaPaywallScreen: View {
         ZStack {
             VitaColors.surface.ignoresSafeArea()
 
-            // Ambient cyan glow at top — matches overall app aesthetic
+            // Ambient gold glow at top — matches gold glassmorphism aesthetic
             RadialGradient(
                 colors: [VitaColors.accent.opacity(0.14), .clear],
                 center: .top,

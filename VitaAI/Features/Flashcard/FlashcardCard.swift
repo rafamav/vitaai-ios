@@ -1,10 +1,16 @@
 import SwiftUI
 
 // MARK: - Card accent colors (mirroring Android/web)
+// Gold theme: front uses gold accent, back uses indigo for visual contrast
 
-private let cyanBorder   = VitaColors.accent.opacity(0.12)   // front side border
-private let cyanGlow     = VitaColors.accent.opacity(0.06)   // front top glow
-private let cyanPillBg   = VitaColors.accent.opacity(0.08)
+private let goldBorder   = VitaColors.accent.opacity(0.12)   // front side border
+private let goldGlow     = VitaColors.accent.opacity(0.06)   // front top glow
+private let goldPillBg   = VitaColors.accent.opacity(0.08)
+
+// Legacy aliases for existing usage below (no functional change needed)
+private let cyanBorder   = goldBorder
+private let cyanGlow     = goldGlow
+private let cyanPillBg   = goldPillBg
 
 private let indigoAccent  = Color(hex: 0xA78BFA)              // indigo-400 for back side
 private let indigoBorder  = Color(hex: 0xA78BFA, opacity: 0.12)
@@ -15,7 +21,7 @@ private let cardBg = Color(hex: 0x11111A, opacity: 0.92)
 
 // MARK: - FlashcardCardView
 
-/// Animated flip card with cyan (front) and indigo (back) themes.
+/// Animated flip card with gold (front) and indigo (back) themes.
 /// Uses `rotation3DEffect` for the Y-axis flip, mirroring the back with negative rotation.
 struct FlashcardCardView: View {
 

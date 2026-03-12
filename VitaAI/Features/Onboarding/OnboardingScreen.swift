@@ -37,25 +37,25 @@ private struct OnboardingContent: View {
 
                 // Progress bar + animated dots
                 VStack(spacing: 10) {
-                    // Animated linear progress bar
+                    // Progress bar — gold gradient fill, matches mockup .ob-bar-fill
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            // Track
+                            // Track — rgba(255,255,255,0.04) from mockup
                             RoundedRectangle(cornerRadius: 2)
-                                .fill(Color.white.opacity(0.08))
-                                .frame(height: 4)
+                                .fill(Color.white.opacity(0.04))
+                                .frame(height: 3)
 
-                            // Fill
+                            // Gold fill — linear-gradient(90deg, rgba(200,160,80,0.30), rgba(220,170,120,0.70))
                             RoundedRectangle(cornerRadius: 2)
-                                .fill(VitaColors.accent)
+                                .fill(VitaColors.goldBarGradient)
                                 .frame(
                                     width: geo.size.width * CGFloat(viewModel.currentStep + 1) / CGFloat(totalSteps),
-                                    height: 4
+                                    height: 3
                                 )
                                 .animation(.spring(response: 0.5, dampingFraction: 0.75), value: viewModel.currentStep)
                         }
                     }
-                    .frame(height: 4)
+                    .frame(height: 3)
 
                     // Step dots
                     HStack(spacing: 10) {
@@ -105,8 +105,9 @@ private struct OnboardingContent: View {
 
         VStack(spacing: 12) {
             // Primary button: Continue / Começar
+            // Gold gradient active, glass inactive — matches mockup .ob-cta
             Button(action: {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 if isLastStep {
                     Task {
                         await viewModel.complete()
@@ -119,44 +120,50 @@ private struct OnboardingContent: View {
                 ZStack {
                     if viewModel.isSaving {
                         ProgressView()
-                            .tint(VitaColors.white)
+                            .tint(VitaColors.goldText)
                     } else {
                         Text(isLastStep ? "Começar" : "Continuar")
                             .font(VitaTypography.titleSmall)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(canProceed ? VitaColors.white : VitaColors.textTertiary)
+                            .fontWeight(.bold)
+                            .tracking(0.5)
+                            .textCase(.uppercase)
+                            .foregroundStyle(
+                                canProceed
+                                    ? Color(red: 0.102, green: 0.078, blue: 0.071).opacity(0.95)
+                                    : VitaColors.textTertiary
+                            )
                     }
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 54)
-                .background(
-                    ZStack {
-                        VitaColors.glassBg
-                        // Glow overlay when last step is ready
-                        if isLastStep && canProceed {
-                            RadialGradient(
-                                colors: [VitaColors.accent.opacity(0.15), .clear],
-                                center: .center,
-                                startRadius: 0,
-                                endRadius: 200
-                            )
-                        }
-                    }
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .frame(height: 52)
+                .background {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(
+                            canProceed
+                                ? AnyShapeStyle(VitaColors.goldGradient)
+                                : AnyShapeStyle(Color.white.opacity(0.03))
+                        )
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 14))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 14)
                         .stroke(
-                            canProceed ? VitaColors.accent.opacity(0.5) : VitaColors.glassBorder,
+                            canProceed
+                                ? VitaColors.accent.opacity(0.22)
+                                : VitaColors.glassBorder,
                             lineWidth: 1
                         )
+                )
+                .shadow(
+                    color: canProceed ? VitaColors.accent.opacity(0.15) : .clear,
+                    radius: 8, x: 0, y: 2
                 )
                 .animation(.easeInOut(duration: 0.2), value: canProceed)
                 .animation(.easeInOut(duration: 0.2), value: isLastStep)
             }
             .disabled(viewModel.isSaving || (!canProceed && !viewModel.canSkip))
 
-            // Skip button (steps 1–3 when not yet valid)
+            // Skip button (steps 1–3 quando ainda não válido) — .ob-skip
             if showSkip {
                 Button(action: {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -164,14 +171,14 @@ private struct OnboardingContent: View {
                 }) {
                     Text("Pular")
                         .font(VitaTypography.bodyMedium)
-                        .foregroundStyle(VitaColors.textTertiary)
+                        .foregroundStyle(VitaColors.textTertiary.opacity(0.50))
                         .padding(.horizontal, 32)
                         .padding(.vertical, 10)
                 }
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
-        .padding(.horizontal, 32)
+        .padding(.horizontal, 28)
         .padding(.bottom, 40)
         .animation(.easeInOut(duration: 0.2), value: showSkip)
     }
@@ -179,8 +186,8 @@ private struct OnboardingContent: View {
     // MARK: - Helpers
 
     private func dotColor(index: Int, isActive: Bool, isCompleted: Bool) -> Color {
-        if isActive { return VitaColors.accent }
-        if isCompleted { return VitaColors.accent.opacity(0.6) }
-        return Color.white.opacity(0.10)
+        if isActive    { return VitaColors.accent }
+        if isCompleted { return VitaColors.accent.opacity(0.50) }
+        return Color.white.opacity(0.08)
     }
 }

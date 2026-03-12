@@ -16,9 +16,9 @@ struct SessionSummaryScreen: View {
     @State private var displayedTime: Double = 0
     @State private var displayedStreak: Double = 0
 
-    // Gradient for primary CTA (matches web / Android cyan→blue)
+    // Gradient for primary CTA — gold theme (matches web / Android gold→warm)
     private let ctaGradient = LinearGradient(
-        colors: [VitaColors.accent, VitaColors.dataBlue],
+        colors: [VitaColors.accent, VitaColors.accentDark],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )

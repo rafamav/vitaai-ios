@@ -43,7 +43,7 @@ struct VitaTabBar: View {
                 tabButton(.home)
                 tabButton(.estudos)
 
-                // Center: Chat (raised cyan circle)
+                // Center: Chat (raised gold circle — vita medallion)
                 Button(action: onCenterTap) {
                     ZStack {
                         Circle()
