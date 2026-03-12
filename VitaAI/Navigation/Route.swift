@@ -54,4 +54,7 @@ enum Route: Hashable {
 
     // MARK: - Provas (Crowd)
     case provas
+
+    // MARK: - QBank (Question Bank)
+    case qbank
 }

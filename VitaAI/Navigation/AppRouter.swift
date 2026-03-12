@@ -72,6 +72,9 @@ struct MainTabView: View {
                                 },
                                 onNavigateToMaterials: {
                                     router.selectedTab = .estudos
+                                },
+                                onNavigateToQBank: {
+                                    router.navigate(to: .qbank)
                                 }
                             )
                             .tag(TabItem.home)
@@ -88,7 +91,8 @@ struct MainTabView: View {
                                 onNavigateToOsce:               { router.navigate(to: .osce) },
                                 onNavigateToAtlas:              { router.navigate(to: .atlas3D) },
                                 onNavigateToCourseDetail:       { courseId, colorIdx in router.navigate(to: .courseDetail(courseId: courseId, colorIndex: colorIdx)) },
-                                onNavigateToProvas:             { router.navigate(to: .provas) }
+                                onNavigateToProvas:             { router.navigate(to: .provas) },
+                                onNavigateToQBank:              { router.navigate(to: .qbank) }
                             )
                             .tag(TabItem.estudos)
                             .background(Color.clear)
@@ -289,6 +293,8 @@ struct MainTabView: View {
                     )
                 case .provas:
                     ProvasScreen(onBack: { router.goBack() })
+                case .qbank:
+                    QBankCoordinatorScreen(onBack: { router.goBack() })
                 default:
                     EmptyView()
                 }

@@ -10,6 +10,7 @@ struct DashboardScreen: View {
     var onNavigateToSimulados: (() -> Void)?
     var onNavigateToPdfs: (() -> Void)?
     var onNavigateToMaterials: (() -> Void)?
+    var onNavigateToQBank: (() -> Void)?
 
     var body: some View {
         Group {
@@ -57,7 +58,8 @@ struct DashboardScreen: View {
                     modules: viewModel.studyModules,
                     onModuleTap: { module in
                         switch module.name {
-                        case NSLocalizedString("Questoes", comment: ""):    onNavigateToSimulados?()
+                        case NSLocalizedString("Questoes", comment: ""):
+                            if let qbank = onNavigateToQBank { qbank() } else { onNavigateToSimulados?() }
                         case NSLocalizedString("Flashcards", comment: ""):  onNavigateToFlashcards?()
                         case NSLocalizedString("Simulados", comment: ""):   onNavigateToSimulados?()
                         default: onNavigateToMaterials?()
@@ -315,17 +317,20 @@ private struct DashMiniPlayer: View {
 }
 
 // MARK: - Quick Access Grid (matches mockup .tools-grid, 4 colunas)
+// Long press → jiggle mode with red remove badge (iOS home screen pattern)
 private struct DashQuickAccessGrid: View {
     let modules: [StudyModule]
     var onModuleTap: ((StudyModule) -> Void)?
 
-        // Quick access tools matching mockup .tools-grid
-    private let quickTools: [(name: String, assetName: String, fallback: String, localizedKey: String)] = [
-        ("Questoes",   "glassv2-exam-paper-nobg",     "doc.text.fill",          "Questoes"),
-        ("Flashcards", "glassv2-flashcard-deck-nobg",  "rectangle.stack.fill",   "Flashcards"),
-        ("Simulados",  "glassv2-calculator-nobg",      "list.bullet.clipboard",  "Simulados"),
-        ("Atlas 3D",   "glassv2-anatomy-3d-nobg",      "staroflife.fill",        "Atlas 3D"),
+    // Default quick tools — matches mockup .tools-grid
+    @State private var quickTools: [QuickTool] = [
+        QuickTool(name: "Questoes",   assetName: "glassv2-exam-paper-nobg",     fallback: "doc.text.fill",          localizedKey: "Questoes"),
+        QuickTool(name: "Flashcards", assetName: "glassv2-flashcard-deck-nobg",  fallback: "rectangle.stack.fill",   localizedKey: "Flashcards"),
+        QuickTool(name: "Simulados",  assetName: "glassv2-calculator-nobg",      fallback: "list.bullet.clipboard",  localizedKey: "Simulados"),
+        QuickTool(name: "Atlas 3D",   assetName: "glassv2-anatomy-3d-nobg",      fallback: "staroflife.fill",        localizedKey: "Atlas 3D"),
     ]
+
+    @State private var isJiggling = false
 
     // LazyVGrid 4 columns — matches mockup .tools-grid (grid-template-columns: repeat(4, 1fr))
     private let columns = [
@@ -337,38 +342,134 @@ private struct DashQuickAccessGrid: View {
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: 0) {
-            ForEach(Array(quickTools.enumerated()), id: \.offset) { index, tool in
-                Button(action: {
-                    // Match by index for reliability (mock data order matches quickTools order)
-                    let module = index < modules.count ? modules[index] : modules.first
-                    if let m = module { onModuleTap?(m) }
-                }) {
-                    VStack(spacing: 8) {
-                        GlassAssetImage(
-                            assetName: tool.assetName,
-                            fallbackSymbol: tool.fallback,
-                            size: 52
-                        )
-
-                        Text(NSLocalizedString(tool.localizedKey, comment: ""))
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.55))
-                            .multilineTextAlignment(.center)
+            ForEach(Array(quickTools.enumerated()), id: \.element.id) { index, tool in
+                QuickToolCell(
+                    tool: tool,
+                    index: index,
+                    isJiggling: isJiggling,
+                    onTap: {
+                        if isJiggling {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isJiggling = false
+                            }
+                        } else {
+                            let module = index < modules.count ? modules[index] : modules.first
+                            if let m = module { onModuleTap?(m) }
+                        }
+                    },
+                    onLongPress: {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            isJiggling = true
+                        }
+                    },
+                    onRemove: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            quickTools.remove(at: index)
+                        }
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .padding(.horizontal, 6)
+                )
+            }
+        }
+        // Tap outside grid to dismiss jiggle
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if isJiggling {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isJiggling = false
                 }
-                .buttonStyle(ScaleButtonStyle())
+            }
+        }
+    }
+}
+
+private struct QuickTool: Identifiable {
+    let id = UUID()
+    let name: String
+    let assetName: String
+    let fallback: String
+    let localizedKey: String
+}
+
+// MARK: - Quick Tool Cell (with jiggle animation)
+private struct QuickToolCell: View {
+    let tool: QuickTool
+    let index: Int
+    let isJiggling: Bool
+    let onTap: () -> Void
+    let onLongPress: () -> Void
+    let onRemove: () -> Void
+
+    // Per-cell jiggle phase offset so they don't all move in sync
+    @State private var jiggleOffset: Double = 0
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Button(action: onTap) {
+                VStack(spacing: 8) {
+                    GlassAssetImage(
+                        assetName: tool.assetName,
+                        fallbackSymbol: tool.fallback,
+                        size: 52
+                    )
+
+                    Text(NSLocalizedString(tool.localizedKey, comment: ""))
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.55))
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .padding(.horizontal, 6)
+            }
+            .buttonStyle(ScaleButtonStyle(enabled: !isJiggling))
+            .simultaneousGesture(
+                LongPressGesture(minimumDuration: 0.5)
+                    .onEnded { _ in onLongPress() }
+            )
+            .rotationEffect(.degrees(isJiggling ? jiggleOffset : 0))
+
+            // Red remove badge — visible only in jiggle mode
+            if isJiggling {
+                Button(action: onRemove) {
+                    ZStack {
+                        Circle()
+                            .fill(Color(red: 255/255, green: 69/255, blue: 58/255))
+                            .frame(width: 20, height: 20)
+                        Image(systemName: "minus")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                .buttonStyle(.plain)
+                .offset(x: -8, y: 4)
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .onChange(of: isJiggling) { _, jiggles in
+            if jiggles {
+                // Different start phase per index so they don't all move identically
+                let phase = Double(index % 2 == 0 ? 1 : -1) * 1.5
+                jiggleOffset = phase
+                withAnimation(
+                    .easeInOut(duration: 0.12)
+                    .repeatForever(autoreverses: true)
+                ) {
+                    jiggleOffset = -phase
+                }
+            } else {
+                withAnimation(.easeOut(duration: 0.1)) {
+                    jiggleOffset = 0
+                }
             }
         }
     }
 }
 
 private struct ScaleButtonStyle: ButtonStyle {
+    var enabled: Bool = true
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .scaleEffect(enabled && configuration.isPressed ? 0.95 : 1.0)
             .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
     }
 }
