@@ -83,26 +83,23 @@ final class AuthManager: ObservableObject {
         error = nil
         defer { isLoading = false }
 
-        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/sign-up/email") else {
+        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/mobile-email-register") else {
             error = "URL inválida"; return
         }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["email": email, "password": password, "name": name, "callbackURL": "/"])
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["email": email, "password": password, "name": name])
 
         await performEmailAuthRequest(req, email: email)
     }
 
     func forgotPassword(email: String) async {
-        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/forget-password") else { return }
+        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/mobile-forgot-password") else { return }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try? JSONSerialization.data(withJSONObject: [
-            "email": email,
-            "redirectTo": "\(AppConfig.authBaseURL)/reset-password"
-        ])
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["email": email])
         _ = try? await URLSession.shared.data(for: req)
     }
 
