@@ -14,9 +14,26 @@ struct VitaTopBar: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // Avatar with streak badge
+            // Avatar with XP ring + level badge (matches mockup topbar)
             Button(action: { onAvatarTap?() }) {
-                ZStack(alignment: .bottomTrailing) {
+                ZStack(alignment: .bottom) {
+                    // XP ring — thin progress arc around avatar
+                    let xpProgress: CGFloat = 0.82 // mock: 82% to next level
+                    ZStack {
+                        Circle()
+                            .stroke(Color.white.opacity(0.08), lineWidth: 2.5)
+                            .frame(width: 50, height: 50)
+                        Circle()
+                            .trim(from: 0, to: xpProgress)
+                            .stroke(
+                                VitaColors.accent.opacity(0.60),
+                                style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
+                            )
+                            .frame(width: 50, height: 50)
+                            .rotationEffect(.degrees(-90))
+                    }
+
+                    // Avatar inside ring
                     Group {
                         if let url = userImageURL {
                             AsyncImage(url: url) { image in
@@ -31,29 +48,36 @@ struct VitaTopBar: View {
                                 .frame(width: 42, height: 42)
                         }
                     }
-                    .overlay(
-                        Circle()
-                            .stroke(VitaColors.accent.opacity(0.35), lineWidth: 1.5)
-                    )
 
-                    // Streak badge (days) — replaces level badge
-                    let streakValue = userStreak ?? userLevel ?? 0
-                    if streakValue > 0 {
+                    // Level badge at bottom of ring (matches mockup .level-badge)
+                    let levelValue = userLevel ?? 0
+                    if levelValue > 0 {
+                        Text("\(levelValue)")
+                            .font(.system(size: 7, weight: .black))
+                            .foregroundStyle(Color(red: 26/255, green: 20/255, blue: 18/255))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(VitaColors.accent.opacity(0.90))
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .offset(y: 8)
+                    } else if let streak = userStreak, streak > 0 {
+                        // Fallback: show streak if no level
                         HStack(spacing: 1) {
                             Image(systemName: "flame.fill")
                                 .font(.system(size: 5, weight: .bold))
                                 .foregroundStyle(Color(red: 26/255, green: 20/255, blue: 18/255))
-                            Text("\(streakValue)")
+                            Text("\(streak)")
                                 .font(.system(size: 7, weight: .black))
                                 .foregroundStyle(Color(red: 26/255, green: 20/255, blue: 18/255))
                         }
                         .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
-                        .background(VitaColors.accent)
-                        .clipShape(Capsule())
-                        .offset(x: 4, y: 4)
+                        .padding(.vertical, 1)
+                        .background(VitaColors.accent.opacity(0.90))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .offset(y: 8)
                     }
                 }
+                .frame(width: 50, height: 58) // extra height for badge
             }
             .buttonStyle(.plain)
 

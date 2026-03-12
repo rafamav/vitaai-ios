@@ -64,11 +64,58 @@ struct ProfileScreen: View {
                         }
                     }
 
-                    // Level + XP label
+                    // Level label
                     if let stats = gamStats {
-                        Text("Nivel \(stats.level) · \(stats.currentLevelXp)/\(stats.xpToNextLevel) XP")
-                            .font(VitaTypography.labelSmall)
-                            .foregroundStyle(VitaColors.textTertiary)
+                        VStack(spacing: 2) {
+                            Text("NIVEL \(stats.level)")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(VitaColors.accent.opacity(0.60))
+                                .textCase(.uppercase)
+                                .kerning(1.0)
+                            Text(levelTitle(for: stats.level))
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundStyle(VitaColors.goldText)
+                        }
+                    }
+
+                    // Stats row: XP / Streak / Medalhas / Prox Lv — matches mockup
+                    if let stats = gamStats {
+                        HStack(spacing: 0) {
+                            profileStatCell(
+                                value: "\(stats.totalXp)",
+                                label: "XP",
+                                color: VitaColors.accent.opacity(0.75)
+                            )
+                            Rectangle().fill(Color.white.opacity(0.06)).frame(width: 1, height: 36)
+                            profileStatCell(
+                                value: "\(stats.currentStreak)",
+                                label: "Streak",
+                                color: Color(red: 0.51, green: 0.78, blue: 0.55).opacity(0.75)
+                            )
+                            Rectangle().fill(Color.white.opacity(0.06)).frame(width: 1, height: 36)
+                            profileStatCell(
+                                value: "\(stats.badges.filter { $0.earned }.count)",
+                                label: "Medalhas",
+                                color: Color(red: 0.63, green: 0.55, blue: 1.0).opacity(0.75)
+                            )
+                            Rectangle().fill(Color.white.opacity(0.06)).frame(width: 1, height: 36)
+                                let pct = stats.xpToNextLevel > 0
+                                ? Int(Double(stats.currentLevelXp) / Double(stats.xpToNextLevel) * 100)
+                                : 0
+                            profileStatCell(
+                                value: "\(pct)%",
+                                label: "Prox Lv",
+                                color: VitaColors.accent.opacity(0.65)
+                            )
+                        }
+                        .padding(.vertical, 10)
+                        .background(VitaColors.glassBg)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(VitaColors.glassBorder, lineWidth: 1)
+                        )
+                        .padding(.horizontal, 20)
                     }
 
                     // Plan status row
@@ -274,5 +321,33 @@ struct ProfileScreen: View {
             .padding(16)
         }
         .buttonStyle(.plain)
+    }
+
+    private func profileStatCell(value: String, label: String, color: Color) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.system(size: 16, weight: .heavy))
+                .foregroundStyle(color)
+                .monospacedDigit()
+            Text(label)
+                .font(.system(size: 8, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.25))
+                .textCase(.uppercase)
+                .kerning(0.5)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func levelTitle(for level: Int) -> String {
+        switch level {
+        case 0...3:   return "Calouro"
+        case 4...6:   return "Estudante"
+        case 7...9:   return "Veterano"
+        case 10...12: return "Especialista"
+        case 13...15: return "Residente"
+        case 16...18: return "Medico Junior"
+        case 19...20: return "Medico Pleno"
+        default:      return "Doutor"
+        }
     }
 }
