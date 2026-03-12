@@ -299,88 +299,133 @@ private struct TypingIndicator: View {
 
 // MARK: - Empty State
 
+// MARK: - Empty State (matches mockup: sparkle hero + 3 glass suggestion cards)
 private struct EmptyStateView: View {
     let viewModel: ChatViewModel
     var isInputFocused: FocusState<Bool>.Binding
 
-    private let suggestions = [
-        "O que estudar hoje?",
-        "Revise Cardiologia",
-        "Monte um simulado"
+    // 3 glass cards with icons — matches mockup chat empty state
+    private struct SuggestionCard {
+        let icon: String
+        let text: String
+        let iconColor: Color
+    }
+
+    private let cards: [SuggestionCard] = [
+        SuggestionCard(icon: "calendar.badge.clock", text: NSLocalizedString("O que estudar hoje?", comment: ""),         iconColor: .init(red: 200/255, green: 160/255, blue: 80/255)),
+        SuggestionCard(icon: "heart.text.square",    text: NSLocalizedString("Revise Cardiologia",  comment: ""),         iconColor: .init(red: 255/255, green: 120/255, blue: 100/255)),
+        SuggestionCard(icon: "list.bullet.clipboard", text: NSLocalizedString("Monte um simulado",  comment: ""),         iconColor: .init(red: 130/255, green: 200/255, blue: 140/255)),
     ]
+
+    @State private var glowPulse = false
 
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
 
-            VStack(spacing: 16) {
-                // Icon
+            VStack(spacing: 20) {
+                // Hero: sparkles icon with pulsing glow ring (matches mockup)
                 ZStack {
+                    // Outer ambient glow
                     Circle()
-                        .fill(VitaColors.accent.opacity(0.1))
-                        .frame(width: 80, height: 80)
+                        .fill(VitaColors.accent.opacity(glowPulse ? 0.14 : 0.06))
+                        .frame(width: 100, height: 100)
+                        .blur(radius: 20)
+
+                    // Ring border
                     Circle()
-                        .stroke(VitaColors.accent.opacity(0.2), lineWidth: 1)
+                        .stroke(VitaColors.accent.opacity(0.25), lineWidth: 1)
                         .frame(width: 80, height: 80)
-                    Image(systemName: "cross.vial.fill")
-                        .font(.system(size: 32, weight: .medium))
-                        .foregroundStyle(VitaColors.accent)
+
+                    // Inner circle
+                    Circle()
+                        .fill(VitaColors.accent.opacity(0.10))
+                        .frame(width: 72, height: 72)
+
+                    // Sparkle icon — matches mockup empty state
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [VitaColors.accentLight, VitaColors.accent],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .shadow(color: VitaColors.accent.opacity(0.5), radius: 8)
+                }
+                .onAppear {
+                    withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+                        glowPulse = true
+                    }
                 }
 
+                // Title + subtitle
                 VStack(spacing: 6) {
-                    Text("Vita IA")
+                    Text(NSLocalizedString("Vita IA", comment: ""))
                         .font(VitaTypography.headlineSmall)
-                        .foregroundStyle(VitaColors.white)
-                    Text("Seu assistente de estudos de medicina")
+                        .foregroundStyle(Color.white.opacity(0.90))
+                    Text(NSLocalizedString("Seu assistente de estudos de medicina", comment: ""))
                         .font(VitaTypography.bodySmall)
-                        .foregroundStyle(VitaColors.textSecondary)
+                        .foregroundStyle(Color.white.opacity(0.45))
                         .multilineTextAlignment(.center)
                 }
 
-                // Suggestion chips
+                // 3 glass suggestion cards — matches mockup (icone + texto, glass-sm style)
                 VStack(spacing: 8) {
-                    ForEach(suggestions, id: \.self) { suggestion in
-                        SuggestionChip(text: suggestion) {
-                            viewModel.inputText = suggestion
+                    ForEach(Array(cards.enumerated()), id: \.offset) { _, card in
+                        Button(action: {
+                            viewModel.inputText = card.text
                             isInputFocused.wrappedValue = true
                             Task { await viewModel.send() }
+                        }) {
+                            HStack(spacing: 12) {
+                                // Glass icon container
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(card.iconColor.opacity(0.12))
+                                        .frame(width: 32, height: 32)
+                                    Image(systemName: card.icon)
+                                        .font(.system(size: 14))
+                                        .foregroundStyle(card.iconColor.opacity(0.85))
+                                }
+
+                                Text(card.text)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.65))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(Color.white.opacity(0.25))
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 12)
+                            // glass-sm style (matches mockup)
+                            .background(.ultraThinMaterial)
+                            .background(Color.white.opacity(0.03))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.white.opacity(0.05), lineWidth: 1)
+                            )
                         }
+                        .buttonStyle(ScaleButtonStyle())
                     }
                 }
-                .padding(.top, 8)
             }
-            .padding(.horizontal, 32)
+            .padding(.horizontal, 24)
 
             Spacer()
         }
     }
 }
 
-private struct SuggestionChip: View {
-    let text: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 11))
-                    .foregroundStyle(VitaColors.accent)
-                Text(text)
-                    .font(VitaTypography.labelMedium)
-                    .foregroundStyle(VitaColors.textSecondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 11)
-            .background(VitaColors.glassBg)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(VitaColors.glassBorder, lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
+private struct ScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 
