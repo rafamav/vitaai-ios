@@ -223,53 +223,37 @@ private struct DashSectionHeader: View {
 }
 
 // MARK: - Mini Player (matches mockup .mini-player)
+// Layout: [title + subtitle + progress] | [⏮ ▶ ⏭] controls (spec: backward.fill/play.fill/forward.fill)
 private struct DashMiniPlayer: View {
     let player: MiniPlayerData
     var onTap: (() -> Void)?
 
     var body: some View {
-        Button(action: { onTap?() }) {
-            HStack(spacing: 10) {
-                // Play button — gold subtle bg + border (matches mockup .mini-play-btn)
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(VitaColors.accent.opacity(0.15))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(VitaColors.accent.opacity(0.20), lineWidth: 1)
-                        )
-                        .frame(width: 32, height: 32)
+        HStack(spacing: 14) {
+            // Left: content info + progress bar
+            VStack(alignment: .leading, spacing: 6) {
+                // Label pill — "Continuar estudando"
+                Text(NSLocalizedString("Continuar estudando", comment: ""))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(VitaColors.accentLight.opacity(0.70))
+                    .textCase(.uppercase)
+                    .kerning(0.5)
 
-                    // Spec: fill rgba(200,160,80,0.25), stroke rgba(200,160,80,0.7)
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 11))
-                        .foregroundStyle(VitaColors.accent.opacity(0.70))
-                }
+                // Subject · Tool
+                Text("\(player.subject) · \(player.tool)")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.85))
+                    .lineLimit(1)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    // Spec: font-size 12px, weight 600, color rgba(255,255,255,0.70)
-                    Text("\(player.subject) · \(player.tool)")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.70))
-                        .lineLimit(1)
-
-                    // Progress bar — spec: rgba(200,160,80,0.5) → rgba(200,160,80,0.7)
+                // Progress bar + counter row
+                HStack(spacing: 8) {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             Capsule()
-                                .fill(Color.white.opacity(0.06))
+                                .fill(Color.white.opacity(0.07))
                                 .frame(height: 3)
                             Capsule()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            VitaColors.accent.opacity(0.50),
-                                            VitaColors.accent.opacity(0.70)
-                                        ],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
+                                .fill(VitaColors.goldBarGradient)
                                 .frame(
                                     width: geo.size.width * CGFloat(player.completed) / CGFloat(max(player.total, 1)),
                                     height: 3
@@ -277,28 +261,56 @@ private struct DashMiniPlayer: View {
                         }
                     }
                     .frame(height: 3)
+
+                    Text("\(Int(CGFloat(player.completed) / CGFloat(max(player.total, 1)) * 100))%")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(Color.white.opacity(0.30))
+                        .frame(minWidth: 28, alignment: .trailing)
                 }
-
-                Spacer()
-
-                // Spec: font-size 11px, weight 700, color rgba(255,255,255,0.30) — muted counter
-                Text("\(player.completed)/\(player.total)")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Color.white.opacity(0.30))
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            // Glass: material blur + tint + border (matches mockup .mini-player)
-            .background(.ultraThinMaterial)
-            .background(Color.white.opacity(0.035))
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
+
+            Spacer(minLength: 0)
+
+            // Right: transport controls — backward | play | forward (SF Symbols per spec)
+            HStack(spacing: 16) {
+                Image(systemName: "backward.fill")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.40))
+
+                // Play button — gold accent (tap navigates to session)
+                Button(action: { onTap?() }) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(VitaColors.accent.opacity(0.18))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(VitaColors.accent.opacity(0.28), lineWidth: 1)
+                            )
+                            .frame(width: 36, height: 36)
+
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 13))
+                            .foregroundStyle(VitaColors.accent.opacity(0.85))
+                    }
+                }
+                .buttonStyle(.plain)
+
+                Image(systemName: "forward.fill")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.40))
+            }
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        // Glass: material blur + tint + border (matches mockup .mini-player)
+        .background(.ultraThinMaterial)
+        .background(Color.white.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.white.opacity(0.07), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.18), radius: 16, x: 0, y: 8)
     }
 }
 
@@ -315,8 +327,16 @@ private struct DashQuickAccessGrid: View {
         ("Atlas 3D",   "glassv2-anatomy-3d-nobg",      "staroflife.fill",        "Atlas 3D"),
     ]
 
+    // LazyVGrid 4 columns — matches mockup .tools-grid (grid-template-columns: repeat(4, 1fr))
+    private let columns = [
+        GridItem(.flexible(), spacing: 0),
+        GridItem(.flexible(), spacing: 0),
+        GridItem(.flexible(), spacing: 0),
+        GridItem(.flexible(), spacing: 0)
+    ]
+
     var body: some View {
-        HStack(spacing: 0) {
+        LazyVGrid(columns: columns, spacing: 0) {
             ForEach(Array(quickTools.enumerated()), id: \.offset) { index, tool in
                 Button(action: {
                     // Match by index for reliability (mock data order matches quickTools order)
@@ -394,13 +414,13 @@ private struct DashWeakSubjectsRow: View {
                     }
                     .padding(14)
                     .frame(minWidth: 120)
-                    // Glass: material blur + tint + border (matches mockup .glass-sm)
+                    // Glass-sm: material blur + tint + border (matches mockup .glass-sm)
                     .background(.ultraThinMaterial)
-                    .background(Color.white.opacity(0.03))
+                    .background(Color.white.opacity(0.04))
                     .clipShape(RoundedRectangle(cornerRadius: 18))
                     .overlay(
                         RoundedRectangle(cornerRadius: 18)
-                            .stroke(Color.white.opacity(0.05), lineWidth: 1)
+                            .stroke(Color.white.opacity(0.07), lineWidth: 1)
                     )
                     .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
                 }

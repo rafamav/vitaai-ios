@@ -1,9 +1,9 @@
 import SwiftUI
 
 extension View {
-    func glassCard(cornerRadius: CGFloat = 24) -> some View {
+    func glassCard(cornerRadius: CGFloat = 20) -> some View {
         self
-            .background(Color.white.opacity(0.035))
+            .background(Color.white.opacity(0.04))
             .background(.ultraThinMaterial)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             .overlay(

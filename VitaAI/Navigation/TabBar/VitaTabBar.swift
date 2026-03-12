@@ -25,11 +25,20 @@ enum TabItem: String, CaseIterable {
         case .historico: return "chart.bar.fill"
         }
     }
+
+    var localizedName: String {
+        switch self {
+        case .home:      return NSLocalizedString("Inicio", comment: "Nav tab home")
+        case .estudos:   return NSLocalizedString("Estudos", comment: "Nav tab estudos")
+        case .faculdade: return NSLocalizedString("Faculdade", comment: "Nav tab faculdade")
+        case .historico: return NSLocalizedString("Progresso", comment: "Nav tab progresso")
+        }
+    }
 }
 
 // MARK: - VitaTabBar
 // Matches mockup .nav-pill: 4 nav-circles + vita-center medallion
-// Style: floating pill with blur, no background bar, just circles
+// Style: floating pill with glass fade, neumorphic circles, gold active glow
 struct VitaTabBar: View {
     @Binding var selectedTab: TabItem
     var onCenterTap: () -> Void
@@ -37,9 +46,13 @@ struct VitaTabBar: View {
     var body: some View {
         ZStack {
             // Fade gradient behind nav (matches mockup ::before — glass fade background)
-            // Taller gradient so medallion floats above content naturally
+            // Tall gradient + backdrop blur for premium look
             LinearGradient(
-                colors: [Color.clear, Color(red: 0.031, green: 0.024, blue: 0.039).opacity(0.92)],
+                colors: [
+                    Color.clear,
+                    Color(red: 0.039, green: 0.039, blue: 0.059).opacity(0.70), // #0A0A0F
+                    Color(red: 0.039, green: 0.039, blue: 0.059).opacity(0.94)  // #0A0A0F
+                ],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -76,40 +89,31 @@ struct VitaTabBar: View {
         .frame(height: 130) // taller to fit 100px medallion floating up
     }
 
-    // MARK: - Nav Circle (matches .nav-circle — neumorphic 48x48)
-    // Mockup: inset shadow dark+light, gold glow active, subtle glass bg always visible
+    // MARK: - Nav Circle (matches .nav-circle — neumorphic 48x48, nearly transparent)
+    // Mockup: rgba(255,255,255,0.03) bg + inset dark shadow + 0.45 opacity inactive
+    // Active: rgba(200,160,80,0.08) bg + gold glow + full opacity
     @ViewBuilder
     private func navCircle(_ item: TabItem) -> some View {
         let isActive = selectedTab == item
 
         Button(action: { selectedTab = item }) {
             ZStack {
-                // Neumorphic base: dark inset shadow (concave effect)
+                // Base circle — near-transparent glass (matches mockup rgba(255,255,255,0.03))
                 Circle()
                     .fill(
                         isActive
-                            ? Color(red: 0.080, green: 0.063, blue: 0.100) // slightly lighter when active
-                            : Color(red: 0.055, green: 0.043, blue: 0.075)
+                            ? VitaColors.accent.opacity(0.08)          // rgba(200,160,80,0.08) active
+                            : Color.white.opacity(0.03)                 // rgba(255,255,255,0.03) inactive
                     )
                     .frame(width: 48, height: 48)
-                    // Outer depth shadow (dark side)
-                    .shadow(
-                        color: Color.black.opacity(isActive ? 0.55 : 0.50),
-                        radius: 6, x: 3, y: 3
-                    )
-                    // Outer highlight (light side — subtle)
-                    .shadow(
-                        color: Color.white.opacity(0.04),
-                        radius: 4, x: -2, y: -2
-                    )
 
-                // Inner inset shadow ring — simulates concave depth
+                // Neumorphic inner shadow ring — simulates concave inset
                 Circle()
                     .stroke(
                         LinearGradient(
                             colors: [
-                                Color.black.opacity(0.35),
-                                Color.white.opacity(0.03)
+                                Color.black.opacity(isActive ? 0.30 : 0.40),
+                                Color.white.opacity(isActive ? 0.04 : 0.03)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -118,27 +122,38 @@ struct VitaTabBar: View {
                     )
                     .frame(width: 48, height: 48)
 
-                // Gold border ring (active only)
+                // Gold border ring (active only — matches mockup active border rgba(200,160,80,0.10))
                 if isActive {
                     Circle()
-                        .stroke(VitaColors.accent.opacity(0.22), lineWidth: 1.5)
+                        .stroke(VitaColors.accent.opacity(0.20), lineWidth: 1.5)
                         .frame(width: 48, height: 48)
                 }
 
-                // Icon
+                // Icon — gold when active, white.35 when inactive (matches mockup stroke colors)
                 Image(systemName: isActive ? item.selectedIcon : item.icon)
                     .font(.system(size: 19, weight: isActive ? .semibold : .regular))
                     .foregroundStyle(
                         isActive
-                            ? Color(red: 255/255, green: 220/255, blue: 160/255).opacity(0.92)
-                            : Color.white.opacity(0.35)
+                            ? Color(red: 255/255, green: 220/255, blue: 160/255).opacity(0.92) // rgba(255,220,160,0.9)
+                            : Color.white.opacity(0.38)                                          // inactive stroke
                     )
             }
-            // Gold glow radiate when active
+            // Outer neumorphic depth shadow
             .shadow(
-                color: isActive ? VitaColors.accent.opacity(0.30) : .clear,
+                color: .black.opacity(isActive ? 0.40 : 0.35),
+                radius: 5, x: 2, y: 2
+            )
+            .shadow(
+                color: Color.white.opacity(0.03),
+                radius: 3, x: -1, y: -1
+            )
+            // Gold ambient glow when active (matches mockup 0 0 12px rgba(200,160,80,0.08))
+            .shadow(
+                color: isActive ? VitaColors.accent.opacity(0.28) : .clear,
                 radius: 12, x: 0, y: 0
             )
+            // Opacity: 0.45 inactive, 1.0 active (matches mockup)
+            .opacity(isActive ? 1.0 : 0.50)
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
@@ -154,24 +169,26 @@ private struct VitaMedallionButton: View {
         ZStack {
             // Outer ambient glow halo (pulsing)
             Circle()
-                .fill(VitaColors.accent.opacity(glowing ? 0.20 : 0.10))
+                .fill(VitaColors.accent.opacity(glowing ? 0.22 : 0.12))
                 .frame(width: 100, height: 100)
-                .blur(radius: glowing ? 18 : 12)
+                .blur(radius: glowing ? 20 : 14)
 
             // Mid glow ring
             Circle()
-                .fill(VitaColors.ambientPrimary.opacity(glowing ? 0.12 : 0.06))
+                .fill(VitaColors.ambientPrimary.opacity(glowing ? 0.14 : 0.07))
                 .frame(width: 84, height: 84)
                 .blur(radius: 8)
 
-            // Medallion image (if asset exists) or premium fallback
+            // Medallion image (asset exists) or premium fallback
             if UIImage(named: "medallion-nav") != nil {
                 Image("medallion-nav")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 80, height: 80)
-                    .shadow(color: VitaColors.accent.opacity(0.60), radius: 20)
-                    .shadow(color: VitaColors.accent.opacity(0.25), radius: 40)
+                    .frame(width: 84, height: 84)
+                    // Matches mockup: brightness(1.6) drop-shadow gold
+                    .colorMultiply(Color(red: 1.0, green: 0.96, blue: 0.85))
+                    .shadow(color: VitaColors.accent.opacity(glowing ? 0.65 : 0.50), radius: glowing ? 24 : 18)
+                    .shadow(color: VitaColors.accent.opacity(glowing ? 0.28 : 0.18), radius: 40)
             } else {
                 // Fallback: 80px neumorphic gold medallion
                 ZStack {
@@ -214,7 +231,7 @@ private struct VitaMedallionButton: View {
                         .shadow(color: VitaColors.accent.opacity(0.55), radius: 18)
                         .shadow(color: VitaColors.accent.opacity(0.25), radius: 36)
 
-                    // Medical icon — caduceus / star of life
+                    // Medical icon — star of life
                     Image(systemName: "staroflife.fill")
                         .font(.system(size: 26, weight: .semibold))
                         .foregroundStyle(

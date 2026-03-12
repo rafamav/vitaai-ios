@@ -4,64 +4,82 @@ struct WeekAgendaSection: View {
     let days: [WeekDay]
     var todayEvents: [AgendaEvent] = []
 
+    @State private var selectedDayId: UUID? = nil
+
+    private var displayedEvents: [AgendaEvent] {
+        if let id = selectedDayId,
+           let day = days.first(where: { $0.id == id }),
+           !day.events.isEmpty {
+            let colors: [AgendaEventColor] = [.gold, .orange, .green, .blue]
+            return day.events.enumerated().map { idx, title in
+                AgendaEvent(title: title, time: "", colorTag: colors[idx % colors.count])
+            }
+        }
+        return todayEvents
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // Week strip — 7 dias, igual ao mockup .week
+            // Week strip — 7 dias (matches mockup .week)
             HStack(spacing: 0) {
                 ForEach(days) { day in
-                    VStack(spacing: 4) {
-                        Text(day.label.uppercased())
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(
-                                day.isToday
-                                    ? Color.white.opacity(0.55)
-                                    : Color.white.opacity(0.40)
-                            )
+                    let isSelected = selectedDayId == day.id || (selectedDayId == nil && day.isToday)
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.20)) { selectedDayId = day.id }
+                    }) {
+                        VStack(spacing: 5) {
+                            // Day letter — gold when active
+                            Text(day.label.uppercased())
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(
+                                    isSelected
+                                        ? VitaColors.accentLight.opacity(0.75)
+                                        : Color.white.opacity(0.38)
+                                )
 
-                        Text("\(day.date.dayOfMonth)")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(
-                                day.isToday
-                                    ? Color.white.opacity(0.95)
-                                    : Color.white.opacity(0.70)
-                            )
+                            // Date number with Circle gold background when active (matches mockup)
+                            ZStack {
+                                if isSelected {
+                                    // Gold circle fill — matches mockup .day.active border-radius:50%
+                                    Circle()
+                                        .fill(VitaColors.accent.opacity(0.20))
+                                        .frame(width: 32, height: 32)
+                                    Circle()
+                                        .stroke(VitaColors.accent.opacity(0.30), lineWidth: 1)
+                                        .frame(width: 32, height: 32)
+                                }
+                                Text("\(day.date.dayOfMonth)")
+                                    .font(.system(size: 16, weight: isSelected ? .bold : .semibold))
+                                    .foregroundStyle(
+                                        isSelected
+                                            ? Color.white.opacity(0.95)
+                                            : Color.white.opacity(0.65)
+                                    )
+                            }
+                            .frame(width: 32, height: 32)
 
-                        // Dot indicator
-                        Circle()
-                            .fill(
-                                day.isToday
-                                    ? Color(red: 220/255, green: 170/255, blue: 120/255).opacity(0.70)
-                                    : VitaColors.accent.opacity(day.events.isEmpty ? 0 : 0.40)
-                            )
-                            .frame(width: 4, height: 4)
+                            // Dot indicator (gold when active or has events)
+                            Circle()
+                                .fill(
+                                    isSelected
+                                        ? Color(red: 220/255, green: 170/255, blue: 120/255).opacity(0.80)
+                                        : VitaColors.accent.opacity(day.events.isEmpty ? 0 : 0.40)
+                                )
+                                .frame(width: 4, height: 4)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 10)
-                    .background(
-                        day.isToday
-                            ? VitaColors.accent.opacity(0.12)
-                            : Color.clear
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(
-                                day.isToday
-                                    ? VitaColors.accent.opacity(0.15)
-                                    : Color.clear,
-                                lineWidth: 1
-                            )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .buttonStyle(.plain)
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, todayEvents.isEmpty ? 0 : 12)
+            .padding(.bottom, displayedEvents.isEmpty ? 0 : 12)
 
             // Eventos do dia dentro de glass card (glassmorphism: material + tint layer)
-            if !todayEvents.isEmpty {
+            if !displayedEvents.isEmpty {
                 VStack(spacing: 0) {
-                    ForEach(todayEvents) { event in
+                    ForEach(displayedEvents) { event in
                         HStack(spacing: 10) {
                             // All agenda icons are gold per mockup (.agenda-ico gold themed)
                             ZStack {
@@ -94,7 +112,7 @@ struct WeekAgendaSection: View {
                 }
                 // Glass: material blur + rgba tint + border (matches mockup .glass-sm)
                 .background(.ultraThinMaterial)
-                .background(Color.white.opacity(0.035))
+                .background(Color.white.opacity(0.04))
                 .clipShape(RoundedRectangle(cornerRadius: 18))
                 .overlay(
                     RoundedRectangle(cornerRadius: 18)

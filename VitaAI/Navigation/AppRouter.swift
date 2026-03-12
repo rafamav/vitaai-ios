@@ -38,6 +38,8 @@ struct MainTabView: View {
     @Environment(\.appContainer) private var container
     @Environment(\.subscriptionStatus) private var subStatus
     @State private var showChat = false
+    // Level from gamification — loaded on task. Initial mock 14 matches mockup.
+    @State private var userLevel: Int? = 14
 
     var body: some View {
         NavigationStack(path: $router.path) {
@@ -48,8 +50,8 @@ struct MainTabView: View {
                             title: router.selectedTab.rawValue,
                             userName: authManager.userName,
                             userImageURL: authManager.userImage.flatMap(URL.init(string:)),
-                            userLevel: nil,
-                            userStreak: 7,
+                            userLevel: userLevel,
+                            userStreak: nil, // streak shown in level badge area only when no level
                             userCourse: NSLocalizedString("Medicina", comment: ""),
                             userSemester: NSLocalizedString("5.º Semestre", comment: ""),
                             onAvatarTap: { router.selectedTab = .historico },
@@ -73,6 +75,7 @@ struct MainTabView: View {
                                 }
                             )
                             .tag(TabItem.home)
+                            .background(Color.clear)
 
                             EstudosScreen(
                                 onNavigateToCanvasConnect:     { router.navigate(to: .canvasConnect) },
@@ -88,6 +91,7 @@ struct MainTabView: View {
                                 onNavigateToProvas:             { router.navigate(to: .provas) }
                             )
                             .tag(TabItem.estudos)
+                            .background(Color.clear)
 
                             // Faculdade — Canvas courses, schedule, grades (matches mockup page-faculdade)
                             FaculdadeScreen(
@@ -97,12 +101,15 @@ struct MainTabView: View {
                                 onNavigateToPdfViewer:      { url in router.navigate(to: .pdfViewer(url: url.absoluteString)) }
                             )
                             .tag(TabItem.faculdade)
+                            .background(Color.clear)
 
                             // Historico — Insights + Activity (matches mockup page-historico)
                             InsightsScreen()
                                 .tag(TabItem.historico)
+                                .background(Color.clear)
                         }
                         .tabViewStyle(.page(indexDisplayMode: .never))
+                        .background(Color.clear) // Critical: let ambient gradient show through TabView
                     }
                 }
 
@@ -118,12 +125,17 @@ struct MainTabView: View {
                 await subStatus.refresh()
                 // Request push notification permission (prompts only if .notDetermined)
                 await PushManager.shared.requestPermission()
-                // Fire daily_login with XP feedback
+                // Fire daily_login with XP feedback + update level badge
                 Task {
                     let stats = try? await container.api.getGamificationStats()
                     let previousLevel = stats?.level
+                    if let level = stats?.level {
+                        userLevel = level
+                    }
                     if let result = try? await container.api.logActivity(action: "daily_login") {
                         container.gamificationEvents.handleActivityResponse(result, previousLevel: previousLevel)
+                        // Update level badge from API response
+                        userLevel = result.level
                     }
                 }
             }

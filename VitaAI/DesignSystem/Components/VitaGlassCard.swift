@@ -21,16 +21,16 @@ struct VitaGlassCard<Content: View>: View {
             // ultraThinMaterial applies iOS blur (~50px equivalent) + saturation boost
             .background(.ultraThinMaterial)
             // Tint layer: rgba(255,255,255,0.04) from mockup .glass
-            .background(Color.white.opacity(0.035))
-            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .background(Color.white.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 20))
             // Border: rgba(255,255,255,0.07) from mockup
             .overlay(
-                RoundedRectangle(cornerRadius: 24)
+                RoundedRectangle(cornerRadius: 20)
                     .stroke(Color.white.opacity(0.07), lineWidth: 1)
             )
             // Inset top highlight: inset 0 1px 0 rgba(255,255,255,0.07)
             .overlay(alignment: .top) {
-                RoundedRectangle(cornerRadius: 24)
+                RoundedRectangle(cornerRadius: 20)
                     .fill(.clear)
                     .overlay(alignment: .top) {
                         Capsule()
@@ -67,9 +67,9 @@ struct VitaGoldCard<Content: View>: View {
             .frame(maxWidth: .infinity)
             .background(.ultraThinMaterial)
             .background(VitaColors.glassBg)
-            .clipShape(RoundedRectangle(cornerRadius: 24))
+            .clipShape(RoundedRectangle(cornerRadius: 20))
             .overlay(
-                RoundedRectangle(cornerRadius: 24)
+                RoundedRectangle(cornerRadius: 20)
                     .stroke(VitaColors.goldBorder, lineWidth: 1.5)
             )
             .overlay(alignment: .top) {

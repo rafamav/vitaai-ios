@@ -18,24 +18,25 @@ struct VitaTopBar: View {
             // Mockup: avatar 38x38 inside gold XP ring, level pill badge
             Button(action: { onAvatarTap?() }) {
                 ZStack(alignment: .bottom) {
-                    // XP ring — thin SVG-style arc (gold, 2px stroke)
+                    // XP ring — AngularGradient conic arc (gold, per task spec)
                     let xpProgress: CGFloat = 0.82 // mock: 82% to next level
                     ZStack {
                         // Track circle
                         Circle()
                             .stroke(Color.white.opacity(0.08), lineWidth: 2.5)
                             .frame(width: 46, height: 46)
-                        // Progress arc — gold
+                        // Progress arc — AngularGradient gold (conic: dark→bright gold)
                         Circle()
                             .trim(from: 0, to: xpProgress)
                             .stroke(
-                                LinearGradient(
-                                    colors: [
-                                        VitaColors.accent.opacity(0.80),
-                                        VitaColors.accentLight.opacity(0.60)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
+                                AngularGradient(
+                                    gradient: Gradient(stops: [
+                                        .init(color: VitaColors.accentDark.opacity(0.40), location: 0.0),
+                                        .init(color: VitaColors.accent.opacity(0.85), location: 0.45),
+                                        .init(color: VitaColors.accentLight.opacity(1.00), location: 0.85),
+                                        .init(color: VitaColors.accent.opacity(0.55), location: 1.0)
+                                    ]),
+                                    center: .center
                                 ),
                                 style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
                             )
@@ -102,17 +103,38 @@ struct VitaTopBar: View {
             .buttonStyle(.plain)
 
             // Greeting + subtitle
-            VStack(alignment: .leading, spacing: 1) {
-                if let userName {
-                    let firstName = userName.split(separator: " ").first.map(String.init) ?? userName
-                    Text("\(timeGreeting), \(firstName)")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.90))
-                        .lineLimit(1)
-                } else {
-                    Text(title)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.90))
+            VStack(alignment: .leading, spacing: 2) {
+                // Greeting row: "Bom dia, Rafael! 🔥42" (streak chip inline — matches mockup)
+                HStack(spacing: 6) {
+                    if let userName {
+                        let firstName = userName.split(separator: " ").first.map(String.init) ?? userName
+                        Text("\(timeGreeting), \(firstName)!")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.90))
+                            .lineLimit(1)
+                    } else {
+                        Text(title)
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.90))
+                    }
+                    // Streak chip inline — matches mockup .streak-chip
+                    if let streak = userStreak, streak > 0 {
+                        HStack(spacing: 2) {
+                            Text("🔥")
+                                .font(.system(size: 10))
+                            Text("\(streak)")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(Color(red: 255/255, green: 200/255, blue: 130/255).opacity(0.95))
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(VitaColors.accent.opacity(0.14))
+                        .overlay(
+                            Capsule()
+                                .stroke(VitaColors.accent.opacity(0.22), lineWidth: 1)
+                        )
+                        .clipShape(Capsule())
+                    }
                 }
 
                 // Subtitle: semestre · curso

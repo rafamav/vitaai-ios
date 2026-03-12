@@ -37,7 +37,7 @@ struct UpcomingExamsRow: View {
         }
         // Glass: material blur + rgba tint + inset shimmer + shadow (matches mockup .glass)
         .background(.ultraThinMaterial)
-        .background(Color.white.opacity(0.035))
+        .background(Color.white.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .overlay(
             RoundedRectangle(cornerRadius: 20)
