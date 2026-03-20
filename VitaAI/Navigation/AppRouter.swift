@@ -54,9 +54,9 @@ struct MainTabView: View {
                             userStreak: nil, // streak shown in level badge area only when no level
                             userCourse: NSLocalizedString("Medicina", comment: ""),
                             userSemester: NSLocalizedString("5.º Semestre", comment: ""),
-                            onAvatarTap: { router.selectedTab = .historico },
+                            onAvatarTap: { router.navigate(to: .profile) },
                             onNotificationsTap: {},
-                            onMenuTap: { router.selectedTab = .historico }
+                            onMenuTap: { router.navigate(to: .profile) }
                         )
 
                         TabView(selection: $router.selectedTab) {
@@ -75,6 +75,12 @@ struct MainTabView: View {
                                 },
                                 onNavigateToQBank: {
                                     router.navigate(to: .qbank)
+                                },
+                                onNavigateToAgenda: {
+                                    router.navigate(to: .agenda)
+                                },
+                                onNavigateToTranscricao: {
+                                    router.navigate(to: .transcricao)
                                 }
                             )
                             .tag(TabItem.home)
@@ -107,8 +113,9 @@ struct MainTabView: View {
                             .tag(TabItem.faculdade)
                             .background(Color.clear)
 
-                            // Historico — Insights + Activity (matches mockup page-historico)
-                            InsightsScreen()
+                            // Historico — Progress screen (matches mockup page-historico)
+                            // XP ring, stats, meta semanal, heatmap, medals, ranking
+                            ProgressScreen()
                                 .tag(TabItem.historico)
                                 .background(Color.clear)
                         }
@@ -295,6 +302,32 @@ struct MainTabView: View {
                     ProvasScreen(onBack: { router.goBack() })
                 case .qbank:
                     QBankCoordinatorScreen(onBack: { router.goBack() })
+                case .toolManager:
+                    ToolManagerView(onBack: { router.goBack() })
+                case .disciplineDetail(let disciplineId, let disciplineName):
+                    DisciplineDetailScreen(
+                        disciplineId: disciplineId,
+                        disciplineName: disciplineName,
+                        onBack: { router.goBack() }
+                    )
+                case .profile:
+                    ProfileScreen(
+                        authManager: authManager,
+                        onNavigateToAbout:         { router.navigate(to: .about) },
+                        onNavigateToAppearance:    { router.navigate(to: .appearance) },
+                        onNavigateToNotifications: { router.navigate(to: .notifications) },
+                        onNavigateToConnections:   { router.navigate(to: .connections) },
+                        onNavigateToCanvasConnect: { router.navigate(to: .canvasConnect) },
+                        onNavigateToWebAluno:      { router.navigate(to: .webalunoConnect) },
+                        onNavigateToInsights:      { router.navigate(to: .insights) },
+                        onNavigateToTrabalhos:     { router.navigate(to: .trabalhos) },
+                        onNavigateToPaywall:       { router.navigate(to: .paywall) },
+                        onNavigateToActivity:      { router.navigate(to: .activityFeed) }
+                    )
+                case .agenda:
+                    AgendaScreen()
+                case .transcricao:
+                    TranscricaoScreen(onBack: { router.goBack() })
                 default:
                     EmptyView()
                 }

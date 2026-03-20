@@ -57,4 +57,13 @@ enum Route: Hashable {
 
     // MARK: - QBank (Question Bank)
     case qbank
+
+    // MARK: - Tool Manager
+    case toolManager
+
+    // MARK: - Discipline Detail
+    case disciplineDetail(disciplineId: String, disciplineName: String)
+
+    // MARK: - Transcricao (audio recording + AI transcription)
+    case transcricao
 }

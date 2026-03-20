@@ -11,6 +11,8 @@ struct DashboardScreen: View {
     var onNavigateToPdfs: (() -> Void)?
     var onNavigateToMaterials: (() -> Void)?
     var onNavigateToQBank: (() -> Void)?
+    var onNavigateToAgenda: (() -> Void)?
+    var onNavigateToTranscricao: (() -> Void)?
 
     var body: some View {
         Group {
@@ -62,6 +64,9 @@ struct DashboardScreen: View {
                             if let qbank = onNavigateToQBank { qbank() } else { onNavigateToSimulados?() }
                         case NSLocalizedString("Flashcards", comment: ""):  onNavigateToFlashcards?()
                         case NSLocalizedString("Simulados", comment: ""):   onNavigateToSimulados?()
+                        case NSLocalizedString("Transcricao", comment: ""),
+                             NSLocalizedString("Gravar Aula", comment: ""):  onNavigateToTranscricao?()
+                        case NSLocalizedString("Agenda", comment: ""):       onNavigateToAgenda?()
                         default: onNavigateToMaterials?()
                         }
                     }
@@ -73,7 +78,7 @@ struct DashboardScreen: View {
                 DashSectionHeader(
                     title: NSLocalizedString("HOJE", comment: ""),
                     link: NSLocalizedString("Ver semana", comment: ""),
-                    onLink: nil
+                    onLink: onNavigateToAgenda
                 )
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
@@ -93,7 +98,7 @@ struct DashboardScreen: View {
                     DashSectionHeader(
                         title: NSLocalizedString("PROXIMAS PROVAS", comment: ""),
                         link: NSLocalizedString("Agenda", comment: ""),
-                        onLink: nil
+                        onLink: onNavigateToAgenda
                     )
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
@@ -225,94 +230,88 @@ private struct DashSectionHeader: View {
 }
 
 // MARK: - Mini Player (matches mockup .mini-player)
-// Layout: [title + subtitle + progress] | [⏮ ▶ ⏭] controls (spec: backward.fill/play.fill/forward.fill)
+// Layout: [play btn 32x32] [title + progress bar] [percentage]
 private struct DashMiniPlayer: View {
     let player: MiniPlayerData
     var onTap: (() -> Void)?
 
+    private var progressFraction: CGFloat {
+        CGFloat(player.completed) / CGFloat(max(player.total, 1))
+    }
+
     var body: some View {
-        HStack(spacing: 14) {
-            // Left: content info + progress bar
-            VStack(alignment: .leading, spacing: 6) {
-                // Label pill — "Continuar estudando"
-                Text(NSLocalizedString("Continuar estudando", comment: ""))
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(VitaColors.accentLight.opacity(0.70))
-                    .textCase(.uppercase)
-                    .kerning(0.5)
+        Button(action: { onTap?() }) {
+            HStack(spacing: 10) {
+                // Play button — gold accent (matches mockup .mini-play-btn 32x32)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(VitaColors.accent.opacity(0.15))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(VitaColors.accent.opacity(0.20), lineWidth: 1)
+                        )
+                        .frame(width: 32, height: 32)
 
-                // Subject · Tool
-                Text("\(player.subject) · \(player.tool)")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.85))
-                    .lineLimit(1)
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 11))
+                        .foregroundStyle(VitaColors.accent.opacity(0.70))
+                }
 
-                // Progress bar + counter row
-                HStack(spacing: 8) {
+                // Title + progress bar (matches mockup .mini-info)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(player.subject) · \(player.tool)")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.70))
+                        .lineLimit(1)
+
+                    // Progress bar (matches mockup .mini-bar 3px)
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             Capsule()
-                                .fill(Color.white.opacity(0.07))
+                                .fill(Color.white.opacity(0.06))
                                 .frame(height: 3)
                             Capsule()
-                                .fill(VitaColors.goldBarGradient)
-                                .frame(
-                                    width: geo.size.width * CGFloat(player.completed) / CGFloat(max(player.total, 1)),
-                                    height: 3
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            VitaColors.accent.opacity(0.50),
+                                            VitaColors.accent.opacity(0.70)
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
                                 )
+                                .frame(width: geo.size.width * progressFraction, height: 3)
                         }
                     }
                     .frame(height: 3)
-
-                    Text("\(Int(CGFloat(player.completed) / CGFloat(max(player.total, 1)) * 100))%")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(Color.white.opacity(0.30))
-                        .frame(minWidth: 28, alignment: .trailing)
                 }
+
+                // Percentage counter (matches mockup .mini-pct)
+                Text("\(Int(progressFraction * 100))%")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.30))
+                    .frame(minWidth: 28, alignment: .trailing)
             }
-
-            Spacer(minLength: 0)
-
-            // Right: transport controls — backward | play | forward (SF Symbols per spec)
-            HStack(spacing: 16) {
-                Image(systemName: "backward.fill")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.40))
-
-                // Play button — gold accent (tap navigates to session)
-                Button(action: { onTap?() }) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(VitaColors.accent.opacity(0.18))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(VitaColors.accent.opacity(0.28), lineWidth: 1)
-                            )
-                            .frame(width: 36, height: 36)
-
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 13))
-                            .foregroundStyle(VitaColors.accent.opacity(0.85))
-                    }
-                }
-                .buttonStyle(.plain)
-
-                Image(systemName: "forward.fill")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.40))
-            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            // Glass: matches mockup .mini-player (rgba(255,255,255,0.04) + border)
+            .background(Color.white.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(Color.white.opacity(0.06), lineWidth: 1)
+            )
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        // Glass: material blur + tint + border (matches mockup .mini-player)
-        .background(.ultraThinMaterial)
-        .background(Color.white.opacity(0.04))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color.white.opacity(0.07), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.18), radius: 16, x: 0, y: 8)
+        .buttonStyle(MiniPlayerButtonStyle())
+    }
+}
+
+private struct MiniPlayerButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
     }
 }
 

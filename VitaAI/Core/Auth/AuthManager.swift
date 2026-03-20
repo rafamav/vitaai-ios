@@ -4,6 +4,8 @@ import Foundation
 @MainActor
 final class AuthManager: ObservableObject {
     private let tokenStore: TokenStore
+    // Retained for the lifetime of the sign-in request (ASAuthorizationController is callback-based)
+    private var appleSignInManager: AppleSignInManager?
 
     @Published var isLoggedIn: Bool = false
     @Published var isLoading: Bool = true
@@ -60,7 +62,62 @@ final class AuthManager: ObservableObject {
     }
 
     func signInWithGoogle() { signIn(provider: "google") }
-    func signInWithApple() { signIn(provider: "apple") }
+
+    // MARK: - Native Apple Sign-In
+    //
+    // Uses ASAuthorizationAppleIDProvider (native) — NOT ASWebAuthenticationSession.
+    // App Store guideline 4.8 requires native Apple Sign-In when other social logins are offered.
+    // Using WebView for Apple Sign-In will be rejected by App Review.
+
+    func signInWithApple() {
+        error = nil
+        isLoading = true
+
+        let manager = AppleSignInManager()
+        appleSignInManager = manager
+
+        Task {
+            defer {
+                isLoading = false
+                appleSignInManager = nil
+            }
+
+            do {
+                let result = try await manager.requestAuthorization()
+                await sendAppleTokenToBackend(result)
+            } catch {
+                let nsError = error as NSError
+                // User-initiated cancel — not an error worth displaying
+                if nsError.domain == ASAuthorizationErrorDomain,
+                   nsError.code == ASAuthorizationError.canceled.rawValue {
+                    return
+                }
+                self.error = error.localizedDescription
+            }
+        }
+    }
+
+    private func sendAppleTokenToBackend(_ result: AppleSignInManager.AppleSignInResult) async {
+        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/mobile-apple") else {
+            error = NSLocalizedString("Invalid auth URL", comment: "Auth error")
+            return
+        }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var payload: [String: Any] = [
+            "identityToken": result.identityToken,
+            "nonce": result.nonce,
+        ]
+        if let name = result.fullName { payload["fullName"] = name }
+        if let email = result.email { payload["email"] = email }
+
+        req.httpBody = try? JSONSerialization.data(withJSONObject: payload)
+
+        await performEmailAuthRequest(req, email: result.email ?? "")
+    }
 
     func signInWithEmail(email: String, password: String) async {
         isLoading = true
