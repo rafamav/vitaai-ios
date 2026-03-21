@@ -2,7 +2,7 @@ import AuthenticationServices
 import Foundation
 
 @MainActor
-final class AuthManager: ObservableObject {
+final class AuthManager: NSObject, ObservableObject {
     private let tokenStore: TokenStore
 
     @Published var isLoggedIn: Bool = false
@@ -11,8 +11,12 @@ final class AuthManager: ObservableObject {
     @Published var userName: String?
     @Published var userImage: String?
 
+    /// Retains the ASWebAuthenticationSession so it isn't deallocated mid-flow.
+    private var webAuthSession: ASWebAuthenticationSession?
+
     init(tokenStore: TokenStore) {
         self.tokenStore = tokenStore
+        super.init()
         Task { await checkLoginStatus() }
     }
 
@@ -26,9 +30,11 @@ final class AuthManager: ObservableObject {
         isLoading = false
     }
 
-    func signIn(provider: String) {
+    // MARK: - Google Sign-In (ASWebAuthenticationSession → /api/auth/mobile-start)
+
+    func signInWithGoogle() {
         error = nil
-        let urlString = "\(AppConfig.authBaseURL)/api/auth/mobile-start?provider=\(provider)"
+        let urlString = "\(AppConfig.authBaseURL)/api/auth/mobile-start?provider=google"
         guard let authURL = URL(string: urlString) else {
             error = "URL inválida"
             return
@@ -40,6 +46,7 @@ final class AuthManager: ObservableObject {
         ) { [weak self] callbackURL, error in
             Task { @MainActor in
                 guard let self else { return }
+                self.webAuthSession = nil
                 if let error {
                     if (error as NSError).code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
                         return // User cancelled
@@ -56,26 +63,78 @@ final class AuthManager: ObservableObject {
         }
         session.prefersEphemeralWebBrowserSession = false
         session.presentationContextProvider = ASWebAuthContextProvider.shared
+        webAuthSession = session
         session.start()
     }
 
-    func signInWithGoogle() { signIn(provider: "google") }
-    func signInWithApple() { signIn(provider: "apple") }
+    // MARK: - Apple Sign-In (Native ASAuthorizationAppleIDProvider → /api/auth/mobile-apple)
+    //
+    // Apple App Store requirement: Sign in with Apple on iOS MUST use
+    // ASAuthorizationAppleIDProvider (native), NOT ASWebAuthenticationSession / WebView.
+
+    func signInWithApple() {
+        error = nil
+        isLoading = true
+        let provider = ASAuthorizationAppleIDProvider()
+        let request = provider.createRequest()
+        request.requestedScopes = [.fullName, .email]
+
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        controller.delegate = self
+        controller.presentationContextProvider = ASWebAuthContextProvider.shared
+        controller.performRequests()
+    }
+
+    private func handleAppleAuthorization(_ authorization: ASAuthorization) async {
+        defer { isLoading = false }
+
+        guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+              let identityTokenData = credential.identityToken,
+              let identityToken = String(data: identityTokenData, encoding: .utf8) else {
+            error = "Token Apple não recebido"
+            return
+        }
+
+        // Build full name from Apple credential (only available on first sign-in)
+        var fullName: String?
+        if let nameComponents = credential.fullName {
+            let parts = [nameComponents.givenName, nameComponents.familyName].compactMap { $0 }
+            if !parts.isEmpty { fullName = parts.joined(separator: " ") }
+        }
+
+        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/mobile-apple") else {
+            error = "URL inválida"; return
+        }
+
+        var body: [String: Any] = ["identityToken": identityToken]
+        if let fullName { body["fullName"] = fullName }
+        if let email = credential.email { body["email"] = email }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        await performAuthRequest(req, email: credential.email)
+    }
+
+    // MARK: - Email Auth
 
     func signInWithEmail(email: String, password: String) async {
         isLoading = true
         error = nil
         defer { isLoading = false }
 
-        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/mobile-email-login") else {
+        // BYM-1180: Use better-auth standard route (handled by [...all] catch-all)
+        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/sign-in/email") else {
             error = "URL inválida"; return
         }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["email": email, "password": password, "callbackURL": "/"])
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["email": email, "password": password])
 
-        await performEmailAuthRequest(req, email: email)
+        await performAuthRequest(req, email: email)
     }
 
     func signUpWithEmail(email: String, password: String, name: String) async {
@@ -89,9 +148,9 @@ final class AuthManager: ObservableObject {
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["email": email, "password": password, "name": name, "callbackURL": "/"])
+        req.httpBody = try? JSONSerialization.data(withJSONObject: ["email": email, "password": password, "name": name])
 
-        await performEmailAuthRequest(req, email: email)
+        await performAuthRequest(req, email: email)
     }
 
     func forgotPassword(email: String) async {
@@ -106,32 +165,52 @@ final class AuthManager: ObservableObject {
         _ = try? await URLSession.shared.data(for: req)
     }
 
-    private func performEmailAuthRequest(_ request: URLRequest, email: String) async {
+    // MARK: - Unified Response Parsing
+    //
+    // Handles two response formats:
+    //   better-auth standard: { session: { token }, user: { name, email, image } }
+    //   mobile-apple / mobile-callback: { token, name, email, image }
+
+    private func performAuthRequest(_ request: URLRequest, email: String?) async {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse else {
                 error = "Resposta inválida"; return
             }
             let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+
             if (200...299).contains(http.statusCode) {
-                let token = json?["token"] as? String
+                // Extract token: try session.token (better-auth) then top-level (mobile endpoints)
+                let token: String?
+                if let session = json?["session"] as? [String: Any] {
+                    token = session["token"] as? String
+                } else {
+                    token = json?["token"] as? String
+                }
+
+                // Extract user info from nested user object or top-level fields
                 let user = json?["user"] as? [String: Any]
                 let name = user?["name"] as? String ?? json?["name"] as? String
-                let image = user?["image"] as? String
+                let resolvedEmail = user?["email"] as? String ?? json?["email"] as? String ?? email
+                let image = user?["image"] as? String ?? json?["image"] as? String
+
                 guard let token else {
                     error = "Credenciais inválidas"; return
                 }
-                await tokenStore.saveSession(token: token, name: name, email: email, image: image)
+
+                await tokenStore.saveSession(token: token, name: name, email: resolvedEmail, image: image)
                 userName = name
                 userImage = image
                 isLoggedIn = true
             } else {
-                error = json?["message"] as? String ?? "Email ou senha incorretos"
+                error = json?["message"] as? String ?? json?["error"] as? String ?? "Email ou senha incorretos"
             }
         } catch {
             self.error = "Erro de conexão"
         }
     }
+
+    // MARK: - OAuth Callback (deep link from mobile-callback)
 
     private func handleCallback(url: URL) async {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
@@ -160,6 +239,8 @@ final class AuthManager: ObservableObject {
         isLoggedIn = true
     }
 
+    // MARK: - Demo & Logout
+
     func enterDemoMode() {
         Task {
             await tokenStore.saveDemoUser()
@@ -178,12 +259,50 @@ final class AuthManager: ObservableObject {
     }
 }
 
-// MARK: - ASWebAuthenticationSession context provider
+// MARK: - ASAuthorizationControllerDelegate (Native Apple Sign-In)
 
-final class ASWebAuthContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+extension AuthManager: ASAuthorizationControllerDelegate {
+    nonisolated func authorizationController(
+        controller: ASAuthorizationController,
+        didCompleteWithAuthorization authorization: ASAuthorization
+    ) {
+        Task { @MainActor [weak self] in
+            await self?.handleAppleAuthorization(authorization)
+        }
+    }
+
+    nonisolated func authorizationController(
+        controller: ASAuthorizationController,
+        didCompleteWithError error: Error
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.isLoading = false
+            if (error as NSError).code == ASAuthorizationError.canceled.rawValue {
+                return // User cancelled
+            }
+            self.error = "Erro ao conectar com Apple: \(error.localizedDescription)"
+        }
+    }
+}
+
+// MARK: - ASWebAuthenticationSession + ASAuthorizationController context provider
+
+final class ASWebAuthContextProvider: NSObject,
+    ASWebAuthenticationPresentationContextProviding,
+    ASAuthorizationControllerPresentationContextProviding
+{
     static let shared = ASWebAuthContextProvider()
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = scene.windows.first else {
+            return ASPresentationAnchor()
+        }
+        return window
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let window = scene.windows.first else {
             return ASPresentationAnchor()
