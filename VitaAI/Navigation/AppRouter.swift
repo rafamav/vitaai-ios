@@ -276,6 +276,13 @@ struct MainTabView: View {
                     )
                 case .provas:
                     ProvasScreen(onBack: { router.goBack() })
+                case .achievements:
+                    AchievementsScreen(onBack: { router.goBack() })
+                case .planner:
+                    PlannerScreen(
+                        onBack: { router.goBack() },
+                        onNavigate: { route in router.navigate(to: route) }
+                    )
                 default:
                     EmptyView()
                 }

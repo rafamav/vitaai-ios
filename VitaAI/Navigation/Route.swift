@@ -54,4 +54,22 @@ enum Route: Hashable {
 
     // MARK: - Provas (Crowd)
     case provas
+
+    // MARK: - QBank (Question Bank)
+    case qbank
+
+    // MARK: - Tool Manager
+    case toolManager
+
+    // MARK: - Discipline Detail
+    case disciplineDetail(disciplineId: String, disciplineName: String)
+
+    // MARK: - Transcricao (audio recording + AI transcription)
+    case transcricao
+
+    // MARK: - Achievements (full badges page — BYM-1135)
+    case achievements
+
+    // MARK: - Planner (daily study plan — BYM-1152)
+    case planner
 }

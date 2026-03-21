@@ -345,4 +345,10 @@ actor VitaAPI {
     func uploadExamImages(_ images: [(Data, String, String)]) async throws -> CrowdUploadResponse {
         try await client.uploadMultipart("crowd/upload", images: images)
     }
+
+    // MARK: - Study Plan (Planner — BYM-1152)
+
+    func getStudyPlan() async throws -> StudyPlanResponse {
+        try await client.get("estudos/plan")
+    }
 }
