@@ -66,7 +66,7 @@ final class GoogleCalendarConnectViewModel {
                 let result = try await api.syncGoogleCalendar()
                 state.isSyncing = false
                 let count = result.events > 0 ? result.events : result.synced
-                state.successMessage = "Sincronizado: \(count) evento(s)"
+                state.successMessage = "Sincronizado: \(count) eventos"
                 await loadStatus()
             } catch {
                 state.isSyncing = false

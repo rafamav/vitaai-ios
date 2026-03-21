@@ -1,7 +1,6 @@
 import SwiftUI
 
 // MARK: - GoogleDriveConnectScreen
-// Android parity: GoogleDriveConnectScreen (OAuth-based Google Drive integration)
 
 struct GoogleDriveConnectScreen: View {
     var onBack: () -> Void
@@ -16,17 +15,17 @@ struct GoogleDriveConnectScreen: View {
 
             // Ambient glow
             Canvas { context, size in
-                let center = CGPoint(x: size.width * 0.5, y: size.height * 0.08)
-                let gradient = Gradient(colors: [VitaColors.accent.opacity(0.07), .clear])
+                let center = CGPoint(x: size.width * 0.15, y: size.height * 0.08)
+                let gradient = Gradient(colors: [Color(red: 0.25, green: 0.50, blue: 0.95).opacity(0.08), .clear])
                 context.drawLayer { ctx in
                     ctx.fill(
                         Path(ellipseIn: CGRect(
-                            x: center.x - size.width * 0.5,
-                            y: center.y - size.width * 0.5,
-                            width: size.width,
-                            height: size.width
+                            x: center.x - size.width * 0.6,
+                            y: center.y - size.width * 0.6,
+                            width: size.width * 1.2,
+                            height: size.width * 1.2
                         )),
-                        with: .radialGradient(gradient, center: center, startRadius: 0, endRadius: size.width * 0.5)
+                        with: .radialGradient(gradient, center: center, startRadius: 0, endRadius: size.width * 0.6)
                     )
                 }
             }
@@ -46,6 +45,11 @@ struct GoogleDriveConnectScreen: View {
                 viewModel = vm
                 vm.onAppear()
             }
+        }
+        // Recarrega status ao voltar do Safari
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            guard let vm = viewModel else { return }
+            Task { await vm.loadStatus() }
         }
         .vitaToastHost(toastState)
         .onChange(of: viewModel?.state.successMessage) { _, msg in
@@ -138,7 +142,7 @@ struct GoogleDriveConnectScreen: View {
                         )
                         .frame(width: 48, height: 48)
 
-                    Image(systemName: state.isConnected ? "externaldrive.fill.badge.checkmark" : "externaldrive.badge.xmark")
+                    Image(systemName: state.isConnected ? "externaldrive.fill.badge.checkmark" : "externaldrive.badge.exclamationmark")
                         .font(.system(size: 22))
                         .foregroundColor(
                             state.isConnected ? VitaColors.dataGreen : VitaColors.textSecondary
@@ -151,14 +155,20 @@ struct GoogleDriveConnectScreen: View {
                         .fontWeight(.semibold)
                         .foregroundColor(VitaColors.textPrimary)
 
-                    if let email = state.googleEmail {
+                    if let email = state.googleEmail, !email.isEmpty {
                         Text(email)
                             .font(VitaTypography.bodySmall)
                             .foregroundColor(VitaColors.textSecondary)
                     }
 
-                    if state.isConnected {
-                        Text("\(state.fileCount) arquivo(s) importado(s)")
+                    if state.isConnected && state.fileCount > 0 {
+                        Text("\(state.fileCount) arquivo(s) sincronizado(s)")
+                            .font(VitaTypography.labelSmall)
+                            .foregroundColor(VitaColors.textTertiary)
+                    }
+
+                    if let syncAt = state.lastSyncAt {
+                        Text("Ultima sinc: \(formatSyncDate(syncAt))")
                             .font(VitaTypography.labelSmall)
                             .foregroundColor(VitaColors.textTertiary)
                     }
@@ -188,7 +198,7 @@ struct GoogleDriveConnectScreen: View {
         howItWorksCard
 
         VitaButton(
-            text: vm.state.isDisconnecting ? "Desconectando..." : "Desconectar Drive",
+            text: vm.state.isDisconnecting ? "Desconectando..." : "Desconectar Google Drive",
             action: { vm.disconnect() },
             variant: .danger,
             size: .lg,
@@ -201,34 +211,39 @@ struct GoogleDriveConnectScreen: View {
     // MARK: - Disconnected section
 
     private var disconnectedSection: some View {
-        VitaGlassCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Conectar Google Drive")
-                    .font(VitaTypography.titleSmall)
-                    .fontWeight(.semibold)
-                    .foregroundColor(VitaColors.textPrimary)
+        VStack(spacing: 16) {
+            VitaGlassCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Conectar Google Drive")
+                        .font(VitaTypography.titleSmall)
+                        .fontWeight(.semibold)
+                        .foregroundColor(VitaColors.textPrimary)
 
-                Text("Importe PDFs, slides e materiais do seu Google Drive diretamente para o VitaAI.")
+                    Text(
+                        "Ao conectar, voce sera redirecionado ao Google para autorizar o acesso. " +
+                        "Seus arquivos serao importados automaticamente apos a autorizacao."
+                    )
                     .font(VitaTypography.bodySmall)
                     .foregroundColor(VitaColors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
-
-                Spacer().frame(height: 4)
-
-                infoRow("PDFs e slides importados automaticamente")
-                infoRow("Arquivos processados para gerar flashcards com IA")
-                infoRow("Sincronizacao periodica mantém materiais atualizados")
-
-                Spacer().frame(height: 8)
-
-                Text("A conexao OAuth sera configurada em breve.")
-                    .font(VitaTypography.labelSmall)
-                    .foregroundColor(VitaColors.textTertiary)
-                    .italic()
+                }
+                .padding(16)
             }
-            .padding(16)
+
+            howItWorksCard
+
+            VitaButton(
+                text: "Conectar com Google",
+                action: { openOAuth() },
+                variant: .primary,
+                size: .lg,
+                leadingSystemImage: "arrow.up.right.square"
+            )
+            .frame(maxWidth: .infinity)
         }
     }
+
+    // MARK: - How it works card
 
     private var howItWorksCard: some View {
         VitaGlassCard {
@@ -238,8 +253,9 @@ struct GoogleDriveConnectScreen: View {
                     .fontWeight(.semibold)
                     .foregroundColor(VitaColors.textPrimary)
 
-                infoRow("PDFs e slides importados do seu Drive")
-                infoRow("Conteudo processado para gerar flashcards")
+                infoRow("Arquivos PDF do seu Drive sao importados para o VitaAI")
+                infoRow("PDFs sao processados para gerar flashcards e resumos com IA")
+                infoRow("A sincronizacao e segura via OAuth — sem armazenar sua senha")
                 infoRow("Sincronize sempre que quiser dados atualizados")
             }
             .padding(16)
@@ -263,4 +279,31 @@ struct GoogleDriveConnectScreen: View {
             Spacer()
         }
     }
+
+    // MARK: - OAuth
+
+    private func openOAuth() {
+        // apiBaseURL = "https://vita-ai.cloud/api" — o endpoint /api/google/drive/authorize
+        // e uma rota web que redireciona ao Google via redirect do servidor
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/google/drive/authorize") else { return }
+        UIApplication.shared.open(url)
+    }
+
+    // MARK: - Helpers
+
+    private func formatSyncDate(_ raw: String) -> String {
+        let prefix = String(raw.prefix(16))
+        return prefix.replacingOccurrences(of: "T", with: " ")
+    }
 }
+
+// MARK: - Preview
+
+#if DEBUG
+#Preview("GoogleDriveConnectScreen") {
+    NavigationStack {
+        GoogleDriveConnectScreen(onBack: {})
+    }
+    .preferredColorScheme(.dark)
+}
+#endif

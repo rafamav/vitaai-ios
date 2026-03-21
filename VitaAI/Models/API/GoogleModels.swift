@@ -2,16 +2,16 @@ import Foundation
 
 // MARK: - Google Calendar
 
+struct GoogleCalendarCountsResponse: Codable {
+    var events: Int = 0
+}
+
 struct GoogleCalendarStatusResponse: Codable {
     var connected: Bool = false
     var status: String?
-    var googleEmail: String?
     var lastSyncAt: String?
-    var counts: GoogleCalendarCounts?
-}
-
-struct GoogleCalendarCounts: Codable {
-    var events: Int = 0
+    var googleEmail: String?
+    var counts: GoogleCalendarCountsResponse?
 }
 
 struct GoogleCalendarSyncResponse: Codable {
@@ -21,16 +21,16 @@ struct GoogleCalendarSyncResponse: Codable {
 
 // MARK: - Google Drive
 
+struct GoogleDriveCountsResponse: Codable {
+    var files: Int = 0
+}
+
 struct GoogleDriveStatusResponse: Codable {
     var connected: Bool = false
     var status: String?
-    var googleEmail: String?
     var lastSyncAt: String?
-    var counts: GoogleDriveCounts?
-}
-
-struct GoogleDriveCounts: Codable {
-    var files: Int = 0
+    var googleEmail: String?
+    var counts: GoogleDriveCountsResponse?
 }
 
 struct GoogleDriveSyncResponse: Codable {

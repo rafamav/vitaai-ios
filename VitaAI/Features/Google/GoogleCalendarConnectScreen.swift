@@ -1,7 +1,6 @@
 import SwiftUI
 
 // MARK: - GoogleCalendarConnectScreen
-// Android parity: GoogleCalendarConnectScreen (OAuth-based Google Calendar integration)
 
 struct GoogleCalendarConnectScreen: View {
     var onBack: () -> Void
@@ -16,17 +15,17 @@ struct GoogleCalendarConnectScreen: View {
 
             // Ambient glow
             Canvas { context, size in
-                let center = CGPoint(x: size.width * 0.85, y: size.height * 0.1)
-                let gradient = Gradient(colors: [VitaColors.accent.opacity(0.07), .clear])
+                let center = CGPoint(x: size.width * 0.85, y: size.height * 0.08)
+                let gradient = Gradient(colors: [Color(red: 0.25, green: 0.65, blue: 0.35).opacity(0.08), .clear])
                 context.drawLayer { ctx in
                     ctx.fill(
                         Path(ellipseIn: CGRect(
-                            x: center.x - size.width * 0.5,
-                            y: center.y - size.width * 0.5,
-                            width: size.width,
-                            height: size.width
+                            x: center.x - size.width * 0.6,
+                            y: center.y - size.width * 0.6,
+                            width: size.width * 1.2,
+                            height: size.width * 1.2
                         )),
-                        with: .radialGradient(gradient, center: center, startRadius: 0, endRadius: size.width * 0.5)
+                        with: .radialGradient(gradient, center: center, startRadius: 0, endRadius: size.width * 0.6)
                     )
                 }
             }
@@ -46,6 +45,11 @@ struct GoogleCalendarConnectScreen: View {
                 viewModel = vm
                 vm.onAppear()
             }
+        }
+        // Recarrega status ao voltar do Safari
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            guard let vm = viewModel else { return }
+            Task { await vm.loadStatus() }
         }
         .vitaToastHost(toastState)
         .onChange(of: viewModel?.state.successMessage) { _, msg in
@@ -151,14 +155,20 @@ struct GoogleCalendarConnectScreen: View {
                         .fontWeight(.semibold)
                         .foregroundColor(VitaColors.textPrimary)
 
-                    if let email = state.googleEmail {
+                    if let email = state.googleEmail, !email.isEmpty {
                         Text(email)
                             .font(VitaTypography.bodySmall)
                             .foregroundColor(VitaColors.textSecondary)
                     }
 
-                    if state.isConnected {
+                    if state.isConnected && state.eventCount > 0 {
                         Text("\(state.eventCount) evento(s) sincronizado(s)")
+                            .font(VitaTypography.labelSmall)
+                            .foregroundColor(VitaColors.textTertiary)
+                    }
+
+                    if let syncAt = state.lastSyncAt {
+                        Text("Ultima sinc: \(formatSyncDate(syncAt))")
                             .font(VitaTypography.labelSmall)
                             .foregroundColor(VitaColors.textTertiary)
                     }
@@ -188,7 +198,7 @@ struct GoogleCalendarConnectScreen: View {
         howItWorksCard
 
         VitaButton(
-            text: vm.state.isDisconnecting ? "Desconectando..." : "Desconectar Calendar",
+            text: vm.state.isDisconnecting ? "Desconectando..." : "Desconectar Google Calendar",
             action: { vm.disconnect() },
             variant: .danger,
             size: .lg,
@@ -201,34 +211,39 @@ struct GoogleCalendarConnectScreen: View {
     // MARK: - Disconnected section
 
     private var disconnectedSection: some View {
-        VitaGlassCard {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Conectar Google Calendar")
-                    .font(VitaTypography.titleSmall)
-                    .fontWeight(.semibold)
-                    .foregroundColor(VitaColors.textPrimary)
+        VStack(spacing: 16) {
+            VitaGlassCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Conectar Google Calendar")
+                        .font(VitaTypography.titleSmall)
+                        .fontWeight(.semibold)
+                        .foregroundColor(VitaColors.textPrimary)
 
-                Text("Sincronize suas provas, aulas e compromissos diretamente do Google Calendar.")
+                    Text(
+                        "Ao conectar, voce sera redirecionado ao Google para autorizar o acesso. " +
+                        "Seus eventos serao importados automaticamente apos a autorizacao."
+                    )
                     .font(VitaTypography.bodySmall)
                     .foregroundColor(VitaColors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
-
-                Spacer().frame(height: 4)
-
-                infoRow("Provas e eventos importados automaticamente")
-                infoRow("Compromissos aparecem na sua agenda VitaAI")
-                infoRow("Sincronizacao automatica periodica")
-
-                Spacer().frame(height: 8)
-
-                Text("A conexao OAuth sera configurada em breve.")
-                    .font(VitaTypography.labelSmall)
-                    .foregroundColor(VitaColors.textTertiary)
-                    .italic()
+                }
+                .padding(16)
             }
-            .padding(16)
+
+            howItWorksCard
+
+            VitaButton(
+                text: "Conectar com Google",
+                action: { openOAuth() },
+                variant: .primary,
+                size: .lg,
+                leadingSystemImage: "arrow.up.right.square"
+            )
+            .frame(maxWidth: .infinity)
         }
     }
+
+    // MARK: - How it works card
 
     private var howItWorksCard: some View {
         VitaGlassCard {
@@ -238,8 +253,9 @@ struct GoogleCalendarConnectScreen: View {
                     .fontWeight(.semibold)
                     .foregroundColor(VitaColors.textPrimary)
 
-                infoRow("Eventos e provas sao importados do Calendar")
-                infoRow("Compromissos aparecem na sua agenda VitaAI")
+                infoRow("Eventos e compromissos sao importados do seu Google Calendar")
+                infoRow("Provas e deadlines aparecem na sua Agenda no VitaAI")
+                infoRow("A sincronizacao e segura via OAuth — sem armazenar sua senha")
                 infoRow("Sincronize sempre que quiser dados atualizados")
             }
             .padding(16)
@@ -263,4 +279,31 @@ struct GoogleCalendarConnectScreen: View {
             Spacer()
         }
     }
+
+    // MARK: - OAuth
+
+    private func openOAuth() {
+        // authBaseURL = "https://vita-ai.cloud" (sem /api) — o endpoint /api/google/calendar/authorize
+        // e uma rota web que redireciona ao Google, entao usamos apiBaseURL diretamente
+        guard let url = URL(string: "\(AppConfig.apiBaseURL)/google/calendar/authorize") else { return }
+        UIApplication.shared.open(url)
+    }
+
+    // MARK: - Helpers
+
+    private func formatSyncDate(_ raw: String) -> String {
+        let prefix = String(raw.prefix(16))
+        return prefix.replacingOccurrences(of: "T", with: " ")
+    }
 }
+
+// MARK: - Preview
+
+#if DEBUG
+#Preview("GoogleCalendarConnectScreen") {
+    NavigationStack {
+        GoogleCalendarConnectScreen(onBack: {})
+    }
+    .preferredColorScheme(.dark)
+}
+#endif
