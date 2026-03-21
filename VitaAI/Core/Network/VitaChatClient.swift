@@ -36,37 +36,34 @@ actor VitaChatClient {
                         return
                     }
 
-                    var eventType = ""
-                    var eventData = ""
+                    // Backend sends: data: {"type":"text_delta","content":"..."}\n\n
+                    // No separate event: line — type is embedded in JSON payload.
+                    // Accumulate data: lines, process on blank line (SSE spec).
+                    var dataBuffer = ""
 
                     for try await line in bytes.lines {
-                        if line.hasPrefix("event:") {
-                            eventType = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
-                        } else if line.hasPrefix("data:") {
-                            eventData = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
-
-                            switch eventType {
-                            case "text_delta":
-                                if let data = eventData.data(using: .utf8),
-                                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                                   let text = json["text"] as? String {
-                                    continuation.yield(.textDelta(text))
+                        if line.hasPrefix("data:") {
+                            dataBuffer += String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                        } else if line.trimmingCharacters(in: .whitespaces).isEmpty, !dataBuffer.isEmpty {
+                            if let event = Self.parseSSEData(dataBuffer) {
+                                continuation.yield(event)
+                                if case .messageStop = event {
+                                    continuation.finish()
+                                    return
                                 }
-                            case "message_stop":
-                                let convId = (try? JSONSerialization.jsonObject(with: eventData.data(using: .utf8) ?? Data()) as? [String: Any])?["conversationId"] as? String
-                                continuation.yield(.messageStop(conversationId: convId))
-                                continuation.finish()
-                                return
-                            case "error":
-                                continuation.yield(.error(eventData))
-                                continuation.finish()
-                                return
-                            default:
-                                break
+                                if case .error = event {
+                                    continuation.finish()
+                                    return
+                                }
                             }
+                            dataBuffer = ""
+                        }
+                    }
 
-                            eventType = ""
-                            eventData = ""
+                    // Handle remaining buffered data (stream closed without trailing blank line)
+                    if !dataBuffer.isEmpty {
+                        if let event = Self.parseSSEData(dataBuffer) {
+                            continuation.yield(event)
                         }
                     }
 
@@ -75,6 +72,33 @@ actor VitaChatClient {
                     continuation.finish(throwing: error)
                 }
             }
+        }
+    }
+
+    /// Parse a JSON SSE data payload from the backend.
+    /// Backend format: {"type":"text_delta","content":"..."}
+    private static func parseSSEData(_ data: String) -> SSEEvent? {
+        guard let jsonData = data.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+              let type = json["type"] as? String else {
+            return nil
+        }
+
+        switch type {
+        case "text_delta":
+            let content = json["content"] as? String ?? ""
+            return .textDelta(content)
+        case "message_stop":
+            let convId = json["conversationId"] as? String
+            return .messageStop(conversationId: convId)
+        case "error":
+            let content = json["content"] as? String ?? "Unknown error"
+            return .error(content)
+        case "tool_use", "tool_result":
+            // Tool events are informational — not surfaced to UI yet
+            return nil
+        default:
+            return nil
         }
     }
 }
