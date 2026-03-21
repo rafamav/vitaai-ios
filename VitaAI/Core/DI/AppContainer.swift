@@ -32,6 +32,7 @@ final class AppContainer: ObservableObject {
     let notebookStore: NotebookStore
     let mindMapStore: MindMapStore
     let gamificationEvents: GamificationEventManager
+    let appConfigService: AppConfigService
 
     // MARK: - Init
 
@@ -96,5 +97,12 @@ final class AppContainer: ObservableObject {
         let mindMapRepository = MindMapRepository(context: self.modelContainer.mainContext)
         self.mindMapStore = MindMapStore(repository: mindMapRepository)
         self.gamificationEvents = GamificationEventManager()
+        self.appConfigService = AppConfigService.shared
+
+        // Kick off remote config fetch in background — no-op if cache is fresh.
+        // AppConfigService.shared starts with fallback values so UI is never blocked.
+        Task { @MainActor in
+            await AppConfigService.shared.loadIfNeeded(api: api)
+        }
     }
 }

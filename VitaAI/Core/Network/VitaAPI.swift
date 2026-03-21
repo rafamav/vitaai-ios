@@ -285,6 +285,12 @@ actor VitaAPI {
         ])
     }
 
+    // MARK: - App Config (remote gamification config — single source of truth)
+
+    func fetchAppConfig() async throws -> AppConfigResponse {
+        try await client.get("config/app")
+    }
+
     // MARK: - Activity / Gamification
 
     func logActivity(action: String, metadata: [String: String]? = nil) async throws -> LogActivityResponse {
