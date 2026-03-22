@@ -142,7 +142,7 @@ struct Notebook: Codable, Identifiable {
 // MARK: - Notebook Cover Colors (mirrors Android notebookColors)
 
 let notebookCoverColors: [UInt64] = [
-    0xFF22D3EE, // Cyan
+    0xFFC8A050, // Gold
     0xFF3B82F6, // Blue
     0xFF8B5CF6, // Violet
     0xFFEC4899, // Pink

@@ -9,13 +9,13 @@ enum VitaTokens {
 
     // MARK: Dark Colors
     enum DarkColors {
-        static let bg = Color(red: 0.016, green: 0.031, blue: 0.035)
-        static let bgCard = Color(red: 0.051, green: 0.075, blue: 0.094)
-        static let bgElevated = Color(red: 0.039, green: 0.063, blue: 0.078)
-        static let bgHover = Color(red: 0.063, green: 0.094, blue: 0.125)
-        static let bgActive = Color(red: 0.086, green: 0.125, blue: 0.157)
-        static let bgSubtle = Color(red: 0.031, green: 0.184, blue: 0.220)
-        static let borderSurface = Color(red: 0.102, green: 0.125, blue: 0.157)
+        static let bg = Color(red: 0.031, green: 0.024, blue: 0.039)             // #08060A
+        static let bgCard = Color(red: 0.071, green: 0.063, blue: 0.055)         // warm-tinted card
+        static let bgElevated = Color(red: 0.055, green: 0.047, blue: 0.039)     // warm-tinted elevated
+        static let bgHover = Color(red: 0.102, green: 0.086, blue: 0.063)
+        static let bgActive = Color(red: 0.133, green: 0.118, blue: 0.086)
+        static let bgSubtle = Color(red: 0.102, green: 0.078, blue: 0.031)       // deep gold-tinted bg
+        static let borderSurface = Color(red: 0.118, green: 0.102, blue: 0.078)
         static let text = Color(red: 1.000, green: 1.000, blue: 1.000).opacity(0.85)
         static let textSecondary = Color(red: 1.000, green: 1.000, blue: 1.000).opacity(0.55)
         static let textMuted = Color(red: 1.000, green: 1.000, blue: 1.000).opacity(0.25)
@@ -23,12 +23,12 @@ enum VitaTokens {
         static let dataGreen = Color(red: 0.290, green: 0.871, blue: 0.502)
         static let dataAmber = Color(red: 0.984, green: 0.749, blue: 0.141)
         static let dataRed = Color(red: 0.973, green: 0.443, blue: 0.443)
-        static let accent = Color(red: 0.133, green: 0.827, blue: 0.933)
-        static let accentHover = Color(red: 0.024, green: 0.714, blue: 0.831)
-        static let accentSubtle = Color(red: 0.133, green: 0.827, blue: 0.933).opacity(0.08)
-        static let border = Color(red: 0.133, green: 0.827, blue: 0.933).opacity(0.08)
-        static let borderHover = Color(red: 0.133, green: 0.827, blue: 0.933).opacity(0.14)
-        static let borderActive = Color(red: 0.133, green: 0.827, blue: 0.933).opacity(0.2)
+        static let accent = Color(red: 0.784, green: 0.627, blue: 0.314)         // #C8A050 gold
+        static let accentHover = Color(red: 0.690, green: 0.541, blue: 0.227)    // #B08A3A darker gold
+        static let accentSubtle = Color(red: 0.784, green: 0.627, blue: 0.314).opacity(0.08)
+        static let border = Color(red: 0.784, green: 0.627, blue: 0.314).opacity(0.08)
+        static let borderHover = Color(red: 0.784, green: 0.627, blue: 0.314).opacity(0.14)
+        static let borderActive = Color(red: 0.784, green: 0.627, blue: 0.314).opacity(0.2)
     }
 
     // MARK: Light Colors
@@ -48,17 +48,17 @@ enum VitaTokens {
         static let dataGreen = Color(red: 0.133, green: 0.773, blue: 0.369)
         static let dataAmber = Color(red: 0.961, green: 0.620, blue: 0.043)
         static let dataRed = Color(red: 0.937, green: 0.267, blue: 0.267)
-        static let accent = Color(red: 0.024, green: 0.714, blue: 0.831)
-        static let accentHover = Color(red: 0.031, green: 0.569, blue: 0.698)
-        static let accentSubtle = Color(red: 0.024, green: 0.714, blue: 0.831).opacity(0.06)
+        static let accent = Color(red: 0.784, green: 0.627, blue: 0.314)         // gold
+        static let accentHover = Color(red: 0.690, green: 0.541, blue: 0.227)    // darker gold
+        static let accentSubtle = Color(red: 0.784, green: 0.627, blue: 0.314).opacity(0.06)
     }
 
     // MARK: Primitive Colors
     enum PrimitiveColors {
-        static let cyan300 = Color(red: 0.404, green: 0.910, blue: 0.976)
-        static let cyan400 = Color(red: 0.133, green: 0.827, blue: 0.933)
-        static let cyan500 = Color(red: 0.024, green: 0.714, blue: 0.831)
-        static let cyan600 = Color(red: 0.031, green: 0.569, blue: 0.698)
+        static let gold300 = Color(red: 0.878, green: 0.784, blue: 0.471)        // #E0C878 light gold
+        static let gold400 = Color(red: 0.784, green: 0.627, blue: 0.314)        // #C8A050 primary gold
+        static let gold500 = Color(red: 0.690, green: 0.541, blue: 0.227)        // #B08A3A
+        static let gold600 = Color(red: 0.604, green: 0.459, blue: 0.188)        // #9A7530
         static let orange400 = Color(red: 0.984, green: 0.573, blue: 0.235)
         static let orange500 = Color(red: 0.976, green: 0.451, blue: 0.086)
         static let orange600 = Color(red: 0.918, green: 0.345, blue: 0.047)
@@ -72,8 +72,8 @@ enum VitaTokens {
         static let red400 = Color(red: 0.973, green: 0.443, blue: 0.443)
         static let red500 = Color(red: 0.937, green: 0.267, blue: 0.267)
         static let indigo400 = Color(red: 0.655, green: 0.545, blue: 0.980)
-        static let glowB = Color(red: 0.000, green: 0.898, blue: 1.000)
-        static let glowC = Color(red: 0.251, green: 0.769, blue: 1.000)
+        static let glowB = Color(red: 1.000, green: 0.816, blue: 0.376)          // warm gold glow
+        static let glowC = Color(red: 0.910, green: 0.784, blue: 0.408)          // lighter gold glow
         static let white = Color(red: 1.000, green: 1.000, blue: 1.000)
         static let black = Color(red: 0.000, green: 0.000, blue: 0.000)
     }

@@ -13,7 +13,7 @@ struct MindMapNode: Codable, Identifiable, Equatable {
     var x: Float
     var y: Float
     var parentId: String?
-    var color: UInt64       // ARGB packed (e.g., 0xFF22D3EE = Cyan)
+    var color: UInt64       // ARGB packed (e.g., 0xFFC8A050 = Gold)
     var width: Float = 160
     var height: Float = 60
 
@@ -71,7 +71,7 @@ struct MindMap: Identifiable {
 // Matches Android implementation (8 colors).
 
 let mindMapNodeColors: [UInt64] = [
-    0xFF22D3EE, // Cyan (KastTeal)
+    0xFFC8A050, // Gold (primary accent)
     0xFF3B82F6, // Blue
     0xFF8B5CF6, // Violet
     0xFFEC4899, // Pink

@@ -1,7 +1,7 @@
 import SwiftUI
 
 private let presetColors: [Color] = [
-    Color(hex: 0x22D3EE),  // cyan/teal
+    Color(hex: 0xC8A050),  // gold accent
     Color(hex: 0xEF4444),  // red
     Color(hex: 0x22C55E),  // green
     Color(hex: 0x3B82F6),  // blue

@@ -13,9 +13,9 @@ struct FlashcardSessionScreen: View {
     @State private var elapsedSeconds: Int = 0
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
-    // Progress bar gradient — matches web/Android
+    // Progress bar gradient — gold theme matches web/Android
     private let progressGradient = LinearGradient(
-        colors: [VitaColors.accent, Color(hex: 0x3B82F6)],
+        colors: [VitaColors.accent, VitaColors.accentDark],
         startPoint: .leading,
         endPoint: .trailing
     )
