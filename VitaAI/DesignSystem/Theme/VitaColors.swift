@@ -45,4 +45,15 @@ enum VitaColors {
     static let dataAmber  = VitaTokens.PrimitiveColors.amber500     // #f59e0b
     static let dataBlue   = VitaTokens.PrimitiveColors.blue400      // #60a5fa
     static let dataIndigo = VitaTokens.PrimitiveColors.indigo400    // #a78bfa (card back accent)
+
+    // Gold (achievements)
+    static let goldText = Color(red: 255/255, green: 215/255, blue: 0/255)   // #FFD700
+    static let goldBarGradient = LinearGradient(
+        colors: [
+            Color(red: 255/255, green: 215/255, blue: 0/255).opacity(0.85),
+            Color(red: 218/255, green: 165/255, blue: 32/255).opacity(0.65)
+        ],
+        startPoint: .leading,
+        endPoint: .trailing
+    )
 }

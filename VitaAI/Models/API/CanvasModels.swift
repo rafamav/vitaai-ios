@@ -5,6 +5,9 @@ struct CanvasStatusResponse: Codable {
     var status: String?
     var instanceUrl: String?
     var lastSyncAt: String?
+    var courses: Int = 0
+    var files: Int = 0
+    var assignments: Int = 0
 }
 
 struct CanvasConnectRequest: Codable {

@@ -180,6 +180,9 @@ final class VoiceModeViewModel {
                     errorMessage = msg
                     status = .idle
                     return
+
+                case .toolProgress:
+                    break
                 }
             }
         } catch {
