@@ -41,17 +41,15 @@ struct VitaScreenBg: View {
             Image("fundo-dashboard")
                 .resizable()
                 .aspectRatio(contentMode: .fill)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
                 .scaleEffect(1.32)
                 .blur(radius: 4)
                 .saturation(0.96)
 
-            // Dark overlay — matches mockup CSS: rgba(6,4,4,0.46) → rgba(6,4,4,0.68)
+            // Dark overlay — subtle to keep starry texture visible
             LinearGradient(
                 colors: [
-                    Color(red: 6/255, green: 4/255, blue: 4/255).opacity(0.46),
-                    Color(red: 6/255, green: 4/255, blue: 4/255).opacity(0.68)
+                    Color(red: 0.024, green: 0.016, blue: 0.016).opacity(0.28),
+                    Color(red: 0.024, green: 0.016, blue: 0.016).opacity(0.50)
                 ],
                 startPoint: .top, endPoint: .bottom
             )

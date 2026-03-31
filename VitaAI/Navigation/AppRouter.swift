@@ -74,6 +74,7 @@ struct MainTabView: View {
                 NavigationStack(path: $router.path) {
                     activeTabView
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .clipped()
                         .safeAreaInset(edge: .bottom, spacing: 0) {
                             Color.clear.frame(height: 80)
                         }
@@ -176,13 +177,6 @@ struct MainTabView: View {
 
     @ViewBuilder
     private func routeDestination(for route: Route) -> some View {
-        routeView(for: route)
-            .navigationBarBackButtonHidden(true)
-            .toolbar(.hidden, for: .navigationBar)
-    }
-
-    @ViewBuilder
-    private func routeView(for route: Route) -> some View {
         switch route {
         case .notebookList:
             NotebookListScreen(
