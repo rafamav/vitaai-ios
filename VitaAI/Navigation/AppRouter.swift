@@ -88,9 +88,11 @@ struct MainTabView: View {
             // TabBar always visible at bottom
             VStack {
                 Spacer()
-                VitaTabBar(selectedTab: $router.selectedTab) {
+                VitaTabBar(selectedTab: $router.selectedTab, onCenterTap: {
                     showChat = true
-                }
+                }, onTabReselect: { _ in
+                    router.popToRoot()
+                })
             }
             .ignoresSafeArea(.keyboard)
         }

@@ -68,9 +68,20 @@ struct VitaChatScreen: View {
 private struct ChatTopBar: View {
     let viewModel: ChatViewModel
     let onVoiceMode: () -> Void
+    let onClose: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
+            // Close button
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(VitaColors.textSecondary)
+                    .frame(minWidth: 44, minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Fechar chat")
+
             // AI avatar
             ZStack {
                 Circle()

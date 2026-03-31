@@ -39,6 +39,7 @@ enum TabItem: String, CaseIterable {
 struct VitaTabBar: View {
     @Binding var selectedTab: TabItem
     var onCenterTap: () -> Void
+    var onTabReselect: ((TabItem) -> Void)? = nil
 
     // Gold palette → VitaColors
     private let goldAccent = VitaColors.accentHover
@@ -94,7 +95,13 @@ struct VitaTabBar: View {
 
     private func tabButton(_ item: TabItem) -> some View {
         let isSelected = selectedTab == item
-        return Button(action: { selectedTab = item }) {
+        return Button(action: {
+            if isSelected {
+                onTabReselect?(item)
+            } else {
+                selectedTab = item
+            }
+        }) {
             Image(systemName: isSelected ? item.selectedIcon : item.icon)
                 .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(
