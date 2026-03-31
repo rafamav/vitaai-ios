@@ -1,126 +1,161 @@
 import SwiftUI
 
 // MARK: - VitaGlassCard — 3-Layer Gold Glass System
-// Matches mockup .g3 / .gpanel CSS exactly:
-//   Layer 0: Dark warm base bg
-//   Layer 1: Corner radial-gradient gold inner lights + inset shadows
-//   Layer 2: Conic-gradient gold border
+// Matches mockup CSS .g3 / .gpanel exactly:
+//   Layer 1: Dark warm base (linear-gradient 175deg)
+//   Layer 2: Inner glow (4 radial-gradients at corners/center)
+//   Layer 3: Conic border (angular-gradient masked to 1px stroke)
+//   Shadow: 2 drop shadows + 2 inset-simulated highlights
 
 struct VitaGlassCard<Content: View>: View {
     let cornerRadius: CGFloat
     let content: Content
 
     init(
-        cornerRadius: CGFloat = 16,
+        cornerRadius: CGFloat = 18,
         @ViewBuilder content: () -> Content
     ) {
         self.cornerRadius = cornerRadius
         self.content = content()
     }
 
+    // MARK: - Mockup-exact colors (from CSS rgba values)
+
+    // Layer 1 base
+    private let baseStart = Color(red: 12/255, green: 9/255, blue: 7/255).opacity(0.94)
+    private let baseEnd   = Color(red: 14/255, green: 11/255, blue: 8/255).opacity(0.90)
+
+    // Layer 2 inner glow
+    private let glowGold120  = Color(red: 1.0, green: 200/255, blue: 120/255) // rgba(255,200,120)
+    private let glowGold100  = Color(red: 1.0, green: 180/255, blue: 100/255) // rgba(255,180,100)
+    private let glowWarm210  = Color(red: 1.0, green: 240/255, blue: 210/255) // rgba(255,240,210)
+
+    // Layer 3 conic border
+    private let conicGold120 = Color(red: 1.0, green: 200/255, blue: 120/255) // rgba(255,200,120)
+    private let conicGold100 = Color(red: 1.0, green: 180/255, blue: 100/255) // rgba(255,180,100)
+
     var body: some View {
         content
             .frame(maxWidth: .infinity)
             .background {
                 ZStack {
-                    // Layer 0 — Base: dark warm gradient
+                    // ── Layer 1: Base dark warm gradient ──
+                    // CSS: linear-gradient(175deg, rgba(12,9,7,0.94), rgba(14,11,8,0.90))
                     RoundedRectangle(cornerRadius: cornerRadius)
                         .fill(
                             LinearGradient(
-                                colors: [
-                                    VitaColors.glassBg,
-                                    VitaColors.surfaceElevated.opacity(0.88)
-                                ],
-                                startPoint: .init(x: 0.5, y: 0),
-                                endPoint: .init(x: 0.45, y: 1)
+                                colors: [baseStart, baseEnd],
+                                startPoint: UnitPoint(x: 0.46, y: 0.0),  // 175deg ≈ nearly vertical, slight left
+                                endPoint: UnitPoint(x: 0.54, y: 1.0)
                             )
                         )
 
-                    // Layer 1 — Inner light: gold radial glows at corners
+                    // ── Layer 2: Inner glow — 4 radial gradients ──
+                    // CSS ::before with 4 radial-gradient layers
                     Canvas { context, size in
                         let rect = CGRect(origin: .zero, size: size)
-                        let path = Path(roundedRect: rect, cornerRadius: cornerRadius)
-                        context.clip(to: path)
+                        let clip = Path(roundedRect: rect, cornerRadius: cornerRadius)
+                        context.clip(to: clip)
 
-                        // Bottom-left glow (strongest)
-                        drawRadial(context: &context, size: size,
-                                   center: CGPoint(x: 0, y: size.height),
-                                   radius: size.width * 0.6,
-                                   color: VitaColors.glassInnerLight,
-                                   alpha: 0.16)
+                        // radial-gradient(circle at 15% 0%, rgba(255,200,120,0.08), transparent 50%)
+                        drawRadial(
+                            context: &context, size: size,
+                            center: CGPoint(x: size.width * 0.15, y: 0),
+                            radiusFraction: 0.50,
+                            color: glowGold120, alpha: 0.08
+                        )
 
-                        // Bottom-right glow
-                        drawRadial(context: &context, size: size,
-                                   center: CGPoint(x: size.width, y: size.height),
-                                   radius: size.width * 0.55,
-                                   color: VitaColors.glassInnerLight,
-                                   alpha: 0.10)
+                        // radial-gradient(circle at 85% 0%, rgba(255,200,120,0.05), transparent 40%)
+                        drawRadial(
+                            context: &context, size: size,
+                            center: CGPoint(x: size.width * 0.85, y: 0),
+                            radiusFraction: 0.40,
+                            color: glowGold120, alpha: 0.05
+                        )
 
-                        // Top-left glow
-                        drawRadial(context: &context, size: size,
-                                   center: CGPoint(x: 0, y: 0),
-                                   radius: size.width * 0.5,
-                                   color: VitaColors.glassInnerLight,
-                                   alpha: 0.08)
+                        // radial-gradient(circle at 50% 100%, rgba(255,180,100,0.04), transparent 35%)
+                        drawRadial(
+                            context: &context, size: size,
+                            center: CGPoint(x: size.width * 0.50, y: size.height),
+                            radiusFraction: 0.35,
+                            color: glowGold100, alpha: 0.04
+                        )
 
-                        // Top-right glow (subtlest)
-                        drawRadial(context: &context, size: size,
-                                   center: CGPoint(x: size.width, y: 0),
-                                   radius: size.width * 0.5,
-                                   color: VitaColors.glassInnerLight,
-                                   alpha: 0.05)
+                        // radial-gradient(circle at 50% 50%, rgba(255,240,210,0.015), transparent 70%)
+                        drawRadial(
+                            context: &context, size: size,
+                            center: CGPoint(x: size.width * 0.50, y: size.height * 0.50),
+                            radiusFraction: 0.70,
+                            color: glowWarm210, alpha: 0.015
+                        )
                     }
                     .allowsHitTesting(false)
 
-                    // Layer 1b — Top edge highlight line
-                    VStack {
+                    // ── Layer 2b: Inset top highlight (simulates inset 0 1px 0 rgba(255,255,255,0.04)) ──
+                    VStack(spacing: 0) {
                         Capsule()
                             .fill(
                                 LinearGradient(
-                                    colors: [.clear, VitaColors.glassHighlight, .clear],
+                                    colors: [.clear, Color.white.opacity(0.04), .clear],
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
                             )
                             .frame(height: 1)
-                            .padding(.horizontal, 24)
+                            .padding(.horizontal, 20)
+                            .padding(.top, 1)
                         Spacer()
+                        // Inset bottom shadow (simulates inset 0 -1px 0 rgba(0,0,0,0.15))
+                        Capsule()
+                            .fill(Color.black.opacity(0.15))
+                            .frame(height: 1)
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 1)
                     }
                     .allowsHitTesting(false)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-            // Layer 2 — Conic gold border via AngularGradient stroke
+            // ── Layer 3: Conic gold border (1px angular gradient stroke) ──
+            // CSS: conic-gradient(from 200deg, ...)  mask-composite: exclude; padding: 1px
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .stroke(
                         AngularGradient(
                             gradient: Gradient(stops: [
-                                .init(color: VitaColors.accentHover.opacity(0.34), location: 0.0),
-                                .init(color: VitaColors.accentHover.opacity(0.16), location: 0.17),
-                                .init(color: Color.white.opacity(0.03), location: 0.39),
-                                .init(color: Color.white.opacity(0.08), location: 0.61),
-                                .init(color: VitaColors.accentHover.opacity(0.12), location: 0.83),
-                                .init(color: VitaColors.accentHover.opacity(0.34), location: 1.0),
+                                .init(color: conicGold120.opacity(0.14), location: 0.0),    // 0%
+                                .init(color: conicGold100.opacity(0.04), location: 0.25),   // 25%
+                                .init(color: conicGold120.opacity(0.08), location: 0.40),   // 40%
+                                .init(color: conicGold100.opacity(0.02), location: 0.60),   // 60%
+                                .init(color: conicGold120.opacity(0.10), location: 0.80),   // 80%
+                                .init(color: conicGold120.opacity(0.14), location: 1.0),    // 100%
                             ]),
-                            center: UnitPoint(x: 0.4, y: 0.8)
+                            center: .center,
+                            startAngle: .degrees(200),
+                            endAngle: .degrees(200 + 360)
                         ),
                         lineWidth: 1
                     )
             )
-            // Shadows matching mockup box-shadow
-            .shadow(color: .black.opacity(0.40), radius: 20, x: 0, y: 8)
-            .shadow(color: VitaColors.glassInnerLight.opacity(0.06), radius: 10, x: 0, y: 0)
+            // ── Shadows ──
+            // CSS: box-shadow: 0 20px 50px rgba(0,0,0,0.50), 0 6px 16px rgba(0,0,0,0.35)
+            .shadow(color: .black.opacity(0.50), radius: 25, x: 0, y: 20)
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 6)
     }
+
+    // MARK: - Radial gradient helper (matches CSS radial-gradient circle)
 
     private func drawRadial(
         context: inout GraphicsContext,
         size: CGSize,
         center: CGPoint,
-        radius: CGFloat,
+        radiusFraction: CGFloat,
         color: Color,
         alpha: Double
     ) {
+        // CSS "circle" radial = radius based on max dimension
+        let radius = max(size.width, size.height) * radiusFraction
+
         context.drawLayer { ctx in
             ctx.fill(
                 Path(ellipseIn: CGRect(
@@ -140,30 +175,53 @@ struct VitaGlassCard<Content: View>: View {
     }
 }
 
-// MARK: - View modifier for inline glass styling
+// MARK: - View modifier for inline glass styling (lightweight version)
 
 extension View {
-    func glassCard(cornerRadius: CGFloat = 16) -> some View {
+    /// Full 3-layer glass card wrapping content
+    func vitaGlassCard(cornerRadius: CGFloat = 18) -> some View {
+        VitaGlassCard(cornerRadius: cornerRadius) {
+            self
+        }
+    }
+
+    /// Lightweight glass background (base + border only, no Canvas overhead)
+    func glassCard(cornerRadius: CGFloat = 18) -> some View {
         self
             .background {
-                ZStack {
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    VitaColors.glassBg,
-                                    VitaColors.surfaceElevated.opacity(0.88)
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 12/255, green: 9/255, blue: 7/255).opacity(0.94),
+                                Color(red: 14/255, green: 11/255, blue: 8/255).opacity(0.90)
+                            ],
+                            startPoint: UnitPoint(x: 0.46, y: 0.0),
+                            endPoint: UnitPoint(x: 0.54, y: 1.0)
                         )
-                }
+                    )
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(VitaColors.glassBorder, lineWidth: 1)
+                    .stroke(
+                        AngularGradient(
+                            gradient: Gradient(stops: [
+                                .init(color: Color(red: 1.0, green: 200/255, blue: 120/255).opacity(0.14), location: 0.0),
+                                .init(color: Color(red: 1.0, green: 180/255, blue: 100/255).opacity(0.04), location: 0.25),
+                                .init(color: Color(red: 1.0, green: 200/255, blue: 120/255).opacity(0.08), location: 0.40),
+                                .init(color: Color(red: 1.0, green: 180/255, blue: 100/255).opacity(0.02), location: 0.60),
+                                .init(color: Color(red: 1.0, green: 200/255, blue: 120/255).opacity(0.10), location: 0.80),
+                                .init(color: Color(red: 1.0, green: 200/255, blue: 120/255).opacity(0.14), location: 1.0),
+                            ]),
+                            center: .center,
+                            startAngle: .degrees(200),
+                            endAngle: .degrees(200 + 360)
+                        ),
+                        lineWidth: 1
+                    )
             )
+            .shadow(color: .black.opacity(0.50), radius: 25, x: 0, y: 20)
+            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 6)
     }
 }
