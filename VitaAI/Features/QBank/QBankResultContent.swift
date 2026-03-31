@@ -155,7 +155,7 @@ struct QBankResultContent: View {
                 Spacer().frame(height: 32)
             }
         }
-        .background(VitaColors.surface.ignoresSafeArea())
+        .vitaScreenBg()
     }
 
     private func buildDiffBreakdown() -> [(String, Int, Int)] {

@@ -184,7 +184,7 @@ struct QBankDisciplineContent: View {
                 .background(VitaColors.surface)
             }
         }
-        .background(VitaColors.surface.ignoresSafeArea())
+        .vitaScreenBg()
     }
 
     private func findDisciplineTitle(id: Int, in nodes: [QBankDiscipline]) -> String {

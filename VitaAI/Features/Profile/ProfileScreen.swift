@@ -21,8 +21,6 @@ struct ProfileScreen: View {
     private let goldSubtle    = VitaColors.accentLight  // → VitaColors.accentLight
     private let cardBg        = Color(red: 0.047, green: 0.035, blue: 0.027).opacity(0.94)
     private let borderColor   = Color(red: 1.0,   green: 0.910, blue: 0.760).opacity(0.14)
-    private let bgColor       = Color(red: 0.031, green: 0.024, blue: 0.039)
-
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
@@ -71,7 +69,7 @@ struct ProfileScreen: View {
                 Spacer().frame(height: 120)
             }
         }
-        .background(bgColor.ignoresSafeArea())
+        .vitaScreenBg()
         .task {
             async let statsTask: () = loadStats()
             async let profileTask: () = loadProfile()

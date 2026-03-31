@@ -167,6 +167,6 @@ struct QBankConfigContent: View {
                 .padding(.bottom, 24)
             }
         }
-        .background(VitaColors.surface.ignoresSafeArea())
+        .vitaScreenBg()
     }
 }

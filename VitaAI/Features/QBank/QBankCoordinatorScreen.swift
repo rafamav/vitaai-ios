@@ -22,10 +22,9 @@ struct QBankCoordinatorScreen: View {
             if let vm {
                 coordinator(vm: vm)
             } else {
-                ZStack {
-                    VitaColors.surface.ignoresSafeArea()
-                    ProgressView().tint(VitaColors.accent)
-                }
+                ProgressView().tint(VitaColors.accent)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .vitaScreenBg()
             }
         }
         .onAppear {

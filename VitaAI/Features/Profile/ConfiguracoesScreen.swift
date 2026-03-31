@@ -32,6 +32,7 @@ struct ConfiguracoesScreen: View {
                 headerBar
                     .padding(.top, 8)
 
+
                 // MARK: - User Card
                 userCard
                     .padding(.top, 12)
@@ -137,6 +138,7 @@ struct ConfiguracoesScreen: View {
                 Spacer().frame(height: 120)
             }
         }
+        .vitaScreenBg()
     }
 
     // MARK: - Header
