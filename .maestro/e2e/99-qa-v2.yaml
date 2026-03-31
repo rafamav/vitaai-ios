@@ -1,0 +1,251 @@
+appId: com.bymav.vitaai
+tags:
+  - e2e
+  - qa
+---
+
+# ═══════════════════════════════════════════════
+# QA v2 — Uses accessibilityIdentifier selectors
+# Requires: feat/ios-gold-redesign-full with a11y IDs
+# ═══════════════════════════════════════════════
+
+- launchApp:
+    clearState: false
+    stopApp: false
+
+- waitForAnimationToEnd
+
+# ─── HOME ───
+- takeScreenshot: "qa-01-home"
+
+# Scroll down to see full home
+- swipe:
+    direction: UP
+    duration: 500
+- waitForAnimationToEnd
+- takeScreenshot: "qa-02-home-scroll"
+
+# Scroll back up
+- swipe:
+    direction: DOWN
+    duration: 500
+- waitForAnimationToEnd
+
+# ─── QUESTOES ───
+- tapOn:
+    id: "tool_questoes"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "qa-03-questoes"
+- tapOn:
+    id: "backButton"
+    optional: true
+- pressKey: back
+- waitForAnimationToEnd
+
+# ─── FLASHCARDS ───
+- tapOn:
+    id: "tool_flashcards"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "qa-04-flashcards"
+- tapOn:
+    id: "backButton"
+    optional: true
+- pressKey: back
+- waitForAnimationToEnd
+
+# ─── SIMULADOS ───
+- tapOn:
+    id: "tool_simulados"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "qa-05-simulados"
+- tapOn:
+    id: "backButton"
+    optional: true
+- pressKey: back
+- waitForAnimationToEnd
+
+# ─── TRANSCRICAO ───
+- tapOn:
+    id: "tool_transcricao"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "qa-06-transcricao"
+- tapOn:
+    id: "backButton"
+    optional: true
+- pressKey: back
+- waitForAnimationToEnd
+
+# ─── TAB: ESTUDOS ───
+- tapOn:
+    id: "tab_estudos"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: "qa-07-estudos"
+
+# ─── TAB: VITA CHAT ───
+- tapOn:
+    id: "tab_vita_chat"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "qa-08-vita-chat"
+- pressKey: back
+- waitForAnimationToEnd
+
+# ─── TAB: FACULDADE ───
+- tapOn:
+    id: "tab_faculdade"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: "qa-09-faculdade"
+
+# ─── TAB: PROGRESSO ───
+- tapOn:
+    id: "tab_progresso"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: "qa-10-progresso"
+
+# ─── BACK TO HOME ───
+- tapOn:
+    id: "tab_home"
+    optional: true
+- waitForAnimationToEnd
+
+# ─── HAMBURGER MENU ───
+- tapOn:
+    id: "menuButton"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 1000
+- takeScreenshot: "qa-11-menu"
+
+# ─── CONFIG (via menu) ───
+- tapOn:
+    id: "menu_config"
+    optional: true
+- tapOn:
+    text: "Configurações"
+    optional: true
+- tapOn:
+    text: "Configuracoes"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: "qa-12-config"
+- pressKey: back
+- waitForAnimationToEnd
+
+# ─── BELL / NOTIFICATIONS ───
+- tapOn:
+    id: "bellButton"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 1000
+- takeScreenshot: "qa-13-notifications"
+- pressKey: back
+- waitForAnimationToEnd
+
+# ─── ATLAS 3D ───
+- tapOn:
+    id: "tool_atlas3d"
+    optional: true
+- tapOn:
+    text: "Atlas 3D"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: "qa-14-atlas3d"
+- tapOn:
+    id: "backButton"
+    optional: true
+- pressKey: back
+- waitForAnimationToEnd
+
+# ─── PERFIL (via menu) ───
+- tapOn:
+    id: "menuButton"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 1000
+- tapOn:
+    id: "menu_perfil"
+    optional: true
+- tapOn:
+    text: "Perfil"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: "qa-15-perfil"
+- pressKey: back
+- waitForAnimationToEnd
+
+# ─── ASSINATURA (via menu) ───
+- tapOn:
+    id: "menuButton"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 1000
+- tapOn:
+    id: "menu_assinatura"
+    optional: true
+- tapOn:
+    text: "Assinatura"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: "qa-16-assinatura"
+- pressKey: back
+- waitForAnimationToEnd
+
+# ─── DISCIPLINE DETAIL ───
+- tapOn:
+    id: "tab_home"
+    optional: true
+- waitForAnimationToEnd
+
+- swipe:
+    direction: UP
+    duration: 500
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "discipline_card_0"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: "qa-17-discipline"
+- pressKey: back
+- waitForAnimationToEnd
+
+# ─── HERO CARD ACTION ───
+- swipe:
+    direction: DOWN
+    duration: 500
+- waitForAnimationToEnd
+- tapOn:
+    id: "hero_estudar_agora"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: "qa-18-hero-action"
+- pressKey: back
+- waitForAnimationToEnd
+
+# ─── FINAL HOME ───
+- tapOn:
+    id: "tab_home"
+    optional: true
+- waitForAnimationToEnd
+- takeScreenshot: "qa-19-final"

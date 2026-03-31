@@ -178,8 +178,7 @@ struct ConnectionsScreen: View {
                 }
             }
 
-            // Sticky top nav
-            topNav
+            // topNav removed — VitaTopBar is persistent shell
         }
         .task { await loadAllStatuses() }
         // Canvas bottom sheet
