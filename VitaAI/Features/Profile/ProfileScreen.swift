@@ -404,9 +404,10 @@ struct ProfileScreen: View {
             statCard(value: formatNumber(flashcards), label: "Flashcards")
             statCard(value: "\(studyHours)h", label: "Horas estudo")
             statCard(
-                value: "\(streak) 🔥",
+                value: "\(streak)",
                 label: "Streak",
-                valueColor: Color(red: 1.0, green: 0.627, blue: 0.314).opacity(0.90)
+                valueColor: Color(red: 1.0, green: 0.627, blue: 0.314).opacity(0.90),
+                icon: "flame.fill"
             )
         }
         .padding(.top, 10)
@@ -415,13 +416,21 @@ struct ProfileScreen: View {
     private func statCard(
         value: String,
         label: String,
-        valueColor: Color? = nil
+        valueColor: Color? = nil,
+        icon: String? = nil
     ) -> some View {
         VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(valueColor ?? Color(red: 1.0, green: 0.863, blue: 0.627).opacity(0.90))
-                .kerning(-0.44)
+            HStack(spacing: 4) {
+                Text(value)
+                    .font(.system(size: 22, weight: .bold))
+                    .foregroundStyle(valueColor ?? Color(red: 1.0, green: 0.863, blue: 0.627).opacity(0.90))
+                    .kerning(-0.44)
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(Color(red: 1.0, green: 0.627, blue: 0.314).opacity(0.90))
+                }
+            }
 
             Text(label.uppercased())
                 .font(.system(size: 10))
@@ -430,9 +439,31 @@ struct ProfileScreen: View {
         }
         .frame(maxWidth: .infinity)
         .padding(14)
-        .background(cardBg)
+        .background(
+            ZStack {
+                // Base fill — matches mockup rgba(12,9,7,0.92)
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(VitaColors.glassBg)
+                // Inner radial glow — subtle gold warmth from center
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                VitaColors.accent.opacity(0.06),
+                                Color.clear
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 80
+                        )
+                    )
+            }
+        )
         .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(borderColor, lineWidth: 1))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(VitaColors.glassBorder, lineWidth: 1)
+        )
     }
 
     // MARK: - Helpers

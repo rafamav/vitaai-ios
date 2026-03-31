@@ -45,13 +45,65 @@ struct FlashcardsListScreen: View {
                             .padding(.top, 40)
                     } else if isEmpty {
                         // Empty state (mockup: #emptyState)
-                        VStack(spacing: 6) {
-                            Text("Sem flashcards ainda")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(Color.white.opacity(0.80))
-                            Text("Peça pra Vita gerar ou crie manualmente")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Color(red: 1, green: 0.941, blue: 0.843).opacity(0.40))
+                        VStack(spacing: 16) {
+                            VStack(spacing: 6) {
+                                Text("Sem flashcards ainda")
+                                    .font(.system(size: 15, weight: .semibold))
+                                    .foregroundStyle(Color.white.opacity(0.80))
+                                Text("Peça pra Vita gerar ou crie manualmente")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(VitaColors.textWarm.opacity(0.40))
+                            }
+
+                            VStack(spacing: 10) {
+                                // Primary CTA — Gerar com IA
+                                Button(action: {
+                                    print("[FlashcardsList] Gerar com IA tapped")
+                                }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "sparkles")
+                                            .font(.system(size: 14, weight: .semibold))
+                                        Text("Gerar com IA")
+                                            .font(.system(size: 14, weight: .semibold))
+                                    }
+                                    .foregroundStyle(VitaColors.surface)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 13)
+                                    .background(
+                                        LinearGradient(
+                                            colors: [VitaColors.accentHover, VitaColors.accent],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .shadow(color: VitaColors.accent.opacity(0.25), radius: 12, x: 0, y: 4)
+                                }
+                                .buttonStyle(.plain)
+
+                                // Secondary CTA — Criar manualmente
+                                Button(action: {
+                                    print("[FlashcardsList] Criar manualmente tapped")
+                                }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "plus")
+                                            .font(.system(size: 14, weight: .semibold))
+                                        Text("Criar manualmente")
+                                            .font(.system(size: 14, weight: .semibold))
+                                    }
+                                    .foregroundStyle(VitaColors.accentLight.opacity(0.80))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 13)
+                                    .background(VitaColors.glassBg)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .stroke(VitaColors.glassBorder, lineWidth: 1)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            .padding(.horizontal, 24)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 40)
