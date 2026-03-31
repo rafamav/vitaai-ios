@@ -89,6 +89,42 @@ struct QBankDisciplineContent: View {
                 // Discipline list
                 ScrollView {
                     LazyVStack(spacing: 8) {
+                        // Subtle inline warning when filters failed to load
+                        if let filterError = vm.state.filterError {
+                            HStack(spacing: 8) {
+                                Image(systemName: "wifi.slash")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(VitaColors.textTertiary)
+                                Text(filterError)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(VitaColors.textSecondary)
+                                Spacer()
+                                Button {
+                                    vm.retryLoadFilters()
+                                } label: {
+                                    Text("Tentar novamente")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(VitaColors.accent)
+                                }
+                                Button {
+                                    vm.dismissFilterError()
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(VitaColors.textTertiary)
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(VitaColors.glassBg)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(VitaColors.glassBorder, lineWidth: 1)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+
                         ForEach(vm.state.currentDisciplines) { disc in
                             QBankDisciplineCard(
                                 discipline: disc,
@@ -98,15 +134,29 @@ struct QBankDisciplineContent: View {
                             )
                         }
 
-                        if vm.state.currentDisciplines.isEmpty {
+                        if vm.state.currentDisciplines.isEmpty && vm.state.filterError == nil {
                             Text("Nenhuma disciplina disponível")
                                 .font(.system(size: 13))
                                 .foregroundStyle(VitaColors.textTertiary)
                                 .padding(.vertical, 24)
                         }
+
+                        if vm.state.currentDisciplines.isEmpty && vm.state.filterError != nil {
+                            VStack(spacing: 8) {
+                                Image(systemName: "tray")
+                                    .font(.system(size: 24))
+                                    .foregroundStyle(VitaColors.textTertiary.opacity(0.5))
+                                Text("Pule esta etapa para usar todas as disciplinas")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(VitaColors.textTertiary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .padding(.vertical, 32)
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
+                    .animation(.easeInOut(duration: 0.3), value: vm.state.filterError == nil)
                 }
 
                 // Bottom CTA

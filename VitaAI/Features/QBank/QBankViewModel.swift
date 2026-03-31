@@ -134,7 +134,11 @@ final class QBankViewModel {
                 state.recentSessions = sessionsResponse?.sessions ?? []
                 state.error = nil
             } catch {
-                state.error = "Erro ao carregar progresso"
+                print("[QBank] loadHomeData failed: \(error)")
+                // Graceful degradation: show empty state instead of permanent error
+                state.progress = .init()
+                state.recentSessions = []
+                state.error = nil
             }
             state.progressLoading = false
         }
@@ -187,7 +191,12 @@ final class QBankViewModel {
                 state.filterError = nil
             } catch {
                 print("[QBank] loadFilters failed: \(error)")
-                state.filterError = "Erro ao carregar filtros. Toque para tentar novamente."
+                // Graceful degradation: use empty filters so the user can still
+                // configure question count and difficulty without server-side data.
+                state.filters = .init()
+                state.filterError = "Filtros indisponíveis no momento."
+                // Auto-dismiss the error after 4 seconds
+                dismissFilterErrorAfterDelay()
             }
             state.filtersLoading = false
         }
@@ -195,6 +204,17 @@ final class QBankViewModel {
 
     func retryLoadFilters() {
         loadFilters()
+    }
+
+    func dismissFilterError() {
+        state.filterError = nil
+    }
+
+    private func dismissFilterErrorAfterDelay() {
+        Task {
+            try? await Task.sleep(for: .seconds(4))
+            state.filterError = nil
+        }
     }
 
     func toggleInstitution(_ id: Int) {

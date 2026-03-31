@@ -111,6 +111,33 @@ struct QBankConfigContent: View {
                             ) { vm.setOnlyUnanswered(!vm.state.onlyUnanswered) }
                         }
 
+                        if let filterError = vm.state.filterError {
+                            HStack(spacing: 8) {
+                                Image(systemName: "wifi.slash")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(VitaColors.textTertiary)
+                                Text(filterError)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(VitaColors.textSecondary)
+                                Spacer()
+                                Button {
+                                    vm.retryLoadFilters()
+                                } label: {
+                                    Text("Tentar")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(VitaColors.accent)
+                                }
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(VitaColors.glassBg)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(VitaColors.glassBorder, lineWidth: 1)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+
                         if let error = vm.state.error {
                             Text(error)
                                 .font(.system(size: 12))
