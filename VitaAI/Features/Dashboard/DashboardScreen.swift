@@ -410,7 +410,7 @@ struct DashboardScreen: View {
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(maxWidth: .infinity)
-                .frame(height: 100)
+                .frame(height: 130)
                 .background(bg)
                 .clipShape(RoundedRectangle(cornerRadius: 18))
                 .overlay(
@@ -419,18 +419,6 @@ struct DashboardScreen: View {
                             Color(red: 1.0, green: 0.784, blue: 0.471).opacity(0.16),
                             lineWidth: 0.5
                         )
-                )
-                .mask(
-                    LinearGradient(
-                        stops: [
-                            .init(color: .clear, location: 0),
-                            .init(color: .black, location: 0.07),
-                            .init(color: .black, location: 0.93),
-                            .init(color: .clear, location: 1),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
                 )
                 .shadow(color: .black.opacity(0.50), radius: 25, x: 0, y: 10)
                 .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 3)
