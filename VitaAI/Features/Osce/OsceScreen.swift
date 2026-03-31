@@ -82,6 +82,7 @@ private struct OsceTopBar: View {
                     .foregroundStyle(VitaColors.textPrimary)
                     .frame(width: 44, height: 44)
             }
+            .accessibilityIdentifier("backButton")
 
             Spacer()
 

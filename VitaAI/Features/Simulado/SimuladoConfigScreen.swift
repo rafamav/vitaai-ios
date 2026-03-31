@@ -172,6 +172,7 @@ struct SimuladoConfigScreen: View {
                     )
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("backButton")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 10)

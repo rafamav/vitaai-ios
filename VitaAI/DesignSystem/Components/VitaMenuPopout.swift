@@ -72,32 +72,33 @@ struct VitaMenuPopout: View {
                 .padding(.vertical, 12)
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("menu_ver_perfil")
 
             menuDivider
 
             // Navigation items
-            menuItem(icon: "person.crop.circle", label: "Perfil") {
+            menuItem(icon: "person.crop.circle", label: "Perfil", identifier: "menu_perfil") {
                 dismiss(); onProfile()
             }
-            menuItem(icon: "bell", label: "Notificacoes") {
+            menuItem(icon: "bell", label: "Notificacoes", identifier: "menu_notificacoes") {
                 dismiss(); onNotifications()
             }
-            menuItem(icon: "calendar", label: "Agenda") {
+            menuItem(icon: "calendar", label: "Agenda", identifier: "menu_agenda") {
                 dismiss(); onAgenda()
             }
 
             menuDivider
 
-            menuItem(icon: "gearshape", label: "Configuracoes") {
+            menuItem(icon: "gearshape", label: "Configuracoes", identifier: "menu_config") {
                 dismiss(); onConfiguracoes()
             }
-            menuItem(icon: "paintpalette", label: "Aparencia") {
+            menuItem(icon: "paintpalette", label: "Aparencia", identifier: "menu_aparencia") {
                 dismiss(); onAppearance()
             }
-            menuItem(icon: "square.3.layers.3d", label: "Conectores") {
+            menuItem(icon: "square.3.layers.3d", label: "Conectores", identifier: "menu_conectores") {
                 dismiss(); onConnections()
             }
-            menuItem(icon: "creditcard", label: "Assinatura") {
+            menuItem(icon: "creditcard", label: "Assinatura", identifier: "menu_assinatura") {
                 dismiss(); onPaywall()
             }
 
@@ -105,6 +106,7 @@ struct VitaMenuPopout: View {
 
             // Logout — red
             Button(action: { showLogoutConfirm = true }) {
+
                 HStack(spacing: 10) {
                     Image(systemName: "rectangle.portrait.and.arrow.right")
                         .font(.system(size: 14))
@@ -119,6 +121,7 @@ struct VitaMenuPopout: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("menu_sair")
 
             Spacer().frame(height: 8)
         }
@@ -178,7 +181,7 @@ struct VitaMenuPopout: View {
             .clipShape(Circle())
     }
 
-    private func menuItem(icon: String, label: String, action: @escaping () -> Void) -> some View {
+    private func menuItem(icon: String, label: String, identifier: String? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
@@ -195,6 +198,7 @@ struct VitaMenuPopout: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier ?? "")
     }
 
     private var menuDivider: some View {

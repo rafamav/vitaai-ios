@@ -148,6 +148,7 @@ struct ConfiguracoesScreen: View {
                         .frame(minWidth: 44, minHeight: 44)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("backButton")
 
                 Text("Configuracoes")
                     .font(.system(size: 17, weight: .semibold))

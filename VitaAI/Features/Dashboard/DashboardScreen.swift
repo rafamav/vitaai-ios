@@ -237,6 +237,7 @@ struct DashboardScreen: View {
                             .fill(Color.white.opacity(0.04))
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(VitaColors.accentHover.opacity(0.12), lineWidth: 1))
                     )
+                    .accessibilityIdentifier("hero_estudar_agora")
             }
             .padding(18)
         }
@@ -532,6 +533,7 @@ struct DashboardScreen: View {
                     .shadow(color: .black.opacity(0.35), radius: 10, x: 0, y: 4)
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("tool_atlas3d")
 
             VStack(alignment: .leading, spacing: 5) {
                 Text("Agenda")

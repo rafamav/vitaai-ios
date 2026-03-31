@@ -83,6 +83,7 @@ struct ProfileScreen: View {
                         .frame(minWidth: 44, minHeight: 44)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("backButton")
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Perfil")

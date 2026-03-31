@@ -183,6 +183,7 @@ struct FlashcardSessionScreen: View {
                 .frame(minWidth: 60, alignment: .leading)
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("backButton")
 
             Spacer()
 

@@ -67,6 +67,7 @@ private struct CourseDetailContent: View {
                         }
                         .foregroundColor(VitaColors.textPrimary)
                     }
+                    .accessibilityIdentifier("backButton")
                     Spacer()
                 }
                 .padding(.horizontal, 20)

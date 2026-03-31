@@ -144,6 +144,7 @@ struct SimuladoSessionScreen: View {
                         .foregroundStyle(VitaColors.textWarm.opacity(0.45))
                         .frame(minWidth: 52, alignment: .leading)
                     }
+                    .accessibilityIdentifier("backButton")
 
                     Spacer()
 

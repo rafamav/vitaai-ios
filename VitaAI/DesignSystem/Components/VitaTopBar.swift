@@ -108,9 +108,10 @@ struct VitaTopBar: View {
             HStack(spacing: 8) {
                 navCircleButton(icon: "bell", badgeCount: notificationCount) { onBellTap?() }
                     .accessibilityLabel("Notificações")
+                    .accessibilityIdentifier("bellButton")
                 navCircleButton(icon: "line.3.horizontal") { onMenuTap?() }
                     .accessibilityLabel("Menu")
-                    .accessibilityIdentifier("menu_button")
+                    .accessibilityIdentifier("menuButton")
             }
         }
         .padding(.horizontal, 14)

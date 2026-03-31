@@ -113,7 +113,7 @@ struct VitaTabBar: View {
                         .aspectRatio(contentMode: .fit)
                         .frame(width: 48, height: 48)
                 }
-                .accessibilityIdentifier("tab_vita")
+                .accessibilityIdentifier("tab_vita_chat")
                 .accessibilityLabel("Abrir Vita Chat")
                 .frame(minWidth: 52, minHeight: 44)
 

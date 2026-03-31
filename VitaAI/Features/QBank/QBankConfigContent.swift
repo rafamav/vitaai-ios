@@ -16,6 +16,7 @@ struct QBankConfigContent: View {
                         .foregroundStyle(VitaColors.textPrimary)
                         .frame(width: 44, height: 44)
                 }
+                .accessibilityIdentifier("backButton")
                 Text("Nova Sessão")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(VitaColors.textPrimary)

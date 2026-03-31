@@ -372,6 +372,7 @@ private struct ModulesRow: View {
                 fallbackIcon: "questionmark.circle.fill",
                 fallbackLabel: "Questões",
                 fallbackColor: VitaColors.dataBlue,
+                identifier: "estudos_questoes",
                 onTap: { onNavigateToQBank?() }
             )
 
@@ -380,6 +381,7 @@ private struct ModulesRow: View {
                 fallbackIcon: "rectangle.on.rectangle.angled",
                 fallbackLabel: "Flashcards",
                 fallbackColor: VitaColors.dataIndigo,
+                identifier: "estudos_flashcards",
                 onTap: { onNavigateToFlashcardStats?() }
             )
 
@@ -388,6 +390,7 @@ private struct ModulesRow: View {
                 fallbackIcon: "text.badge.checkmark",
                 fallbackLabel: "Simulados",
                 fallbackColor: VitaColors.dataGreen,
+                identifier: "estudos_simulados",
                 onTap: { onNavigateToSimulados?() }
             )
         }
@@ -399,6 +402,7 @@ private struct ModuleImageCard: View {
     let fallbackIcon: String
     let fallbackLabel: String
     let fallbackColor: Color
+    var identifier: String? = nil
     let onTap: () -> Void
 
     var body: some View {
@@ -450,6 +454,7 @@ private struct ModuleImageCard: View {
         .frame(maxWidth: .infinity)
         .clipped()
         .accessibilityLabel(fallbackLabel)
+        .accessibilityIdentifier(identifier ?? "")
     }
 }
 
