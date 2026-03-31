@@ -53,6 +53,8 @@ struct MainTabView: View {
     @Environment(\.appContainer) private var container
     @Environment(\.subscriptionStatus) private var subStatus
     @State private var showChat = false
+    @State private var showMenuPopout = false
+    @State private var showNotifPopout = false
     @State private var dashboardSubtitle: String = ""
 
     var body: some View {
@@ -65,8 +67,8 @@ struct MainTabView: View {
                     userImageURL: authManager.userImage.flatMap(URL.init(string:)),
                     subtitle: dashboardSubtitle,
                     onAvatarTap: { router.selectedTab = .progresso },
-                    onBellTap: { router.navigate(to: .notifications) },
-                    onMenuTap: { router.navigate(to: .configuracoes) }
+                    onBellTap: { showMenuPopout = false; showNotifPopout.toggle() },
+                    onMenuTap: { showNotifPopout = false; showMenuPopout.toggle() }
                 )
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
@@ -95,12 +97,48 @@ struct MainTabView: View {
                 })
             }
             .ignoresSafeArea(.keyboard)
+
+            // MARK: - Menu Popout Overlay
+            if showMenuPopout {
+                VitaMenuPopout(
+                    userName: authManager.userName,
+                    userImageURL: authManager.userImage.flatMap(URL.init(string:)),
+                    onProfile: { router.navigate(to: .profile) },
+                    onNotifications: { showNotifPopout = true },
+                    onAgenda: { router.selectedTab = .faculdade },
+                    onConfiguracoes: { router.navigate(to: .configuracoes) },
+                    onAppearance: { router.navigate(to: .appearance) },
+                    onConnections: { router.navigate(to: .connections) },
+                    onPaywall: { router.navigate(to: .paywall) },
+                    onLogout: { Task { await authManager.logout() } },
+                    onDismiss: { showMenuPopout = false }
+                )
+                .transition(.opacity)
+                .zIndex(200)
+            }
+
+            // MARK: - Notification Popout Overlay
+            if showNotifPopout {
+                VitaNotifPopout(
+                    onDismiss: { showNotifPopout = false },
+                    onMarkAllRead: { /* TODO: API call */ },
+                    onSettingsTap: {
+                        showNotifPopout = false
+                        router.navigate(to: .notifications)
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(200)
+            }
         }
         .background {
             VitaAmbientBackground { Color.clear }
                 .ignoresSafeArea()
         }
         .onChange(of: router.selectedTab) { _, _ in
+            // Dismiss popouts on tab change
+            showMenuPopout = false
+            showNotifPopout = false
             // When switching tabs, pop all pushed routes so user sees the tab root
             if !router.path.isEmpty {
                 router.popToRoot()
@@ -177,6 +215,13 @@ struct MainTabView: View {
 
     @ViewBuilder
     private func routeDestination(for route: Route) -> some View {
+        routeView(for: route)
+            .navigationBarBackButtonHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
+    }
+
+    @ViewBuilder
+    private func routeView(for route: Route) -> some View {
         switch route {
         case .notebookList:
             NotebookListScreen(

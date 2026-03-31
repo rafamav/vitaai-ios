@@ -60,6 +60,7 @@ struct EstudosScreen: View {
                     .tint(GoldAccent.primary)
             }
         }
+        .vitaScreenBg()
         .onAppear {
             if viewModel == nil {
                 viewModel = EstudosViewModel(api: container.api)
@@ -88,8 +89,19 @@ private struct EstudosContent: View {
     let onNavigateToTranscricao:       (() -> Void)?
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
+        ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
+                // Continue studying card
+                if let firstRec = viewModel.studyRecommendations.first {
+                    ContinueStudyingCard(
+                        recommendation: firstRec,
+                        onNavigateToFlashcardSession: onNavigateToFlashcardSession
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 12)
+                }
+
                 // 3 module cards horizontal
                 ModulesRow(
                     onNavigateToQBank: onNavigateToQBank,
@@ -99,6 +111,7 @@ private struct EstudosContent: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, 14)
 
+                // Suas disciplinas
                 EstudosSectionLabel(text: "SUAS DISCIPLINAS")
                     .padding(.horizontal, 16)
                     .padding(.bottom, 10)
@@ -109,16 +122,38 @@ private struct EstudosContent: View {
                 )
                 .padding(.bottom, 16)
 
+                // Vita sugere
                 EstudosSectionLabel(text: "VITA SUGERE")
                     .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 10)
 
+                MateriaisScroll(recommendations: viewModel.studyRecommendations)
+                    .padding(.bottom, 16)
+
+                // Trabalhos pendentes
                 EstudosSectionLabel(text: "TRABALHOS PENDENTES")
                     .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 10)
 
+                TrabalhosSection()
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
+
+                // Sessoes recentes
                 EstudosSectionLabel(text: "SESSÕES RECENTES")
                     .padding(.horizontal, 16)
+                    .padding(.top, 4)
+                    .padding(.bottom, 10)
+
+                SessoesRecentesSection(activities: viewModel.recentActivity)
+                    .padding(.horizontal, 16)
             }
-            .padding(.top, 20)
+            .padding(.bottom, 120)
+        }
+        .refreshable {
+            await viewModel.load()
         }
     }
 }
@@ -129,11 +164,13 @@ private struct EstudosSectionLabel: View {
     let text: String
 
     var body: some View {
-        Text(text)
-            .font(.system(size: 15, weight: .bold))
-            .foregroundStyle(Color.white)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.red)
+        HStack {
+            Text(text)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(GoldAccent.labelGold)
+                .tracking(0.8)
+            Spacer()
+        }
     }
 }
 
