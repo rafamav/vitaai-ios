@@ -2,15 +2,7 @@ import Foundation
 import Observation
 
 // MARK: - ChatViewModel
-// Uses ChatMessage from Models/Domain/ChatMessage.swift:
-//   struct ChatMessage: Identifiable, Codable {
-//     let id: String
-//     let role: String      // "user" or "assistant"
-//     var content: String
-//     var timestamp: Date
-//     var feedback: Int
-//   }
-//
+// Uses ChatMessage from Models/Domain/ChatMessage.swift
 // Uses ConversationEntry, ConversationMessagesResponse, ConversationMessage
 //   from Models/API/ConversationModels.swift
 
@@ -24,6 +16,13 @@ final class ChatViewModel {
     var conversations: [ConversationEntry] = []
     var showHistory: Bool = false
 
+    // Image attachment state
+    var pendingImageData: Data?
+    var pendingImageMimeType: String?
+    var isUploadingImage: Bool = false
+
+    var hasPendingImage: Bool { pendingImageData != nil }
+
     private let chatClient: VitaChatClient
     private let api: VitaAPI
 
@@ -32,21 +31,40 @@ final class ChatViewModel {
         self.api = api
     }
 
+    // MARK: - Image Attachment
+
+    func setImageAttachment(data: Data, mimeType: String = "image/jpeg") {
+        pendingImageData = data
+        pendingImageMimeType = mimeType
+    }
+
+    func clearImageAttachment() {
+        pendingImageData = nil
+        pendingImageMimeType = nil
+    }
+
     // MARK: - Send
 
     func send() async {
-        guard !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              !isStreaming else { return }
+        let hasText = !inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard (hasText || hasPendingImage), !isStreaming else { return }
 
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         inputText = ""
 
-        let userMsg = ChatMessage(
+        // Capture and clear pending image
+        let attachedImageData = pendingImageData
+        let attachedImageMime = pendingImageMimeType
+        clearImageAttachment()
+
+        var userMsg = ChatMessage(
             id: UUID().uuidString,
             role: "user",
-            content: text,
+            content: text.isEmpty ? "[Imagem]" : text,
             timestamp: Date()
         )
+        userMsg.imageData = attachedImageData
+        userMsg.imageMimeType = attachedImageMime
         messages.append(userMsg)
 
         var assistantMsg = ChatMessage(
@@ -60,10 +78,16 @@ final class ChatViewModel {
 
         isStreaming = true
 
+        // Encode image as base64 if present
+        let imageBase64: String? = attachedImageData?.base64EncodedString()
+        let imageType: String? = attachedImageMime
+
         do {
             for try await event in await chatClient.streamChat(
-                message: text,
-                conversationId: currentConversationId
+                message: userMsg.content,
+                conversationId: currentConversationId,
+                imageBase64: imageBase64,
+                imageType: imageType
             ) {
                 switch event {
                 case .textDelta(let chunk):

@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 // MARK: - VitaChatScreen
 
@@ -17,7 +18,7 @@ struct VitaChatScreen: View {
                 ProgressView()
                     .tint(VitaColors.accent)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .vitaScreenBg()
+                    
             }
         }
         .onAppear {
@@ -52,7 +53,7 @@ struct VitaChatScreen: View {
 
             ChatInputBar(viewModel: viewModel, isInputFocused: $isInputFocused)
         }
-        .vitaScreenBg()
+        
         .ignoresSafeArea(.keyboard)
         .sheet(isPresented: Binding(
             get: { viewModel.showHistory },
@@ -222,17 +223,28 @@ private struct MessageBubble: View {
     }
 
     private var userBubble: some View {
-        Text(message.content)
-            .font(VitaTypography.bodyMedium)
-            .foregroundColor(VitaColors.textPrimary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(VitaColors.accent.opacity(0.15))
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(VitaColors.accent.opacity(0.25), lineWidth: 1)
-            )
+        VStack(alignment: .trailing, spacing: 8) {
+            if let image = message.uiImage {
+                image
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: 200, maxHeight: 200)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+            if message.content != "[Imagem]" || !message.hasImage {
+                Text(message.content)
+                    .font(VitaTypography.bodyMedium)
+                    .foregroundColor(VitaColors.textPrimary)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(VitaColors.accent.opacity(0.15))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(VitaColors.accent.opacity(0.25), lineWidth: 1)
+        )
     }
 
     private var assistantAvatar: some View {
@@ -439,10 +451,12 @@ private struct SuggestionChip: View {
     }
 }
 
-// MARK: - Studio Actions Menu
+// MARK: - Chat Plus Menu (Attachments + Studio Actions)
 
-private struct StudioActionsMenu: View {
-    let onSelect: (String) -> Void
+private struct ChatPlusMenu: View {
+    let onStudioSelect: (String) -> Void
+    let onCamera: () -> Void
+    let onGalleryItem: (PhotosPickerItem) -> Void
     @Binding var isPresented: Bool
 
     private struct StudioAction {
@@ -451,47 +465,83 @@ private struct StudioActionsMenu: View {
         let prompt: String
     }
 
-    private let actions: [StudioAction] = [
+    private let studioActions: [StudioAction] = [
         StudioAction(icon: "brain.head.profile", label: "Gerar Flashcards",   prompt: "Gere flashcards sobre "),
         StudioAction(icon: "doc.text",           label: "Gerar Resumo",       prompt: "Faca um resumo completo sobre "),
         StudioAction(icon: "list.clipboard",     label: "Gerar Quiz",         prompt: "Gere um quiz sobre ")
     ]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(actions, id: \.label) { action in
+        VStack(alignment: .leading, spacing: 0) {
+            // Attachment section header
+            Text("ANEXAR")
+                .font(VitaTypography.labelSmall)
+                .foregroundColor(VitaColors.textTertiary)
+                .padding(.horizontal, 14)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+
+            // Camera
+            Button {
+                isPresented = false
+                onCamera()
+            } label: {
+                menuRow(icon: "camera.fill", label: "Camera")
+            }
+            .buttonStyle(.plain)
+
+            Divider()
+                .background(VitaColors.surfaceBorder)
+                .padding(.horizontal, 14)
+
+            // Gallery (PhotosPicker)
+            PhotosPicker(
+                selection: Binding(
+                    get: { nil },
+                    set: { item in
+                        if let item {
+                            isPresented = false
+                            onGalleryItem(item)
+                        }
+                    }
+                ),
+                matching: .images,
+                photoLibrary: .shared()
+            ) {
+                menuRow(icon: "photo.fill", label: "Galeria")
+            }
+            .buttonStyle(.plain)
+
+            Divider()
+                .background(VitaColors.surfaceBorder)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 2)
+
+            // Studio section header
+            Text("STUDIO")
+                .font(VitaTypography.labelSmall)
+                .foregroundColor(VitaColors.textTertiary)
+                .padding(.horizontal, 14)
+                .padding(.top, 6)
+                .padding(.bottom, 4)
+
+            ForEach(studioActions, id: \.label) { action in
                 Button {
                     isPresented = false
-                    onSelect(action.prompt)
+                    onStudioSelect(action.prompt)
                 } label: {
-                    HStack(spacing: 12) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(VitaColors.accent.opacity(0.12))
-                                .frame(width: 32, height: 32)
-                            Image(systemName: action.icon)
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(VitaColors.accent)
-                        }
-                        Text(action.label)
-                            .font(VitaTypography.bodyMedium)
-                            .foregroundColor(VitaColors.textPrimary)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .contentShape(Rectangle())
+                    menuRow(icon: action.icon, label: action.label)
                 }
                 .buttonStyle(.plain)
 
-                if action.label != actions.last?.label {
+                if action.label != studioActions.last?.label {
                     Divider()
                         .background(VitaColors.surfaceBorder)
                         .padding(.horizontal, 14)
                 }
             }
         }
-        .padding(.vertical, 6)
+        .padding(.bottom, 6)
         .background(VitaColors.surfaceElevated)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay(
@@ -499,6 +549,112 @@ private struct StudioActionsMenu: View {
                 .stroke(VitaColors.glassBorder, lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.35), radius: 16, x: 0, y: 8)
+    }
+
+    @ViewBuilder
+    private func menuRow(icon: String, label: String) -> some View {
+        HStack(spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(VitaColors.accent.opacity(0.12))
+                    .frame(width: 32, height: 32)
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(VitaColors.accent)
+            }
+            Text(label)
+                .font(VitaTypography.bodyMedium)
+                .foregroundColor(VitaColors.textPrimary)
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Pending Image Preview
+
+private struct PendingImagePreview: View {
+    let imageData: Data?
+    let onRemove: () -> Void
+
+    var body: some View {
+        if let data = imageData, let uiImage = UIImage(data: data) {
+            HStack(spacing: 0) {
+                ZStack(alignment: .topTrailing) {
+                    Image(uiImage: uiImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 64, height: 64)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(VitaColors.glassBorder, lineWidth: 1)
+                        )
+
+                    Button(action: onRemove) {
+                        ZStack {
+                            Circle()
+                                .fill(VitaColors.surface.opacity(0.85))
+                                .frame(width: 22, height: 22)
+                            Image(systemName: "xmark")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundColor(VitaColors.textPrimary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .offset(x: 6, y: -6)
+                    .accessibilityLabel("Remover imagem")
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+        }
+    }
+}
+
+// MARK: - Camera Capture View (UIKit bridge)
+
+private struct CameraCaptureView: UIViewControllerRepresentable {
+    let onCapture: (Data?) -> Void
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.cameraCaptureMode = .photo
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onCapture: onCapture)
+    }
+
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let onCapture: (Data?) -> Void
+
+        init(onCapture: @escaping (Data?) -> Void) {
+            self.onCapture = onCapture
+        }
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                // Compress to JPEG at 0.8 quality to keep size reasonable
+                let data = image.jpegData(compressionQuality: 0.8)
+                onCapture(data)
+            } else {
+                onCapture(nil)
+            }
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            onCapture(nil)
+        }
     }
 }
 
@@ -510,14 +666,25 @@ private struct ChatInputBar: View {
 
     @State private var isListening: Bool = false
     @State private var showPlusMenu: Bool = false
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var showCamera: Bool = false
+    @State private var isLoadingImage: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
             Divider()
                 .background(VitaColors.surfaceBorder)
 
+            // Pending image preview
+            if viewModel.hasPendingImage {
+                PendingImagePreview(
+                    imageData: viewModel.pendingImageData,
+                    onRemove: { viewModel.clearImageAttachment() }
+                )
+            }
+
             HStack(spacing: 10) {
-                // Plus button — Studio actions
+                // Plus button — Studio actions + attachments
                 Button {
                     showPlusMenu.toggle()
                 } label: {
@@ -525,26 +692,41 @@ private struct ChatInputBar: View {
                         Circle()
                             .fill(showPlusMenu ? VitaColors.accent.opacity(0.18) : VitaColors.surfaceCard)
                             .frame(width: 34, height: 34)
-                        Image(systemName: showPlusMenu ? "xmark" : "plus")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(showPlusMenu ? VitaColors.accent : VitaColors.textSecondary)
-                            .animation(.easeInOut(duration: 0.15), value: showPlusMenu)
+                        if isLoadingImage {
+                            ProgressView()
+                                .tint(VitaColors.accent)
+                                .scaleEffect(0.7)
+                        } else {
+                            Image(systemName: showPlusMenu ? "xmark" : "plus")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(showPlusMenu ? VitaColors.accent : VitaColors.textSecondary)
+                                .animation(.easeInOut(duration: 0.15), value: showPlusMenu)
+                        }
                     }
                     .frame(minWidth: 44, minHeight: 44)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(showPlusMenu ? "Fechar menu" : "Abrir studio")
+                .disabled(isLoadingImage)
+                .accessibilityLabel(showPlusMenu ? "Fechar menu" : "Abrir menu")
                 .overlay(alignment: .bottomLeading) {
                     if showPlusMenu {
-                        StudioActionsMenu(
-                            onSelect: { prompt in
+                        ChatPlusMenu(
+                            onStudioSelect: { prompt in
                                 viewModel.inputText = prompt
                                 isInputFocused.wrappedValue = true
                             },
+                            onCamera: {
+                                showPlusMenu = false
+                                showCamera = true
+                            },
+                            onGalleryItem: { item in
+                                showPlusMenu = false
+                                selectedPhotoItem = item
+                            },
                             isPresented: $showPlusMenu
                         )
-                        .frame(width: 230)
-                        .offset(x: 0, y: -148)
+                        .frame(width: 250)
+                        .offset(x: 0, y: -250)
                         .zIndex(100)
                         .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .bottomLeading)))
                     }
@@ -601,7 +783,33 @@ private struct ChatInputBar: View {
             .padding(.top, 10)
             .padding(.bottom, 12)
         }
-        .vitaScreenBg()
+        .onChange(of: selectedPhotoItem) { newItem in
+            guard let newItem else { return }
+            isLoadingImage = true
+            Task {
+                defer {
+                    isLoadingImage = false
+                    selectedPhotoItem = nil
+                }
+                if let data = try? await newItem.loadTransferable(type: Data.self) {
+                    let mimeType: String
+                    if let contentType = newItem.supportedContentTypes.first?.preferredMIMEType {
+                        mimeType = contentType
+                    } else {
+                        mimeType = "image/jpeg"
+                    }
+                    viewModel.setImageAttachment(data: data, mimeType: mimeType)
+                }
+            }
+        }
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraCaptureView { imageData in
+                if let imageData {
+                    viewModel.setImageAttachment(data: imageData, mimeType: "image/jpeg")
+                }
+                showCamera = false
+            }
+        }
     }
 }
 
@@ -609,8 +817,9 @@ private struct SendButton: View {
     let viewModel: ChatViewModel
 
     private var canSend: Bool {
-        !viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !viewModel.isStreaming
+        let hasText = !viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasImage = viewModel.hasPendingImage
+        return (hasText || hasImage) && !viewModel.isStreaming
     }
 
     var body: some View {

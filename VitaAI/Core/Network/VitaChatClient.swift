@@ -25,7 +25,13 @@ actor VitaChatClient {
         self.onUnauthorized = handler
     }
 
-    func streamChat(message: String, conversationId: String?, voiceMode: Bool = false) -> AsyncThrowingStream<SSEEvent, Error> {
+    func streamChat(
+        message: String,
+        conversationId: String?,
+        voiceMode: Bool = false,
+        imageBase64: String? = nil,
+        imageType: String? = nil
+    ) -> AsyncThrowingStream<SSEEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
@@ -34,9 +40,18 @@ actor VitaChatClient {
                         return
                     }
 
-                    let encodedBody = try JSONEncoder().encode(
-                        ChatRequest(message: message, conversationId: conversationId, voiceMode: voiceMode ? true : nil)
-                    )
+                    var requestDict: [String: Any] = [
+                        "message": message,
+                        "voiceMode": voiceMode
+                    ]
+                    if let conversationId {
+                        requestDict["conversationId"] = conversationId
+                    }
+                    if let imageBase64, let imageType {
+                        requestDict["image"] = imageBase64
+                        requestDict["imageType"] = imageType
+                    }
+                    let encodedBody = try JSONSerialization.data(withJSONObject: requestDict)
 
                     var didAttemptRefresh = false
                     var lastError: Error = APIError.unknown
