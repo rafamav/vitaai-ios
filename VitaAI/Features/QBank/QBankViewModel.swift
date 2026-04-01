@@ -38,6 +38,17 @@ struct QBankUiState {
     var onlyUnanswered = false
     var questionCount = 20
 
+    // Status filter: "unanswered" | "wrong" | "correct" | nil
+    var selectedStatus: String? = nil
+
+    // Search (client-side)
+    var institutionSearch: String = ""
+    var topicSearch: String = ""
+
+    // Dynamic available count
+    var availableCount: Int? = nil
+    var isLoadingCount = false
+
     // Session
     var session: QBankSession? = nil
     var sessionLoading = false
@@ -58,7 +69,7 @@ struct QBankUiState {
     var sessionAnswers: [Int: QBankAnswerResponse] = [:]   // questionId -> answer
     var sessionDetails: [Int: QBankQuestionDetail] = [:]   // questionId -> detail
 
-    // Error — scoped per concern so filter errors don't leak to home screen
+    // Error -- scoped per concern so filter errors don't leak to home screen
     var error: String? = nil
     var filterError: String? = nil
 
@@ -91,7 +102,29 @@ struct QBankUiState {
     var hasActiveFilters: Bool {
         !selectedInstitutionIds.isEmpty || !selectedYears.isEmpty ||
         !selectedDifficulties.isEmpty || !selectedTopicIds.isEmpty ||
-        onlyResidence || onlyUnanswered
+        onlyResidence || onlyUnanswered || selectedStatus != nil
+    }
+
+    /// Display count: dynamic or fallback to totalQuestions from filters
+    var displayAvailableCount: Int {
+        availableCount ?? filters.totalQuestions
+    }
+
+    /// Institutions filtered by local search
+    var filteredInstitutions: [QBankInstitution] {
+        if institutionSearch.isEmpty { return filters.institutions }
+        let query = institutionSearch.lowercased()
+        return filters.institutions.filter { inst in
+            inst.name.lowercased().contains(query) ||
+            (inst.state?.lowercased().contains(query) ?? false)
+        }
+    }
+
+    /// Topics filtered by local search
+    var filteredTopics: [QBankTopic] {
+        if topicSearch.isEmpty { return filters.topics }
+        let query = topicSearch.lowercased()
+        return filters.topics.filter { $0.title.lowercased().contains(query) }
     }
 
     /// Current disciplines to display based on drill-down path
@@ -106,6 +139,25 @@ struct QBankUiState {
     var disciplineBreadcrumb: [String] {
         ["Todas"] + disciplinePath.map(\.title)
     }
+
+    /// Summary of selected disciplines
+    var selectedDisciplineSummary: String {
+        if selectedDisciplineIds.isEmpty { return "" }
+        let allDisc = QBankUiState.flattenDisciplines(filters.disciplines)
+        let names = allDisc.filter { selectedDisciplineIds.contains($0.id) }.map(\.title)
+        let preview = names.prefix(3).joined(separator: ", ")
+        return names.count > 3 ? "\(preview) +\(names.count - 3)" : preview
+    }
+
+    /// Recursively flatten a discipline tree
+    static func flattenDisciplines(_ disciplines: [QBankDiscipline]) -> [QBankDiscipline] {
+        var result: [QBankDiscipline] = []
+        for d in disciplines {
+            result.append(d)
+            result.append(contentsOf: flattenDisciplines(d.children))
+        }
+        return result
+    }
 }
 
 // MARK: - ViewModel
@@ -116,6 +168,9 @@ final class QBankViewModel {
 
     var state = QBankUiState()
     private let api: VitaAPI
+
+    /// Debounce task for dynamic count refresh
+    private var countTask: Task<Void, Never>?
 
     init(api: VitaAPI) {
         self.api = api
@@ -135,7 +190,6 @@ final class QBankViewModel {
                 state.error = nil
             } catch {
                 print("[QBank] loadHomeData failed: \(error)")
-                // Graceful degradation: show empty state instead of permanent error
                 state.progress = .init()
                 state.recentSessions = []
                 state.error = nil
@@ -174,7 +228,7 @@ final class QBankViewModel {
                 state.activeScreen = .session
                 await loadCurrentQuestion()
             } catch {
-                state.error = "Erro ao criar sessão inteligente: \(error.localizedDescription)"
+                state.error = "Erro ao criar sessao inteligente: \(error.localizedDescription)"
             }
             state.isCreatingSmartSession = false
         }
@@ -187,16 +241,45 @@ final class QBankViewModel {
             state.filtersLoading = true
             state.filterError = nil
             do {
-                state.filters = try await api.getQBankFilters()
+                let filters = try await api.getQBankFilters()
+                state.filters = filters
+                state.availableCount = filters.totalQuestions
+                // If API returned no disciplines, fallback to user's enrolled subjects
+                if filters.disciplines.isEmpty {
+                    let dashboard = try? await api.getDashboard()
+                    if let subjects = dashboard?.subjects, !subjects.isEmpty {
+                        state.filters.disciplines = subjects.enumerated().map { index, subject in
+                            QBankDiscipline(
+                                id: index + 1,
+                                title: subject.name ?? "",
+                                parentId: nil,
+                                level: 0,
+                                questionCount: 0,
+                                children: []
+                            )
+                        }
+                    }
+                }
                 state.filterError = nil
             } catch {
                 print("[QBank] loadFilters failed: \(error)")
-                // Graceful degradation: use empty filters so the user can still
-                // configure question count and difficulty without server-side data.
-                state.filters = .init()
-                state.filterError = "Filtros indisponíveis no momento."
-                // Auto-dismiss the error after 4 seconds
-                dismissFilterErrorAfterDelay()
+                if let dashboard = try? await api.getDashboard(),
+                   !(dashboard.subjects ?? []).isEmpty {
+                    state.filters.disciplines = (dashboard.subjects ?? []).enumerated().map { index, subject in
+                        QBankDiscipline(
+                            id: index + 1,
+                            title: subject.name ?? "",
+                            parentId: nil,
+                            level: 0,
+                            questionCount: 0,
+                            children: []
+                        )
+                    }
+                } else {
+                    state.filters = .init()
+                    state.filterError = "Filtros indisponiveis no momento."
+                    dismissFilterErrorAfterDelay()
+                }
             }
             state.filtersLoading = false
         }
@@ -217,12 +300,46 @@ final class QBankViewModel {
         }
     }
 
+    // MARK: - Dynamic Available Count (debounced)
+
+    private func scheduleCountRefresh() {
+        countTask?.cancel()
+        countTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            await self?.loadAvailableCount()
+        }
+    }
+
+    private func loadAvailableCount() async {
+        state.isLoadingCount = true
+        do {
+            let response = try await api.getQBankQuestions(
+                page: 1,
+                limit: 1,
+                institutionIds: Array(state.selectedInstitutionIds),
+                years: Array(state.selectedYears),
+                difficulties: Array(state.selectedDifficulties),
+                topicIds: Array(state.selectedTopicIds),
+                status: state.selectedStatus,
+                onlyResidence: state.onlyResidence
+            )
+            state.availableCount = response.pagination.total
+        } catch {
+            print("[QBank] loadAvailableCount failed: \(error)")
+        }
+        state.isLoadingCount = false
+    }
+
+    // MARK: - Filter Toggles
+
     func toggleInstitution(_ id: Int) {
         if state.selectedInstitutionIds.contains(id) {
             state.selectedInstitutionIds.remove(id)
         } else {
             state.selectedInstitutionIds.insert(id)
         }
+        scheduleCountRefresh()
     }
 
     func toggleYear(_ year: Int) {
@@ -231,6 +348,7 @@ final class QBankViewModel {
         } else {
             state.selectedYears.insert(year)
         }
+        scheduleCountRefresh()
     }
 
     func toggleDifficulty(_ diff: String) {
@@ -239,6 +357,7 @@ final class QBankViewModel {
         } else {
             state.selectedDifficulties.insert(diff)
         }
+        scheduleCountRefresh()
     }
 
     func toggleTopic(_ id: Int) {
@@ -247,20 +366,77 @@ final class QBankViewModel {
         } else {
             state.selectedTopicIds.insert(id)
         }
+        scheduleCountRefresh()
     }
 
-    func setOnlyResidence(_ val: Bool) { state.onlyResidence = val }
-    func setOnlyUnanswered(_ val: Bool) { state.onlyUnanswered = val }
+    func setOnlyResidence(_ val: Bool) {
+        state.onlyResidence = val
+        scheduleCountRefresh()
+    }
+
+    func setOnlyUnanswered(_ val: Bool) {
+        state.onlyUnanswered = val
+    }
+
     func setQuestionCount(_ val: Int) { state.questionCount = val }
+
+    // MARK: - Status filter (unanswered / wrong / correct)
+
+    func setStatus(_ status: String) {
+        if state.selectedStatus == status {
+            state.selectedStatus = nil
+            state.onlyUnanswered = false
+        } else {
+            state.selectedStatus = status
+            state.onlyUnanswered = (status == "unanswered")
+        }
+        scheduleCountRefresh()
+    }
+
+    // MARK: - Search
+
+    func setInstitutionSearch(_ query: String) {
+        state.institutionSearch = query
+    }
+
+    func setTopicSearch(_ query: String) {
+        state.topicSearch = query
+    }
+
+    // MARK: - Year Range
+
+    func setYearRange(start: Int, end: Int) {
+        let allYears = state.filters.years
+        guard let minYear = allYears.min(), let maxYear = allYears.max() else { return }
+        if start <= minYear && end >= maxYear {
+            state.selectedYears = []
+        } else {
+            state.selectedYears = Set(allYears.filter { $0 >= start && $0 <= end })
+        }
+        scheduleCountRefresh()
+    }
+
+    func clearYears() {
+        state.selectedYears = []
+        scheduleCountRefresh()
+    }
+
+    // MARK: - Clear All
 
     func clearFilters() {
         state.selectedInstitutionIds = []
         state.selectedYears = []
         state.selectedDifficulties = []
         state.selectedTopicIds = []
+        state.selectedDisciplineIds = []
+        state.disciplinePath = []
         state.onlyResidence = false
         state.onlyUnanswered = false
+        state.selectedStatus = nil
+        state.institutionSearch = ""
+        state.topicSearch = ""
         state.questionCount = 20
+        scheduleCountRefresh()
     }
 
     // MARK: - Create Session
@@ -278,9 +454,13 @@ final class QBankViewModel {
                     topicIds: state.selectedTopicIds.isEmpty ? nil : Array(state.selectedTopicIds),
                     disciplineIds: state.selectedDisciplineIds.isEmpty ? nil : Array(state.selectedDisciplineIds),
                     onlyResidence: state.onlyResidence ? true : nil,
-                    onlyUnanswered: state.onlyUnanswered ? true : nil,
+                    onlyUnanswered: {
+                        if state.selectedStatus == "unanswered" { return true }
+                        if state.onlyUnanswered { return true }
+                        return nil
+                    }(),
                     title: nil,
-                    status: nil
+                    status: state.selectedStatus
                 )
                 let session = try await api.createQBankSession(request: req)
                 state.session = session
@@ -293,10 +473,12 @@ final class QBankViewModel {
                 state.questionStartDate = Date()
                 state.elapsedSeconds = 0
                 state.activeScreen = .session
-                // Load first question
                 await loadCurrentQuestion()
             } catch {
-                state.error = "Erro ao criar sessão. Tente novamente."
+                let msg = "\(error)".contains("404") || "\(error)".contains("No questions")
+                    ? "Nenhuma questao encontrada com esses filtros. Tente ampliar os criterios."
+                    : "Erro ao criar sessao. Tente novamente."
+                state.error = msg
             }
             state.sessionLoading = false
         }
@@ -308,7 +490,6 @@ final class QBankViewModel {
         guard let session = state.session,
               session.questionIds.indices.contains(state.currentQuestionIndex) else { return }
         let questionId = session.questionIds[state.currentQuestionIndex]
-        // Use cached detail if available
         if let cached = state.sessionDetails[questionId] {
             state.currentQuestionDetail = cached
             return
@@ -319,7 +500,7 @@ final class QBankViewModel {
             state.sessionDetails[questionId] = detail
             state.currentQuestionDetail = detail
         } catch {
-            state.error = "Erro ao carregar questão"
+            state.error = "Erro ao carregar questao"
         }
         state.questionLoading = false
     }
@@ -350,7 +531,6 @@ final class QBankViewModel {
                 state.sessionAnswers[question.id] = result
                 state.showFeedback = true
             } catch {
-                // Compute locally as fallback
                 let isCorrect = question.alternatives.first(where: { $0.id == alternativeId })?.isCorrect ?? false
                 let fallback = QBankAnswerResponse(isCorrect: isCorrect, answerId: 0)
                 state.answerResult = fallback
@@ -433,7 +613,27 @@ final class QBankViewModel {
     }
 
     func proceedFromDisciplines() {
+        // Collect topic IDs for selected disciplines
+        let allDisc = QBankUiState.flattenDisciplines(state.filters.disciplines)
+        var topicIds = Set<Int>()
+        for discId in state.selectedDisciplineIds {
+            guard let disc = allDisc.first(where: { $0.id == discId }) else { continue }
+            let descIds = collectDescendantIds(disc)
+            for topic in state.filters.topics where descIds.contains(topic.disciplineId ?? -1) {
+                topicIds.insert(topic.id)
+            }
+        }
+        state.selectedTopicIds = topicIds
         state.activeScreen = .config
+        scheduleCountRefresh()
+    }
+
+    private func collectDescendantIds(_ discipline: QBankDiscipline) -> Set<Int> {
+        var ids: Set<Int> = [discipline.id]
+        for child in discipline.children {
+            ids.formUnion(collectDescendantIds(child))
+        }
+        return ids
     }
 
     func goToConfig() {
@@ -457,11 +657,10 @@ final class QBankViewModel {
     }
 
     func resumeSession(_ summary: QBankSessionSummary) {
-        // Convert summary to a session and start it
         let session = QBankSession(
             id: summary.id,
             title: summary.title,
-            questionIds: [], // will be loaded
+            questionIds: [],
             totalQuestions: summary.totalQuestions,
             currentIndex: summary.currentIndex,
             correctCount: summary.correctCount,
@@ -477,8 +676,6 @@ final class QBankViewModel {
         state.questionStartDate = Date()
         state.elapsedSeconds = 0
         state.activeScreen = .session
-        // For now, go to config to start a new session instead
-        // since we'd need the full question IDs to resume
         goToDisciplines()
     }
 
@@ -496,9 +693,9 @@ final class QBankViewModel {
 extension String {
     var difficultyLabel: String {
         switch self {
-        case "easy":   return "Fácil"
-        case "medium": return "Médio"
-        case "hard":   return "Difícil"
+        case "easy":   return "Facil"
+        case "medium": return "Medio"
+        case "hard":   return "Dificil"
         default:       return self.capitalized
         }
     }

@@ -77,7 +77,13 @@ actor VitaAPI {
     // MARK: - Dashboard (unified endpoint — same as web)
 
     func getDashboard() async throws -> DashboardResponse {
-        try await client.get("mockup/dashboard")
+        try await client.get("dashboard")
+    }
+
+    // MARK: - Server-Driven UI (SDUI)
+
+    func getScreen(screenId: String) async throws -> ScreenResponse {
+        try await client.get("screen/\(screenId)")
     }
 
     // MARK: - Progress
@@ -113,6 +119,24 @@ actor VitaAPI {
 
     func getMockupFlashcardsRecommended() async throws -> [FlashcardRecommended] {
         try await client.get("mockup/flashcards/recommended")
+    }
+
+    func generateFlashcards(discipline: String, count: Int = 30) async throws -> [FlashcardDeckEntry] {
+        struct Body: Encodable { let discipline: String; let count: Int }
+        let body = Body(discipline: discipline, count: count)
+        if let decks: [FlashcardDeckEntry] = try? await client.post("mockup/flashcards/generate", body: body) {
+            return decks
+        }
+        return try await client.post("study/flashcards/generate", body: body)
+    }
+
+    func generateFlashcardsAutoSeed() async throws -> [FlashcardDeckEntry] {
+        struct Body: Encodable { let autoSeed: Bool }
+        let body = Body(autoSeed: true)
+        if let decks: [FlashcardDeckEntry] = try? await client.post("mockup/flashcards/generate", body: body) {
+            return decks
+        }
+        return try await client.post("study/flashcards/generate", body: body)
     }
 
     // MARK: - Flashcards (legacy)
@@ -267,7 +291,10 @@ actor VitaAPI {
     }
 
     func generateSimulado(_ body: GenerateSimuladoRequest) async throws -> GenerateSimuladoResponse {
-        try await client.post("simulados/generate", body: body)
+        if let response: GenerateSimuladoResponse = try? await client.post("mockup/simulados/generate", body: body) {
+            return response
+        }
+        return try await client.post("simulados/generate", body: body)
     }
 
     func answerSimuladoQuestion(attemptId: String, body: AnswerSimuladoRequest) async throws -> AnswerSimuladoResponse {
@@ -332,6 +359,42 @@ actor VitaAPI {
         try await client.get("qbank/sessions", queryItems: [
             URLQueryItem(name: "limit", value: String(limit)),
         ])
+    }
+
+    /// Fetch questions list (page=1, limit=1) to get total available count for current filters.
+    func getQBankQuestions(
+        page: Int = 1,
+        limit: Int = 1,
+        institutionIds: [Int] = [],
+        years: [Int] = [],
+        difficulties: [String] = [],
+        topicIds: [Int] = [],
+        status: String? = nil,
+        onlyResidence: Bool = false
+    ) async throws -> QBankQuestionsResponse {
+        var items: [URLQueryItem] = [
+            URLQueryItem(name: "page", value: String(page)),
+            URLQueryItem(name: "limit", value: String(limit)),
+        ]
+        if !institutionIds.isEmpty {
+            items.append(URLQueryItem(name: "institutionIds", value: institutionIds.map(String.init).joined(separator: ",")))
+        }
+        if !years.isEmpty {
+            items.append(URLQueryItem(name: "years", value: years.map(String.init).joined(separator: ",")))
+        }
+        if !difficulties.isEmpty {
+            items.append(URLQueryItem(name: "difficulties", value: difficulties.joined(separator: ",")))
+        }
+        if !topicIds.isEmpty {
+            items.append(URLQueryItem(name: "topicIds", value: topicIds.map(String.init).joined(separator: ",")))
+        }
+        if let status {
+            items.append(URLQueryItem(name: "status", value: status))
+        }
+        if onlyResidence {
+            items.append(URLQueryItem(name: "onlyResidence", value: "true"))
+        }
+        return try await client.get("qbank/questions", queryItems: items)
     }
 
     // MARK: - App Config (remote gamification config — single source of truth)
@@ -466,4 +529,3 @@ struct UniversityRequestBody: Encodable {
 }
 
 // UniversitiesResponse defined in OnboardingData.swift
-

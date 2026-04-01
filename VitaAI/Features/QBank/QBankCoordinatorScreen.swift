@@ -24,7 +24,7 @@ struct QBankCoordinatorScreen: View {
             } else {
                 ProgressView().tint(VitaColors.accent)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .vitaScreenBg()
+                    
             }
         }
         .onAppear {

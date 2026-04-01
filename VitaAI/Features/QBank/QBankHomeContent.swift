@@ -1,63 +1,21 @@
 import SwiftUI
 
-// MARK: - Mock data (matches qbank-mobile-v1.html mockup exactly)
-
-private let mockProgress = QBankProgressResponse(
-    totalAvailable: 1248,
-    totalAnswered: 234,
-    totalCorrect: 183,
-    accuracy: 78.0,
-    byDifficulty: [],
-    byTopic: [
-        QBankProgressByTopic(topicId: 1, topicTitle: "Farmacologia", answered: 50, correct: 41),
-        QBankProgressByTopic(topicId: 2, topicTitle: "Cardiologia", answered: 40, correct: 30),
-        QBankProgressByTopic(topicId: 3, topicTitle: "Pediatria", answered: 20, correct: 18),
-        QBankProgressByTopic(topicId: 4, topicTitle: "Semiologia", answered: 25, correct: 17),
-        QBankProgressByTopic(topicId: 5, topicTitle: "Histologia", answered: 20, correct: 11),
-    ]
-)
-
-private let mockSessions = [
-    QBankSessionSummary(id: "mock-1", title: "Farmacologia \u{2014} ENARE", totalQuestions: 40, currentIndex: 28, correctCount: 23, completedAt: nil, createdAt: "2026-03-31T09:00:00Z"),
-    QBankSessionSummary(id: "mock-2", title: "Cardiologia \u{2014} USP-RP", totalQuestions: 40, currentIndex: 40, correctCount: 30, completedAt: "2026-03-24T15:00:00Z", createdAt: "2026-03-24T14:00:00Z"),
-    QBankSessionSummary(id: "mock-3", title: "Pediatria Geral", totalQuestions: 20, currentIndex: 20, correctCount: 18, completedAt: "2026-03-22T10:00:00Z", createdAt: "2026-03-22T09:00:00Z"),
-]
-
 // MARK: - Home content (mockup-matched: bg-qbank + hero + CTA + chips + sessions + topics)
 
 struct QBankHomeContent: View {
     @Bindable var vm: QBankViewModel
     let onBack: () -> Void
-    @State private var selectedChip = "Todas"
-
-    private let chipLabels = ["Todas", "N\u{e3}o respondidas", "Resid\u{ea}ncia", "F\u{e1}cil", "M\u{e9}dia", "Dif\u{ed}cil"]
-
-    /// Use real data if available, otherwise fall back to mock
-    private var displayProgress: QBankProgressResponse {
-        vm.state.progress.totalAvailable > 0 ? vm.state.progress : mockProgress
-    }
-
-    private var displaySessions: [QBankSessionSummary] {
-        vm.state.recentSessions.isEmpty ? mockSessions : vm.state.recentSessions
-    }
-
-    private var displayTopics: [QBankProgressByTopic] {
-        let real = vm.state.progress.byTopic
-        return real.isEmpty ? mockProgress.byTopic : real
-    }
 
     var body: some View {
-        ZStack {
-            // -- Fullscreen bg-qbank image with dark overlay (matches .bg-fullscreen CSS)
-            QBankBackground()
-
+        Group {
             if vm.state.progressLoading {
                 ProgressView().tint(VitaColors.accent)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 0) {
                         // -- PROGRESS HERO card
-                        QBankProgressHero(progress: displayProgress)
+                        QBankProgressHero(progress: vm.state.progress)
                             .padding(.horizontal, 16)
                             .padding(.top, 8)
 
@@ -92,17 +50,11 @@ struct QBankHomeContent: View {
                         .padding(.horizontal, 16)
                         .padding(.top, 16)
 
-                        // -- FILTER CHIPS (horizontal scroll)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(chipLabels, id: \.self) { label in
-                                    QBankFilterChip(label: label, isActive: selectedChip == label) {
-                                        selectedChip = label
-                                    }
-                                }
-                            }
+                        Text("Os filtros reais aparecem ao criar uma nova sessao.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(VitaColors.textSecondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 16)
-                        }
                         .padding(.top, 16)
 
                         // -- SESSOES RECENTES
@@ -110,31 +62,49 @@ struct QBankHomeContent: View {
                             .padding(.horizontal, 16)
                             .padding(.top, 16)
 
-                        VStack(spacing: 10) {
-                            ForEach(displaySessions) { session in
-                                QBankSessionCard(session: session) {
-                                    vm.resumeSession(session)
+                        if vm.state.recentSessions.isEmpty {
+                            QBankInfoCard(
+                                icon: "clock",
+                                message: "Suas sessoes recentes vao aparecer aqui quando vierem da API."
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                        } else {
+                            VStack(spacing: 10) {
+                                ForEach(vm.state.recentSessions) { session in
+                                    QBankSessionCard(session: session) {
+                                        vm.resumeSession(session)
+                                    }
                                 }
                             }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
 
                         // -- DESEMPENHO POR TOPICO
                         QBankSectionLabel(title: "Desempenho por t\u{f3}pico")
                             .padding(.horizontal, 16)
                             .padding(.top, 16)
 
-                        QBankTopicsCard(topics: Array(displayTopics.prefix(5)))
+                        if vm.state.progress.byTopic.isEmpty {
+                            QBankInfoCard(
+                                icon: "chart.bar",
+                                message: "Ainda nao recebemos desempenho por topico para montar este resumo."
+                            )
                             .padding(.horizontal, 16)
                             .padding(.top, 12)
-
-                        if displayTopics.count > 5 {
-                            Text("e mais \(displayTopics.count - 5) temas...")
-                                .font(.system(size: 10))
-                                .foregroundStyle(VitaColors.textSecondary)
-                                .frame(maxWidth: .infinity)
+                        } else {
+                            QBankTopicsCard(topics: Array(vm.state.progress.byTopic.prefix(5)))
+                                .padding(.horizontal, 16)
                                 .padding(.top, 6)
+
+                            if vm.state.progress.byTopic.count > 5 {
+                                Text("e mais \(vm.state.progress.byTopic.count - 5) temas...")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(VitaColors.textSecondary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.top, 6)
+                            }
                         }
 
                         if let error = vm.state.error {
@@ -150,7 +120,34 @@ struct QBankHomeContent: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background { QBankBackground() }
         .onAppear { vm.loadHomeData() }
+    }
+}
+
+private struct QBankInfoCard: View {
+    let icon: String
+    let message: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundStyle(VitaColors.textSecondary)
+            Text(message)
+                .font(.system(size: 11))
+                .foregroundStyle(VitaColors.textSecondary)
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color.white.opacity(0.03))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(VitaColors.surfaceBorder, lineWidth: 1)
+        )
     }
 }
 
@@ -164,12 +161,11 @@ struct QBankBackground: View {
             Image("bg-qbank")
                 .resizable()
                 .aspectRatio(contentMode: .fill)
-                .scaleEffect(1.1)
 
-            // Dark gradient overlay (matches .bg-fullscreen::after)
+            // Dark gradient overlay
             LinearGradient(
                 stops: [
-                    .init(color: VitaColors.surface.opacity(0.40), location: 0),
+                    .init(color: VitaColors.surface.opacity(0.15), location: 0),
                     .init(color: VitaColors.surface.opacity(0.15), location: 0.40),
                     .init(color: VitaColors.surface.opacity(0.55), location: 1.0),
                 ],

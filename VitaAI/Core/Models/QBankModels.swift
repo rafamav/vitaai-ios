@@ -31,6 +31,7 @@ struct QBankInstitution: Decodable, Identifiable, Hashable {
 struct QBankTopic: Decodable, Identifiable, Hashable {
     var id: Int = 0
     var title: String = ""
+    var disciplineId: Int? = nil
 }
 
 struct QBankDifficultyStat: Decodable, Identifiable {

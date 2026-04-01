@@ -1,10 +1,16 @@
 import SwiftUI
 
-// MARK: - Config content
+// MARK: - Config content (Android parity: status, count, year range, institution/topic sheets)
 
 struct QBankConfigContent: View {
     @Bindable var vm: QBankViewModel
     let onBack: () -> Void
+
+    @State private var showInstitutionSheet = false
+    @State private var showTopicSheet = false
+    @State private var showCustomSlider = false
+
+    private let presetCounts = [10, 20, 30, 50]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -17,7 +23,7 @@ struct QBankConfigContent: View {
                         .frame(width: 44, height: 44)
                 }
                 .accessibilityIdentifier("backButton")
-                Text("Nova Sessão")
+                Text("Configurar Sessao")
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(VitaColors.textPrimary)
                 Spacer()
@@ -41,77 +47,84 @@ struct QBankConfigContent: View {
                 }
                 Spacer()
             } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        QBankSectionTitle("Número de Questões")
-                        HStack(spacing: 8) {
-                            ForEach([10, 20, 30, 50, 100], id: \.self) { count in
-                                QBankChip(label: "\(count)", isSelected: vm.state.questionCount == count) {
-                                    vm.setQuestionCount(count)
-                                }
-                            }
+                ScrollView(showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 20) {
+                        // [0] Selected disciplines summary
+                        if !vm.state.selectedDisciplineIds.isEmpty {
+                            selectedDisciplinesSummary
                         }
 
-                        QBankSectionTitle("Dificuldade")
-                        HStack(spacing: 8) {
-                            ForEach([("easy","Fácil"),("medium","Médio"),("hard","Difícil")], id: \.0) { key, label in
-                                QBankChip(label: label, isSelected: vm.state.selectedDifficulties.contains(key)) {
-                                    vm.toggleDifficulty(key)
-                                }
-                            }
+                        // [1] Available count banner
+                        availableCountBanner
+
+                        // [2] Question count
+                        questionCountSection
+
+                        // [3] Status filter (unanswered / wrong / correct)
+                        statusFilterSection
+
+                        // [4] Difficulty
+                        if !vm.state.filters.difficulties.isEmpty {
+                            difficultySection
                         }
 
-                        if !vm.state.filters.institutions.isEmpty {
-                            QBankSectionTitle("Bancas / Instituições")
-                            QBankFlowLayout(spacing: 8) {
-                                ForEach(vm.state.filters.institutions) { inst in
-                                    QBankChip(label: inst.name, isSelected: vm.state.selectedInstitutionIds.contains(inst.id)) {
-                                        vm.toggleInstitution(inst.id)
-                                    }
-                                }
-                            }
-                        }
-
+                        // [5] Year range
                         if !vm.state.filters.years.isEmpty {
-                            QBankSectionTitle("Ano")
-                            let sortedYears = vm.state.filters.years.sorted(by: >)
-                            QBankFlowLayout(spacing: 8) {
-                                ForEach(sortedYears, id: \.self) { year in
-                                    QBankChip(label: "\(year)", isSelected: vm.state.selectedYears.contains(year)) {
-                                        vm.toggleYear(year)
-                                    }
-                                }
+                            yearRangeSection
+                        }
+
+                        // [6] Institution picker
+                        if !vm.state.filters.institutions.isEmpty {
+                            filterPickerCard(
+                                title: "INSTITUICAO",
+                                selectedCount: vm.state.selectedInstitutionIds.count,
+                                totalCount: vm.state.filters.institutions.count,
+                                selectedPreview: vm.state.filters.institutions
+                                    .filter { vm.state.selectedInstitutionIds.contains($0.id) }
+                                    .prefix(3)
+                                    .map(\.name)
+                                    .joined(separator: ", ")
+                            ) {
+                                showInstitutionSheet = true
                             }
                         }
 
+                        // [7] Topic picker
                         if !vm.state.filters.topics.isEmpty {
-                            QBankSectionTitle("Tópicos")
-                            QBankFlowLayout(spacing: 8) {
-                                ForEach(vm.state.filters.topics) { topic in
-                                    QBankChip(label: topic.title, isSelected: vm.state.selectedTopicIds.contains(topic.id)) {
-                                        vm.toggleTopic(topic.id)
-                                    }
-                                }
+                            filterPickerCard(
+                                title: "TEMA",
+                                selectedCount: vm.state.selectedTopicIds.count,
+                                totalCount: vm.state.filters.topics.count,
+                                selectedPreview: vm.state.filters.topics
+                                    .filter { vm.state.selectedTopicIds.contains($0.id) }
+                                    .prefix(3)
+                                    .map(\.title)
+                                    .joined(separator: ", ")
+                            ) {
+                                showTopicSheet = true
                             }
                         }
 
-                        QBankSectionTitle("Opções")
-                        VStack(spacing: 10) {
-                            QBankConfigToggleRow(
-                                icon: "graduationcap",
-                                title: "Apenas Residência Médica",
-                                description: "Filtra somente questões de prova de residência",
-                                isOn: vm.state.onlyResidence
-                            ) { vm.setOnlyResidence(!vm.state.onlyResidence) }
+                        // [8] Toggles
+                        configGlassSection(title: "OPCOES") {
+                            VStack(spacing: 10) {
+                                QBankConfigToggleRow(
+                                    icon: "graduationcap",
+                                    title: "Apenas Residencia Medica",
+                                    description: "Filtra somente questoes de prova de residencia",
+                                    isOn: vm.state.onlyResidence
+                                ) { vm.setOnlyResidence(!vm.state.onlyResidence) }
 
-                            QBankConfigToggleRow(
-                                icon: "circle.dotted",
-                                title: "Apenas Não Respondidas",
-                                description: "Exclui questões que você já respondeu",
-                                isOn: vm.state.onlyUnanswered
-                            ) { vm.setOnlyUnanswered(!vm.state.onlyUnanswered) }
+                                QBankConfigToggleRow(
+                                    icon: "circle.dotted",
+                                    title: "Apenas Nao Respondidas",
+                                    description: "Exclui questoes que voce ja respondeu",
+                                    isOn: vm.state.onlyUnanswered
+                                ) { vm.setOnlyUnanswered(!vm.state.onlyUnanswered) }
+                            }
                         }
 
+                        // Filter error
                         if let filterError = vm.state.filterError {
                             HStack(spacing: 8) {
                                 Image(systemName: "wifi.slash")
@@ -139,35 +152,669 @@ struct QBankConfigContent: View {
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
 
+                        // Error
                         if let error = vm.state.error {
                             Text(error)
                                 .font(.system(size: 12))
                                 .foregroundStyle(VitaColors.dataRed)
                         }
+
+                        Spacer(minLength: 20)
                     }
                     .padding(16)
                 }
 
-                VStack(spacing: 8) {
-                    if vm.state.sessionLoading {
-                        VStack(spacing: 10) {
-                            ProgressView().tint(VitaColors.accent)
-                            Text("Montando sua sessão...")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(VitaColors.accent)
-                        }
-                        .padding(.vertical, 12)
-                    } else {
-                        VitaButton(
-                            text: "Iniciar Sessão (\(vm.state.questionCount) questões)",
-                            action: { vm.createSession() }
-                        )
-                        .padding(.horizontal, 16)
-                    }
-                }
-                .padding(.bottom, 24)
+                // Bottom CTA
+                bottomCTA
             }
         }
-        .vitaScreenBg()
+        .background { QBankBackground() }
+        .sheet(isPresented: $showInstitutionSheet) {
+            QBankInstitutionSheet(vm: vm)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showTopicSheet) {
+            QBankTopicSheet(vm: vm)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    // MARK: - Sections
+
+    private var selectedDisciplinesSummary: some View {
+        VitaGlassCard(cornerRadius: 14) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("DISCIPLINAS")
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(0.8)
+                        .foregroundStyle(VitaColors.sectionLabel)
+                    Text(vm.state.selectedDisciplineSummary)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(VitaColors.accentLight)
+                        .lineLimit(2)
+                }
+                Spacer()
+                Text("\(vm.state.selectedTopicIds.count) temas")
+                    .font(.system(size: 11))
+                    .foregroundStyle(VitaColors.textSecondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+    }
+
+    private var availableCountBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "doc.text.magnifyingglass")
+                .font(.system(size: 14))
+                .foregroundStyle(VitaColors.accent)
+            if vm.state.isLoadingCount {
+                ProgressView()
+                    .tint(VitaColors.accent)
+                    .scaleEffect(0.7)
+                Text("Calculando...")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(VitaColors.textSecondary)
+            } else {
+                Text("\(formatNumber(vm.state.displayAvailableCount)) questoes disponiveis")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(VitaColors.accentLight)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(VitaColors.accent.opacity(0.06))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(VitaColors.accent.opacity(0.15), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var questionCountSection: some View {
+        configGlassSection(title: "NUMERO DE QUESTOES") {
+            VStack(alignment: .leading, spacing: 10) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(presetCounts, id: \.self) { count in
+                            QBankChip(
+                                label: "\(count)",
+                                isSelected: vm.state.questionCount == count && !showCustomSlider
+                            ) {
+                                vm.setQuestionCount(count)
+                                showCustomSlider = false
+                            }
+                        }
+                        QBankChip(
+                            label: "Personalizado",
+                            isSelected: showCustomSlider
+                        ) {
+                            showCustomSlider = true
+                        }
+                    }
+                }
+
+                if showCustomSlider {
+                    Text("\(vm.state.questionCount) questoes")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundStyle(VitaColors.accentLight)
+                        .padding(.top, 4)
+
+                    Slider(
+                        value: Binding(
+                            get: { Double(vm.state.questionCount) },
+                            set: { vm.setQuestionCount(Int($0)) }
+                        ),
+                        in: 5...100,
+                        step: 5
+                    )
+                    .tint(VitaColors.accent)
+
+                    HStack {
+                        Text("5")
+                            .font(.system(size: 10))
+                            .foregroundStyle(VitaColors.textTertiary)
+                        Spacer()
+                        Text("100")
+                            .font(.system(size: 10))
+                            .foregroundStyle(VitaColors.textTertiary)
+                    }
+                }
+            }
+        }
+        .onAppear {
+            showCustomSlider = !presetCounts.contains(vm.state.questionCount)
+        }
+    }
+
+    private var statusFilterSection: some View {
+        configGlassSection(title: "TIPO DE QUESTAO") {
+            VStack(alignment: .leading, spacing: 6) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        QBankStatusChip(
+                            label: "Nao respondidas",
+                            isSelected: vm.state.selectedStatus == "unanswered",
+                            color: VitaColors.accent
+                        ) { vm.setStatus("unanswered") }
+
+                        QBankStatusChip(
+                            label: "Erradas",
+                            isSelected: vm.state.selectedStatus == "wrong",
+                            color: VitaColors.dataRed
+                        ) { vm.setStatus("wrong") }
+
+                        QBankStatusChip(
+                            label: "Acertadas",
+                            isSelected: vm.state.selectedStatus == "correct",
+                            color: VitaColors.dataGreen
+                        ) { vm.setStatus("correct") }
+                    }
+                }
+                if vm.state.selectedStatus != nil {
+                    Text("Toque novamente para remover")
+                        .font(.system(size: 10))
+                        .foregroundStyle(VitaColors.textTertiary)
+                }
+            }
+        }
+    }
+
+    private var difficultySection: some View {
+        configGlassSection(title: "DIFICULDADE") {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(vm.state.filters.difficulties) { dc in
+                        let label: String = {
+                            switch dc.difficulty {
+                            case "easy":   return "Facil (\(dc.count))"
+                            case "medium": return "Medio (\(dc.count))"
+                            case "hard":   return "Dificil (\(dc.count))"
+                            default:       return "\(dc.difficulty) (\(dc.count))"
+                            }
+                        }()
+                        let color: Color = {
+                            switch dc.difficulty {
+                            case "easy":  return VitaColors.dataGreen
+                            case "hard":  return VitaColors.dataRed
+                            default:      return VitaColors.dataAmber
+                            }
+                        }()
+                        QBankStatusChip(
+                            label: label,
+                            isSelected: vm.state.selectedDifficulties.contains(dc.difficulty),
+                            color: color
+                        ) {
+                            vm.toggleDifficulty(dc.difficulty)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var yearRangeSection: some View {
+        let years = vm.state.filters.years.sorted()
+        let yearMin = years.first ?? 1995
+        let yearMax = years.last ?? 2026
+
+        if yearMin < yearMax {
+            configGlassSection(title: "ANO") {
+                VStack(alignment: .leading, spacing: 8) {
+                    let hasFilter = !vm.state.selectedYears.isEmpty
+                    let rangeStart = vm.state.selectedYears.min() ?? yearMin
+                    let rangeEnd = vm.state.selectedYears.max() ?? yearMax
+
+                    HStack {
+                        Text(hasFilter ? "De \(rangeStart)" : "Todos os anos")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(hasFilter ? VitaColors.accentLight : VitaColors.textSecondary)
+                        Spacer()
+                        if hasFilter {
+                            Text("Ate \(rangeEnd)")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(VitaColors.accentLight)
+                        }
+                    }
+
+                    QBankYearRangeSlider(
+                        rangeStart: rangeStart,
+                        rangeEnd: rangeEnd,
+                        yearMin: yearMin,
+                        yearMax: yearMax,
+                        onChange: { start, end in
+                            vm.setYearRange(start: start, end: end)
+                        }
+                    )
+
+                    HStack {
+                        Text("\(yearMin)")
+                            .font(.system(size: 10))
+                            .foregroundStyle(VitaColors.textTertiary)
+                        Spacer()
+                        Text("\(yearMax)")
+                            .font(.system(size: 10))
+                            .foregroundStyle(VitaColors.textTertiary)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Filter Picker Card (opens sheet)
+
+    private func filterPickerCard(
+        title: String,
+        selectedCount: Int,
+        totalCount: Int,
+        selectedPreview: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VitaGlassCard(cornerRadius: 14) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(title)
+                            .font(.system(size: 11, weight: .bold))
+                            .tracking(0.8)
+                            .foregroundStyle(VitaColors.sectionLabel)
+                        if selectedCount > 0 {
+                            Text(selectedPreview)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(VitaColors.accentLight)
+                                .lineLimit(1)
+                        } else {
+                            Text("Todos (\(totalCount))")
+                                .font(.system(size: 12))
+                                .foregroundStyle(VitaColors.textSecondary)
+                        }
+                    }
+                    Spacer()
+                    HStack(spacing: 4) {
+                        if selectedCount > 0 {
+                            Text("\(selectedCount)")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(VitaColors.accent)
+                        }
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(VitaColors.textTertiary)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Bottom CTA
+
+    private var bottomCTA: some View {
+        VStack(spacing: 8) {
+            if vm.state.sessionLoading {
+                VStack(spacing: 10) {
+                    ProgressView().tint(VitaColors.accent)
+                    Text("Montando sua sessao...")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(VitaColors.accent)
+                }
+                .padding(.vertical, 12)
+            } else {
+                // Count + button
+                HStack {
+                    if vm.state.isLoadingCount {
+                        ProgressView()
+                            .tint(VitaColors.accent)
+                            .scaleEffect(0.6)
+                    } else {
+                        Text("\(formatNumber(vm.state.displayAvailableCount)) disponiveis")
+                            .font(.system(size: 11))
+                            .foregroundStyle(VitaColors.textSecondary)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+
+                VitaButton(
+                    text: "Iniciar Sessao (\(vm.state.questionCount) questoes)",
+                    action: { vm.createSession() }
+                )
+                .padding(.horizontal, 16)
+            }
+        }
+        .padding(.bottom, 24)
+        .padding(.top, 8)
+        .background(
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: VitaColors.surface.opacity(0.95), location: 0.3),
+                    .init(color: VitaColors.surface, location: 1),
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea(edges: .bottom)
+        )
+    }
+
+    // MARK: - Helpers
+
+    private func configGlassSection(title: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.8)
+                .foregroundStyle(VitaColors.sectionLabel)
+            content()
+        }
+        .padding(14)
+        .background(VitaColors.glassBg)
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(VitaColors.glassBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func formatNumber(_ n: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = Locale(identifier: "pt_BR")
+        return formatter.string(from: NSNumber(value: n)) ?? "\(n)"
+    }
+}
+
+// MARK: - Status Chip (with custom color)
+
+private struct QBankStatusChip: View {
+    let label: String
+    let isSelected: Bool
+    let color: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(isSelected ? color : VitaColors.textSecondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(isSelected ? color.opacity(0.12) : VitaColors.glassBg)
+                .overlay(
+                    Capsule().stroke(
+                        isSelected ? color.opacity(0.3) : VitaColors.glassBorder,
+                        lineWidth: 1
+                    )
+                )
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Year Range Slider (two-thumb approximation using two Sliders)
+
+private struct QBankYearRangeSlider: View {
+    let rangeStart: Int
+    let rangeEnd: Int
+    let yearMin: Int
+    let yearMax: Int
+    let onChange: (Int, Int) -> Void
+
+    @State private var lowValue: Double = 0
+    @State private var highValue: Double = 0
+
+    var body: some View {
+        VStack(spacing: 4) {
+            // Low bound slider
+            HStack(spacing: 8) {
+                Text("De")
+                    .font(.system(size: 10))
+                    .foregroundStyle(VitaColors.textTertiary)
+                    .frame(width: 20)
+                Slider(
+                    value: $lowValue,
+                    in: Double(yearMin)...Double(yearMax),
+                    step: 1,
+                    onEditingChanged: { editing in
+                        if !editing {
+                            let clamped = min(Int(lowValue), Int(highValue))
+                            onChange(clamped, Int(highValue))
+                        }
+                    }
+                )
+                .tint(VitaColors.accent)
+            }
+            // High bound slider
+            HStack(spacing: 8) {
+                Text("Ate")
+                    .font(.system(size: 10))
+                    .foregroundStyle(VitaColors.textTertiary)
+                    .frame(width: 20)
+                Slider(
+                    value: $highValue,
+                    in: Double(yearMin)...Double(yearMax),
+                    step: 1,
+                    onEditingChanged: { editing in
+                        if !editing {
+                            let clamped = max(Int(lowValue), Int(highValue))
+                            onChange(Int(lowValue), clamped)
+                        }
+                    }
+                )
+                .tint(VitaColors.accent)
+            }
+        }
+        .onAppear {
+            lowValue = Double(rangeStart)
+            highValue = Double(rangeEnd)
+        }
+        .onChange(of: rangeStart) { _, new in lowValue = Double(new) }
+        .onChange(of: rangeEnd) { _, new in highValue = Double(new) }
+    }
+}
+
+// MARK: - Institution Bottom Sheet
+
+private struct QBankInstitutionSheet: View {
+    @Bindable var vm: QBankViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Instituicoes")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(VitaColors.textPrimary)
+                Spacer()
+                if !vm.state.selectedInstitutionIds.isEmpty {
+                    Button("Limpar") {
+                        vm.state.selectedInstitutionIds = []
+                    }
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(VitaColors.accent)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+
+            // Search
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14))
+                    .foregroundStyle(VitaColors.textTertiary)
+                TextField("Buscar instituicao...", text: Binding(
+                    get: { vm.state.institutionSearch },
+                    set: { vm.setInstitutionSearch($0) }
+                ))
+                .font(.system(size: 14))
+                .foregroundStyle(VitaColors.textPrimary)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(VitaColors.glassBg)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(VitaColors.glassBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
+
+            // List
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(vm.state.filteredInstitutions) { inst in
+                        let isSelected = vm.state.selectedInstitutionIds.contains(inst.id)
+                        Button {
+                            vm.toggleInstitution(inst.id)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(isSelected ? VitaColors.accent : VitaColors.textTertiary)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(inst.name)
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(VitaColors.textPrimary)
+                                        .lineLimit(1)
+                                    if let state = inst.state, !state.isEmpty {
+                                        Text(state)
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(VitaColors.textTertiary)
+                                    }
+                                }
+                                Spacer()
+                                if inst.isResidence {
+                                    QBankBadge(text: "Residencia", color: VitaColors.accent)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+
+                        if inst.id != vm.state.filteredInstitutions.last?.id {
+                            Rectangle()
+                                .fill(VitaColors.glassBorder)
+                                .frame(height: 1)
+                                .padding(.leading, 46)
+                        }
+                    }
+                }
+            }
+
+            // Done button
+            VitaButton(text: "Confirmar (\(vm.state.selectedInstitutionIds.count) selecionadas)") {
+                dismiss()
+            }
+            .padding(16)
+        }
+        .background(VitaColors.surface)
+    }
+}
+
+// MARK: - Topic Bottom Sheet
+
+private struct QBankTopicSheet: View {
+    @Bindable var vm: QBankViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Temas")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(VitaColors.textPrimary)
+                Spacer()
+                if !vm.state.selectedTopicIds.isEmpty {
+                    Button("Limpar") {
+                        vm.state.selectedTopicIds = []
+                    }
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(VitaColors.accent)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+
+            // Search
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14))
+                    .foregroundStyle(VitaColors.textTertiary)
+                TextField("Buscar tema...", text: Binding(
+                    get: { vm.state.topicSearch },
+                    set: { vm.setTopicSearch($0) }
+                ))
+                .font(.system(size: 14))
+                .foregroundStyle(VitaColors.textPrimary)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(VitaColors.glassBg)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(VitaColors.glassBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
+
+            // List
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(vm.state.filteredTopics) { topic in
+                        let isSelected = vm.state.selectedTopicIds.contains(topic.id)
+                        Button {
+                            vm.toggleTopic(topic.id)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(isSelected ? VitaColors.accent : VitaColors.textTertiary)
+                                Text(topic.title)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(VitaColors.textPrimary)
+                                    .lineLimit(2)
+                                Spacer()
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                        }
+                        .buttonStyle(.plain)
+
+                        if topic.id != vm.state.filteredTopics.last?.id {
+                            Rectangle()
+                                .fill(VitaColors.glassBorder)
+                                .frame(height: 1)
+                                .padding(.leading, 46)
+                        }
+                    }
+                }
+            }
+
+            // Done button
+            VitaButton(text: "Confirmar (\(vm.state.selectedTopicIds.count) selecionados)") {
+                dismiss()
+            }
+            .padding(16)
+        }
+        .background(VitaColors.surface)
     }
 }
