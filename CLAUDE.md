@@ -59,6 +59,15 @@ VitaAI unifica TUDO em um lugar so, com IA que personaliza o estudo pro nivel do
 
 ---
 
+## Cross-Platform Parity
+- Screen map: /Users/mav/agent-brain/screen-map.yaml (every screen, 3 platforms, file paths, status)
+- Design tokens (source of truth): /Users/mav/agent-brain/design-tokens.json
+- Token generator: /Users/mav/agent-brain/scripts/generate-tokens.mjs
+- Generated Swift: VitaAI/DesignSystem/Tokens.swift (DO NOT edit directly — edit design-tokens.json)
+- When changing visual tokens: edit design-tokens.json → run generate-tokens.sh → commit all 3 outputs
+- Android: /Users/mav/bymav-mobile/ (Kotlin/Compose)
+- Web: /Users/mav/conductor/repos/vitaai-web/ (Next.js)
+
 ## STACK TECNICO
 - SwiftUI, iOS 16+ (com SwiftData iOS 17 hacks via swift-perception)
 - SPM: Sentry (crash), PostHog (analytics), swift-perception (backport Observable)
