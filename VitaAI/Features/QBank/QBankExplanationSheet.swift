@@ -27,7 +27,7 @@ struct QBankExplanationSheet: View {
                                 .frame(width: 22, height: 22)
                                 .background(VitaColors.dataGreen.opacity(0.15))
                                 .clipShape(Circle())
-                            Text(alt.description)
+                            Text(alt.text)
                                 .font(.system(size: 13))
                                 .foregroundStyle(VitaColors.textPrimary)
                             Spacer()

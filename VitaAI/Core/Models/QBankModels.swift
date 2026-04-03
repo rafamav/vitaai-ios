@@ -9,6 +9,22 @@ struct QBankFiltersResponse: Decodable {
     var difficulties: [QBankDifficultyStat] = []
     var totalQuestions: Int = 0
     var disciplines: [QBankDiscipline] = []
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        institutions = (try? c.decode([QBankInstitution].self, forKey: .institutions)) ?? []
+        topics = (try? c.decode([QBankTopic].self, forKey: .topics)) ?? []
+        years = (try? c.decode([Int].self, forKey: .years)) ?? []
+        difficulties = (try? c.decode([QBankDifficultyStat].self, forKey: .difficulties)) ?? []
+        totalQuestions = (try? c.decode(Int.self, forKey: .totalQuestions)) ?? 0
+        disciplines = (try? c.decode([QBankDiscipline].self, forKey: .disciplines)) ?? []
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case institutions, topics, years, difficulties, totalQuestions, disciplines
+    }
 }
 
 struct QBankDiscipline: Decodable, Identifiable, Hashable {
@@ -20,18 +36,58 @@ struct QBankDiscipline: Decodable, Identifiable, Hashable {
     var children: [QBankDiscipline] = []
 }
 
-struct QBankInstitution: Decodable, Identifiable, Hashable {
+struct QBankInstitution: Identifiable, Hashable {
     var id: Int = 0
     var name: String = ""
     var slug: String = ""
     var state: String? = nil
     var isResidence: Bool = false
+    var count: Int?
 }
 
-struct QBankTopic: Decodable, Identifiable, Hashable {
+extension QBankInstitution: Decodable {
+    private enum CodingKeys: String, CodingKey {
+        case id, name, slug, state, isResidence, count
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(Int.self, forKey: .id)) ?? 0
+        name = (try? c.decode(String.self, forKey: .name)) ?? ""
+        slug = (try? c.decode(String.self, forKey: .slug)) ?? ""
+        state = try? c.decode(String.self, forKey: .state)
+        isResidence = (try? c.decode(Bool.self, forKey: .isResidence)) ?? false
+        count = try? c.decode(Int.self, forKey: .count)
+    }
+}
+
+struct QBankTopic: Identifiable, Hashable {
     var id: Int = 0
     var title: String = ""
     var disciplineId: Int? = nil
+    var name: String?
+    var disciplineName: String?
+    var count: Int?
+    var iconSlug: String?
+
+    var displayTitle: String { name ?? (title.isEmpty ? "Tópico \(id)" : title) }
+}
+
+extension QBankTopic: Decodable {
+    private enum CodingKeys: String, CodingKey {
+        case id, title, disciplineId, name, disciplineName, count, iconSlug
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(Int.self, forKey: .id)) ?? 0
+        title = (try? c.decode(String.self, forKey: .title)) ?? ""
+        disciplineId = try? c.decode(Int.self, forKey: .disciplineId)
+        name = try? c.decode(String.self, forKey: .name)
+        disciplineName = try? c.decode(String.self, forKey: .disciplineName)
+        count = try? c.decode(Int.self, forKey: .count)
+        iconSlug = try? c.decode(String.self, forKey: .iconSlug)
+    }
 }
 
 struct QBankDifficultyStat: Decodable, Identifiable {
@@ -66,7 +122,7 @@ struct QBankPagination: Decodable {
 
 // MARK: - Question Detail
 
-struct QBankQuestionDetail: Decodable, Identifiable {
+struct QBankQuestionDetail: Identifiable {
     var id: Int = 0
     var statement: String = ""
     var explanation: String? = nil
@@ -84,11 +140,55 @@ struct QBankQuestionDetail: Decodable, Identifiable {
     var userAnswer: QBankUserAnswer? = nil
 }
 
-struct QBankAlternative: Decodable, Identifiable {
+extension QBankQuestionDetail: Decodable {
+    private enum CodingKeys: String, CodingKey {
+        case id, statement, explanation, difficulty, year, isResidence, isCancelled
+        case isDiscursive, isOutdated, institutionName, alternatives, images, topics
+        case statistics, userAnswer
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(Int.self, forKey: .id)) ?? 0
+        statement = (try? c.decode(String.self, forKey: .statement)) ?? ""
+        explanation = try? c.decode(String.self, forKey: .explanation)
+        difficulty = (try? c.decode(String.self, forKey: .difficulty)) ?? ""
+        year = try? c.decode(Int.self, forKey: .year)
+        isResidence = (try? c.decode(Bool.self, forKey: .isResidence)) ?? false
+        isCancelled = (try? c.decode(Bool.self, forKey: .isCancelled)) ?? false
+        isDiscursive = (try? c.decode(Bool.self, forKey: .isDiscursive)) ?? false
+        isOutdated = (try? c.decode(Bool.self, forKey: .isOutdated)) ?? false
+        institutionName = try? c.decode(String.self, forKey: .institutionName)
+        alternatives = (try? c.decode([QBankAlternative].self, forKey: .alternatives)) ?? []
+        images = (try? c.decode([QBankImage].self, forKey: .images)) ?? []
+        topics = (try? c.decode([QBankTopic].self, forKey: .topics)) ?? []
+        statistics = (try? c.decode([QBankStatistic].self, forKey: .statistics)) ?? []
+        userAnswer = try? c.decode(QBankUserAnswer.self, forKey: .userAnswer)
+    }
+}
+
+struct QBankAlternative: Identifiable {
     var id: Int = 0
-    var description: String = ""
+    var text: String = ""
     var isCorrect: Bool = false
     var sortOrder: Int = 0
+}
+
+extension QBankAlternative: Decodable {
+    private enum CodingKeys: String, CodingKey {
+        case id, text, description, isCorrect, sortOrder
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(Int.self, forKey: .id)) ?? 0
+        // API returns "text", legacy model used "description"
+        text = (try? c.decode(String.self, forKey: .text))
+            ?? (try? c.decode(String.self, forKey: .description))
+            ?? ""
+        isCorrect = (try? c.decode(Bool.self, forKey: .isCorrect)) ?? false
+        sortOrder = (try? c.decode(Int.self, forKey: .sortOrder)) ?? 0
+    }
 }
 
 struct QBankImage: Decodable, Identifiable {
@@ -185,6 +285,19 @@ struct QBankProgressByTopic: Decodable, Identifiable {
 
 struct QBankSessionsResponse: Decodable {
     var sessions: [QBankSessionSummary] = []
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        // API may return bare array or {"sessions": [...]}
+        if let c = try? decoder.container(keyedBy: CodingKeys.self) {
+            sessions = (try? c.decode([QBankSessionSummary].self, forKey: .sessions)) ?? []
+        } else if let arr = try? decoder.singleValueContainer().decode([QBankSessionSummary].self) {
+            sessions = arr
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey { case sessions }
 }
 
 struct QBankSessionSummary: Decodable, Identifiable {

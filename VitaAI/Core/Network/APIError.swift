@@ -3,6 +3,7 @@ import Foundation
 enum APIError: LocalizedError {
     case invalidURL
     case unauthorized
+    case forbidden
     case serverError(Int)
     case decodingError(Error)
     case networkError(Error)
@@ -15,6 +16,8 @@ enum APIError: LocalizedError {
             return "URL inválida"
         case .unauthorized:
             return "Sessão expirada. Faça login novamente."
+        case .forbidden:
+            return "Recurso disponível apenas para assinantes Pro."
         case .serverError(let code):
             return "Erro no servidor (\(code))"
         case .decodingError:

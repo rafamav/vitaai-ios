@@ -143,6 +143,44 @@ struct QBankSessionContent: View {
                             .padding(.bottom, 20)
                     }
 
+                    // Question images (if any)
+                    if !question.images.isEmpty {
+                        VStack(spacing: 8) {
+                            ForEach(question.images) { img in
+                                AsyncImage(url: URL(string: img.imageUrl)) { phase in
+                                    switch phase {
+                                    case .success(let image):
+                                        image
+                                            .resizable()
+                                            .scaledToFit()
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    case .failure:
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "photo.badge.exclamationmark")
+                                                .font(.system(size: 14))
+                                                .foregroundStyle(VitaColors.textTertiary)
+                                            Text("Imagem indisponivel")
+                                                .font(.system(size: 12))
+                                                .foregroundStyle(VitaColors.textTertiary)
+                                        }
+                                    default:
+                                        ProgressView()
+                                            .tint(VitaColors.accent)
+                                            .frame(height: 100)
+                                    }
+                                }
+                                if let caption = img.caption, !caption.isEmpty {
+                                    Text(caption)
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(VitaColors.textTertiary)
+                                        .italic()
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
+                    }
+
                     // Alternatives
                     let sortedAlts = question.alternatives.sorted { $0.sortOrder < $1.sortOrder }
                     ForEach(Array(sortedAlts.enumerated()), id: \.element.id) { idx, alt in
@@ -232,7 +270,7 @@ struct QBankSessionContent: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 20)
+            .padding(.bottom, 80)
         }
         .animation(.easeInOut(duration: 0.3), value: vm.state.showFeedback)
     }
@@ -309,7 +347,7 @@ struct QBankAlternativeCard: View {
                         .foregroundStyle(letterColor)
                 }
             }
-            Text(alternative.description)
+            Text(alternative.text)
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(VitaColors.textPrimary)
                 .lineSpacing(2)

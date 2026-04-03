@@ -180,6 +180,7 @@ struct QBankDisciplineContent: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
+                    .padding(.bottom, 60)
                 }
                 .background(VitaColors.surface)
             }

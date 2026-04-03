@@ -35,7 +35,8 @@ actor HTTPClient {
         _ method: String = "GET",
         path: String,
         body: (any Encodable)? = nil,
-        queryItems: [URLQueryItem]? = nil
+        queryItems: [URLQueryItem]? = nil,
+        timeoutInterval: TimeInterval? = nil
     ) async throws -> T {
         guard var components = URLComponents(string: AppConfig.apiBaseURL + "/" + path) else {
             throw APIError.invalidURL
@@ -54,12 +55,22 @@ actor HTTPClient {
             encodedBody = try encoder.encode(body)
         }
 
+        if method != "GET" {
+            NSLog("[HTTPClient] %@ %@ (body: %d bytes)", method, url.absoluteString, encodedBody?.count ?? 0)
+            if let encodedBody, let bodyStr = String(data: encodedBody, encoding: .utf8) {
+                NSLog("[HTTPClient] Body preview: %@", String(bodyStr.prefix(2000)))
+                NSLog("[HTTPClient] Body tail: %@", String(bodyStr.suffix(500)))
+            }
+        }
         let (data, _) = try await performWithRetry {
             var request = URLRequest(url: url)
             request.httpMethod = method
+            if let timeoutInterval {
+                request.timeoutInterval = timeoutInterval
+            }
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             if let token = await self.tokenStore.token {
-                request.setValue("__Secure-better-auth.session_token=\(token)", forHTTPHeaderField: "Cookie")
+                request.setValue("\(AppConfig.sessionCookieName)=\(token)", forHTTPHeaderField: "Cookie")
             }
             if let forwardedHost = AppConfig.localForwardedHostHeader {
                 request.setValue(forwardedHost, forHTTPHeaderField: "x-forwarded-host")
@@ -71,6 +82,7 @@ actor HTTPClient {
         do {
             return try decoder.decode(T.self, from: data)
         } catch {
+            NSLog("[HTTPClient] DECODE FAILED for %@: %@", String(describing: T.self), "\(error)")
             throw APIError.decodingError(error)
         }
     }
@@ -78,11 +90,35 @@ actor HTTPClient {
     // MARK: - Convenience
 
     func get<T: Decodable>(_ path: String, queryItems: [URLQueryItem]? = nil) async throws -> T {
-        try await request("GET", path: path, queryItems: queryItems)
+        NSLog("[HTTPClient] GET %@ (type: %@)", path, String(describing: T.self))
+        return try await request("GET", path: path, queryItems: queryItems)
     }
 
-    func post<T: Decodable>(_ path: String, body: (any Encodable)? = nil) async throws -> T {
-        try await request("POST", path: path, body: body)
+    func post<T: Decodable>(_ path: String, body: (any Encodable)? = nil, timeoutInterval: TimeInterval? = nil) async throws -> T {
+        try await request("POST", path: path, body: body, timeoutInterval: timeoutInterval)
+    }
+
+    /// POST with pre-serialized JSON data (bypasses convertToSnakeCase encoding).
+    func postRaw<T: Decodable>(_ path: String, body: Data, timeoutInterval: TimeInterval? = nil) async throws -> T {
+        guard let url = URL(string: AppConfig.apiBaseURL + "/" + path) else {
+            throw APIError.invalidURL
+        }
+        NSLog("[HTTPClient] POST %@ (raw body: %d bytes)", url.absoluteString, body.count)
+        let (data, _) = try await performWithRetry {
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            if let timeoutInterval { request.timeoutInterval = timeoutInterval }
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            if let token = await self.tokenStore.token {
+                request.setValue("\(AppConfig.sessionCookieName)=\(token)", forHTTPHeaderField: "Cookie")
+            }
+            if let forwardedHost = AppConfig.localForwardedHostHeader {
+                request.setValue(forwardedHost, forHTTPHeaderField: "x-forwarded-host")
+            }
+            request.httpBody = body
+            return request
+        }
+        return try decoder.decode(T.self, from: data)
     }
 
     func patch<T: Decodable>(_ path: String, body: (any Encodable)? = nil) async throws -> T {
@@ -106,7 +142,7 @@ actor HTTPClient {
             var req = URLRequest(url: url)
             req.httpMethod = "GET"
             if let token = await self.tokenStore.token {
-                req.setValue("__Secure-better-auth.session_token=\(token)", forHTTPHeaderField: "Cookie")
+                req.setValue("\(AppConfig.sessionCookieName)=\(token)", forHTTPHeaderField: "Cookie")
             }
             if let forwardedHost = AppConfig.localForwardedHostHeader {
                 req.setValue(forwardedHost, forHTTPHeaderField: "x-forwarded-host")
@@ -114,6 +150,17 @@ actor HTTPClient {
             return req
         }
         return data
+    }
+
+    /// Downloads a text response (e.g. JavaScript) from the given path.
+    func downloadText(_ path: String) async throws -> String {
+        let data = try await downloadRaw(path)
+        guard let text = String(data: data, encoding: .utf8) else {
+            throw APIError.decodingError(
+                NSError(domain: "HTTPClient", code: -1, userInfo: [NSLocalizedDescriptionKey: "Response is not valid UTF-8 text"])
+            )
+        }
+        return text
     }
 
     /// Uploads multiple images as multipart/form-data.
@@ -139,7 +186,7 @@ actor HTTPClient {
             req.httpMethod = "POST"
             req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
             if let token = await self.tokenStore.token {
-                req.setValue("__Secure-better-auth.session_token=\(token)", forHTTPHeaderField: "Cookie")
+                req.setValue("\(AppConfig.sessionCookieName)=\(token)", forHTTPHeaderField: "Cookie")
             }
             if let forwardedHost = AppConfig.localForwardedHostHeader {
                 req.setValue(forwardedHost, forHTTPHeaderField: "x-forwarded-host")
@@ -189,6 +236,10 @@ actor HTTPClient {
 
             switch http.statusCode {
             case 200...299:
+                if let urlStr = request.url?.absoluteString, urlStr.contains("portal") || urlStr.contains("webaluno") {
+                    let raw = String(data: data, encoding: .utf8) ?? "(non-utf8)"
+                    NSLog("[HTTPClient] 200 %@ raw: %@", urlStr, String(raw.prefix(500)))
+                }
                 return (data, http)
             case 401:
                 if !didAttemptRefresh {
@@ -200,9 +251,15 @@ actor HTTPClient {
                 if let handler = onUnauthorized { await handler() }
                 throw APIError.unauthorized
             case 500...599:
+                if let body = String(data: data, encoding: .utf8) {
+                    NSLog("[HTTPClient] %d error body: %@", http.statusCode, String(body.prefix(500)))
+                }
                 lastError = APIError.serverError(http.statusCode)
                 continue
             default:
+                if let body = String(data: data, encoding: .utf8) {
+                    NSLog("[HTTPClient] %d error body: %@", http.statusCode, String(body.prefix(500)))
+                }
                 throw APIError.serverError(http.statusCode)
             }
         }

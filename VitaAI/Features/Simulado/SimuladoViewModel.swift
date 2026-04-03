@@ -25,7 +25,7 @@ struct SimuladoUiState {
     var isGenerating = false
     // Config redesign
     var templates: [SimuladoTemplate] = SimuladoTemplate.defaults
-    var disciplines: [SimuladoDiscipline] = SimuladoDiscipline.defaults
+    var disciplines: [SimuladoDiscipline] = []
     var disciplinesLoading = false
     var selectedDisciplineName: String? = nil
     var timedMode = true
@@ -99,6 +99,7 @@ final class SimuladoViewModel {
                 state.bySemester = response.bySemester
                 state.error = nil
             } catch {
+                NSLog("[SimuladoVM] loadAttempts error: %@", "\(error)")
                 state.error = "Erro ao carregar simulados"
             }
             state.isLoading = false
@@ -167,7 +168,37 @@ final class SimuladoViewModel {
 
     func loadConfigData() {
         state.templates = SimuladoTemplate.defaults
-        state.disciplines = SimuladoDiscipline.defaults
+        state.disciplinesLoading = true
+        Task { @MainActor in
+            do {
+                let filters = try await api.getQBankFilters()
+                let top = filters.disciplines
+                    .filter { $0.questionCount > 0 }
+                    .sorted { $0.questionCount > $1.questionCount }
+                    .prefix(12)
+                if !top.isEmpty {
+                    state.disciplines = top.map { SimuladoDiscipline(name: $0.title, count: $0.questionCount) }
+                } else {
+                    // Fallback: use user's real enrolled subjects from dashboard
+                    await loadDisciplinesFromDashboard()
+                }
+            } catch {
+                // Fallback: use user's real enrolled subjects from dashboard
+                await loadDisciplinesFromDashboard()
+            }
+            state.disciplinesLoading = false
+        }
+    }
+
+    private func loadDisciplinesFromDashboard() async {
+        // Use /api/subjects as source of truth for disciplines
+        if let subjectsResp = try? await api.getSubjects(status: "cursando"),
+           !subjectsResp.subjects.isEmpty {
+            state.disciplines = subjectsResp.subjects.map {
+                SimuladoDiscipline(name: $0.name, count: 0)
+            }
+        }
+        // If subjects also fails, state.disciplines stays empty (no hardcoded fallback)
     }
 
     func selectSimuladoDiscipline(_ name: String?) {
@@ -385,7 +416,14 @@ final class SimuladoViewModel {
 
     private func advanceToNext() {
         let next = state.currentQuestionIndex + 1
-        guard next < state.questions.count else { return }
+        if next >= state.questions.count {
+            // Last question answered — auto-finish in exam mode
+            if state.isExamMode {
+                finishSimulado()
+            }
+            // In immediate mode, the UI shows a "Finalizar" button after feedback
+            return
+        }
         state.currentQuestionIndex = next
         state.showFeedback = false
         state.lastAnswerCorrect = nil

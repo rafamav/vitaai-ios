@@ -25,6 +25,7 @@ final class ChatViewModel {
 
     private let chatClient: VitaChatClient
     private let api: VitaAPI
+    private var streamingTask: Task<Void, Never>?
 
     init(chatClient: VitaChatClient, api: VitaAPI) {
         self.chatClient = chatClient
@@ -82,40 +83,67 @@ final class ChatViewModel {
         let imageBase64: String? = attachedImageData?.base64EncodedString()
         let imageType: String? = attachedImageMime
 
-        do {
-            for try await event in await chatClient.streamChat(
-                message: userMsg.content,
-                conversationId: currentConversationId,
-                imageBase64: imageBase64,
-                imageType: imageType
-            ) {
-                switch event {
-                case .textDelta(let chunk):
-                    // If a progress indicator was showing, replace it; otherwise append
-                    if messages[idx].content.hasPrefix("⏳") {
-                        messages[idx].content = chunk
+        streamingTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            do {
+                for try await event in await self.chatClient.streamChat(
+                    message: userMsg.content,
+                    conversationId: self.currentConversationId,
+                    imageBase64: imageBase64,
+                    imageType: imageType
+                ) {
+                    guard !Task.isCancelled else { break }
+                    switch event {
+                    case .textDelta(let chunk):
+                        if self.messages[idx].content.hasPrefix("\u{23f3}") {
+                            self.messages[idx].content = chunk
+                        } else {
+                            self.messages[idx].content += chunk
+                        }
+
+                    case .toolProgress(let text):
+                        self.messages[idx].content = "\u{23f3} \(text)"
+
+                    case .messageStop(let convId):
+                        if let convId {
+                            self.currentConversationId = convId
+                        }
+
+                    case .error:
+                        self.messages[idx].content = "Erro ao gerar resposta."
+                        self.messages[idx].isError = true
+                    }
+                }
+            } catch {
+                if !Task.isCancelled {
+                    NSLog("[ChatViewModel] Stream error: %@", "\(error)")
+                    if let apiError = error as? APIError {
+                        switch apiError {
+                        case .forbidden:
+                            self.messages[idx].content = "O Chat IA está disponível apenas para assinantes Pro. Assine para desbloquear!"
+                        case .unauthorized:
+                            self.messages[idx].content = "Sessão expirada. Faça login novamente."
+                        default:
+                            self.messages[idx].content = "Erro de conexão. Tente novamente."
+                        }
                     } else {
-                        messages[idx].content += chunk
+                        self.messages[idx].content = "Erro de conexão. Tente novamente."
                     }
-
-                case .toolProgress(let text):
-                    messages[idx].content = "⏳ \(text)"
-
-                case .messageStop(let convId):
-                    if let convId {
-                        currentConversationId = convId
-                    }
-
-                case .error:
-                    messages[idx].content = "Erro ao gerar resposta."
-                    messages[idx].isError = true
+                    self.messages[idx].isError = true
                 }
             }
-        } catch {
-            messages[idx].content = "Erro de conexao."
-            messages[idx].isError = true
+
+            self.isStreaming = false
+            self.streamingTask = nil
         }
 
+        await streamingTask?.value
+    }
+
+    /// Cancel the current streaming response.
+    func stopStreaming() {
+        streamingTask?.cancel()
+        streamingTask = nil
         isStreaming = false
     }
 
@@ -125,6 +153,8 @@ final class ChatViewModel {
         // Find the last user message
         guard let lastUserIndex = messages.lastIndex(where: { $0.role == "user" }) else { return }
         let userText = messages[lastUserIndex].content
+        let retryImageData = messages[lastUserIndex].imageData
+        let retryImageMime = messages[lastUserIndex].imageMimeType
 
         // Remove the error assistant message (should be right after the user message)
         let assistantIndex = lastUserIndex + 1
@@ -136,6 +166,12 @@ final class ChatViewModel {
 
         // Also remove the user message — send() will re-append both
         messages.remove(at: lastUserIndex)
+
+        // Restore image attachment if present
+        if let retryImageData {
+            pendingImageData = retryImageData
+            pendingImageMimeType = retryImageMime
+        }
 
         // Re-send
         inputText = userText

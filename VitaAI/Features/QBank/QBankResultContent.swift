@@ -152,10 +152,10 @@ struct QBankResultContent: View {
                 }
                 .padding(.horizontal, 24)
 
-                Spacer().frame(height: 32)
+                Spacer().frame(height: 80)
             }
         }
-        
+
     }
 
     private func buildDiffBreakdown() -> [(String, Int, Int)] {

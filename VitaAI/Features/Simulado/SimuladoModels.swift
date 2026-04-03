@@ -7,6 +7,20 @@ struct SimuladoListResponse: Decodable {
     var stats: SimuladoStats = .init()
     var bySubject: [SubjectSummary] = []
     var bySemester: [SemesterSummary] = []
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        attempts = (try? c.decode([SimuladoAttemptEntry].self, forKey: .attempts)) ?? []
+        stats = (try? c.decode(SimuladoStats.self, forKey: .stats)) ?? .init()
+        bySubject = (try? c.decode([SubjectSummary].self, forKey: .bySubject)) ?? []
+        bySemester = (try? c.decode([SemesterSummary].self, forKey: .bySemester)) ?? []
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case attempts, stats, bySubject, bySemester
+    }
 }
 
 struct SimuladoStats: Decodable {
@@ -48,6 +62,28 @@ struct SimuladoAttemptEntry: Decodable, Identifiable {
     var finishedAt: String? = nil
     var timeTakenMs: Int64? = nil
     var questions: [SimuladoQuestionEntry] = []
+
+    private enum CodingKeys: String, CodingKey {
+        case id, title, subject, difficulty, mode, totalQ, correctQ, score, status
+        case startedAt, finishedAt, timeTakenMs, questions
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? c.decode(String.self, forKey: .id)) ?? ""
+        title = (try? c.decode(String.self, forKey: .title)) ?? ""
+        subject = try? c.decode(String.self, forKey: .subject)
+        difficulty = (try? c.decode(String.self, forKey: .difficulty)) ?? "medium"
+        mode = (try? c.decode(String.self, forKey: .mode)) ?? "immediate"
+        totalQ = (try? c.decode(Int.self, forKey: .totalQ)) ?? 0
+        correctQ = (try? c.decode(Int.self, forKey: .correctQ)) ?? 0
+        score = (try? c.decode(Double.self, forKey: .score)) ?? 0
+        status = (try? c.decode(String.self, forKey: .status)) ?? "in_progress"
+        startedAt = try? c.decode(String.self, forKey: .startedAt)
+        finishedAt = try? c.decode(String.self, forKey: .finishedAt)
+        timeTakenMs = try? c.decode(Int64.self, forKey: .timeTakenMs)
+        questions = (try? c.decode([SimuladoQuestionEntry].self, forKey: .questions)) ?? []
+    }
 }
 
 struct SimuladoQuestionEntry: Decodable, Identifiable {
@@ -176,14 +212,8 @@ struct SimuladoDiscipline: Identifiable {
     let count: Int
     var id: String { name }
 
-    static let defaults: [SimuladoDiscipline] = [
-        .init(name: "Cardiologia", count: 124),
-        .init(name: "Farmacologia", count: 98),
-        .init(name: "Anatomia", count: 87),
-        .init(name: "Histologia", count: 72),
-        .init(name: "Fisiologia", count: 95),
-        .init(name: "Bioquímica", count: 63),
-    ]
+    // No hardcoded defaults — disciplines come from GET /api/subjects (source of truth)
+    static let defaults: [SimuladoDiscipline] = []
 }
 
 struct SimuladoTemplate: Identifiable {

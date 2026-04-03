@@ -69,7 +69,9 @@ actor VitaChatClient {
                         request.httpBody = encodedBody
 
                         if let token = await self.tokenStore.token {
-                            request.setValue("__Secure-better-auth.session_token=\(token)", forHTTPHeaderField: "Cookie")
+                            request.setValue("\(AppConfig.sessionCookieName)=\(token)", forHTTPHeaderField: "Cookie")
+                        } else {
+                            NSLog("[VitaChatClient] WARNING: No token available")
                         }
 
                         let bytes: URLSession.AsyncBytes
@@ -77,6 +79,7 @@ actor VitaChatClient {
                         do {
                             (bytes, response) = try await self.session.bytes(for: request)
                         } catch {
+                            NSLog("[VitaChatClient] Network error: %@", "\(error)")
                             lastError = APIError.networkError(error)
                             continue
                         }
@@ -85,6 +88,8 @@ actor VitaChatClient {
                             lastError = APIError.unknown
                             continue
                         }
+
+                        NSLog("[VitaChatClient] HTTP %d", httpResponse.statusCode)
 
                         if httpResponse.statusCode == 401 {
                             if !didAttemptRefresh {
@@ -99,6 +104,11 @@ actor VitaChatClient {
                         }
 
                         guard (200...299).contains(httpResponse.statusCode) else {
+                            if httpResponse.statusCode == 403 {
+                                NSLog("[VitaChatClient] 403 Forbidden — user may lack Pro subscription")
+                                continuation.finish(throwing: APIError.forbidden)
+                                return
+                            }
                             if (500...599).contains(httpResponse.statusCode) {
                                 lastError = APIError.serverError(httpResponse.statusCode)
                                 continue

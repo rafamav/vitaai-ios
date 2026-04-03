@@ -98,7 +98,7 @@ struct QBankConfigContent: View {
                                 selectedPreview: vm.state.filters.topics
                                     .filter { vm.state.selectedTopicIds.contains($0.id) }
                                     .prefix(3)
-                                    .map(\.title)
+                                    .map(\.displayTitle)
                                     .joined(separator: ", ")
                             ) {
                                 showTopicSheet = true
@@ -488,7 +488,7 @@ struct QBankConfigContent: View {
                 .padding(.horizontal, 16)
             }
         }
-        .padding(.bottom, 24)
+        .padding(.bottom, 80)
         .padding(.top, 8)
         .background(
             LinearGradient(
@@ -788,7 +788,7 @@ private struct QBankTopicSheet: View {
                                 Image(systemName: isSelected ? "checkmark.square.fill" : "square")
                                     .font(.system(size: 18))
                                     .foregroundStyle(isSelected ? VitaColors.accent : VitaColors.textTertiary)
-                                Text(topic.title)
+                                Text(topic.displayTitle)
                                     .font(.system(size: 13, weight: .medium))
                                     .foregroundStyle(VitaColors.textPrimary)
                                     .lineLimit(2)
