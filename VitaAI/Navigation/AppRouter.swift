@@ -68,20 +68,8 @@ struct MainTabView: View {
                             )
                             .tag(TabItem.home)
 
-                            EstudosScreen(
-                                onNavigateToCanvasConnect:     { router.navigate(to: .canvasConnect) },
-                                onNavigateToNotebooks:          { router.navigate(to: .notebookList) },
-                                onNavigateToMindMaps:           { router.navigate(to: .mindMapList) },
-                                onNavigateToFlashcardSession:   { deckId in router.navigate(to: .flashcardSession(deckId: deckId)) },
-                                onNavigateToFlashcardStats:     { router.navigate(to: .flashcardStats) },
-                                onNavigateToPdfViewer:          { url in router.navigate(to: .pdfViewer(url: url.absoluteString)) },
-                                onNavigateToSimulados:          { router.navigate(to: .simuladoHome) },
-                                onNavigateToOsce:               { router.navigate(to: .osce) },
-                                onNavigateToAtlas:              { router.navigate(to: .atlas3D) },
-                                onNavigateToCourseDetail:       { courseId, colorIdx in router.navigate(to: .courseDetail(courseId: courseId, colorIndex: colorIdx)) },
-                                onNavigateToProvas:             { router.navigate(to: .provas) },
-                                onNavigateToQBank:              { router.navigate(to: .qbank) },
-                                onNavigateToTranscricao:        { router.navigate(to: .transcricao) }
+                            EstudosScreenV2(
+                                onNavigate: { route in router.navigate(to: route) }
                             )
                             .tag(TabItem.estudos)
 

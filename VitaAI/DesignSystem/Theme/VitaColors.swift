@@ -39,10 +39,14 @@ enum VitaColors {
     static let textSecondary = VitaTokens.DarkColors.textSecondary
     static let textTertiary  = VitaTokens.DarkColors.textMuted
 
+    // Accent hover (tool cards, recommendation CTA borders)
+    static let accentHover = VitaTokens.DarkColors.accentHover      // cyan-500
+
     // Semantic data colors
     static let dataGreen  = VitaTokens.PrimitiveColors.green500     // #22c55e
     static let dataRed    = VitaTokens.PrimitiveColors.red500       // #ef4444
     static let dataAmber  = VitaTokens.PrimitiveColors.amber500     // #f59e0b
     static let dataBlue   = VitaTokens.PrimitiveColors.blue400      // #60a5fa
     static let dataIndigo = VitaTokens.PrimitiveColors.indigo400    // #a78bfa (card back accent)
+    static let dataTeal   = VitaTokens.PrimitiveColors.cyan600      // #0892b2 (simulados/transcricao)
 }
