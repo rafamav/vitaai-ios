@@ -17,7 +17,7 @@ struct SimuladoReviewScreen: View {
             } else {
                 ZStack {
                     VitaColors.surface.ignoresSafeArea()
-                    ProgressView().tint(VitaColors.accent)
+                    ProgressView().tint(VitaColors.tealAccent)
                 }
             }
         }
@@ -121,10 +121,10 @@ private struct ReviewFilterChip: View {
         Button(action: action) {
             Text(label)
                 .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? VitaColors.accent : VitaColors.textPrimary)
+                .foregroundStyle(isSelected ? VitaColors.tealAccent : VitaColors.textPrimary)
                 .padding(.horizontal, 12).padding(.vertical, 6)
-                .background(isSelected ? VitaColors.accent.opacity(0.15) : VitaColors.glassBg)
-                .overlay(Capsule().stroke(isSelected ? VitaColors.accent : VitaColors.glassBorder, lineWidth: 1))
+                .background(isSelected ? VitaColors.tealAccent.opacity(0.15) : VitaColors.glassBg)
+                .overlay(Capsule().stroke(isSelected ? VitaColors.tealAccent : VitaColors.glassBorder, lineWidth: 1))
                 .clipShape(Capsule())
         }
     }
@@ -147,7 +147,7 @@ private struct ReviewCard: View {
             // Header
             Text("Questão \(question.questionNo)")
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(VitaColors.accent)
+                .foregroundStyle(VitaColors.tealAccent)
                 .padding(.bottom, 6)
 
             // Statement
@@ -172,7 +172,7 @@ private struct ReviewCard: View {
             Button(action: onToggleExplanation) {
                 Text(isExpanded ? "Ocultar Explicação" : "Ver Explicação")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(VitaColors.accent)
+                    .foregroundStyle(VitaColors.tealAccent)
                     .padding(.horizontal, 8).padding(.vertical, 6)
             }
             .padding(.top, 8)
@@ -181,7 +181,7 @@ private struct ReviewCard: View {
             if isExpanded {
                 VStack(alignment: .leading, spacing: 8) {
                     if isLoadingExplanation {
-                        HStack { Spacer(); ProgressView().tint(VitaColors.accent); Spacer() }
+                        HStack { Spacer(); ProgressView().tint(VitaColors.tealAccent); Spacer() }
                             .frame(height: 40)
                     } else if let exp = explanation {
                         if !exp.general.isEmpty {
@@ -208,8 +208,8 @@ private struct ReviewCard: View {
                     }
                 }
                 .padding(12)
-                .background(VitaColors.accent.opacity(0.05))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(VitaColors.accent.opacity(0.15), lineWidth: 1))
+                .background(VitaColors.tealAccent.opacity(0.05))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(VitaColors.tealAccent.opacity(0.15), lineWidth: 1))
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .transition(.opacity.combined(with: .move(edge: .top)))
                 .animation(.easeInOut(duration: 0.2), value: isExpanded)

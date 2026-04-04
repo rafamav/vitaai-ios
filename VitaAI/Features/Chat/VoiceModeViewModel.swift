@@ -176,6 +176,9 @@ final class VoiceModeViewModel {
                         streamingConversationId = convId
                     }
 
+                case .toolProgress:
+                    break // voice mode ignores tool progress
+
                 case .error(let msg):
                     errorMessage = msg
                     status = .idle

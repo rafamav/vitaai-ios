@@ -17,7 +17,7 @@ struct SimuladoResultScreen: View {
             } else {
                 ZStack {
                     VitaColors.surface.ignoresSafeArea()
-                    ProgressView().tint(VitaColors.accent)
+                    ProgressView().tint(VitaColors.tealAccent)
                 }
             }
         }

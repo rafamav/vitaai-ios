@@ -20,7 +20,7 @@ struct SimuladoConfigScreen: View {
             } else {
                 ZStack {
                     VitaColors.surface.ignoresSafeArea()
-                    ProgressView().tint(VitaColors.accent)
+                    ProgressView().tint(VitaColors.tealAccent)
                 }
             }
         }
@@ -58,7 +58,7 @@ struct SimuladoConfigScreen: View {
                     if vm.state.coursesLoading {
                         HStack {
                             Spacer()
-                            ProgressView().tint(VitaColors.accent)
+                            ProgressView().tint(VitaColors.tealAccent)
                             Spacer()
                         }
                         .padding(.vertical, 8)
@@ -152,10 +152,10 @@ struct SimuladoConfigScreen: View {
             VStack(spacing: 8) {
                 if vm.state.isGenerating {
                     VStack(spacing: 10) {
-                        ProgressView().tint(VitaColors.accent)
+                        ProgressView().tint(VitaColors.tealAccent)
                         Text("Analisando PDFs e gerando questões...")
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(VitaColors.accent)
+                            .foregroundStyle(VitaColors.tealAccent)
                         Text("Isso pode levar alguns segundos")
                             .font(.system(size: 11))
                             .foregroundStyle(VitaColors.textTertiary)
@@ -188,7 +188,7 @@ struct SimuladoConfigScreen: View {
         if vm.state.filesLoading {
             HStack {
                 Spacer()
-                ProgressView().tint(VitaColors.accent)
+                ProgressView().tint(VitaColors.tealAccent)
                 Spacer()
             }
             .padding(.vertical, 8)
@@ -247,13 +247,13 @@ private struct ChipButton: View {
         Button(action: action) {
             Text(label)
                 .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? VitaColors.accent : VitaColors.textPrimary)
+                .foregroundStyle(isSelected ? VitaColors.tealAccent : VitaColors.textPrimary)
                 .lineLimit(1)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
-                .background(isSelected ? VitaColors.accent.opacity(0.15) : VitaColors.glassBg)
+                .background(isSelected ? VitaColors.tealAccent.opacity(0.15) : VitaColors.glassBg)
                 .overlay(
-                    Capsule().stroke(isSelected ? VitaColors.accent : VitaColors.glassBorder, lineWidth: 1)
+                    Capsule().stroke(isSelected ? VitaColors.tealAccent : VitaColors.glassBorder, lineWidth: 1)
                 )
                 .clipShape(Capsule())
         }
@@ -271,12 +271,12 @@ private struct ModeCard: View {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 20))
-                    .foregroundStyle(isSelected ? VitaColors.accent : VitaColors.textTertiary)
+                    .foregroundStyle(isSelected ? VitaColors.tealAccent : VitaColors.textTertiary)
                     .frame(width: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(isSelected ? VitaColors.accent : VitaColors.textPrimary)
+                        .foregroundStyle(isSelected ? VitaColors.tealAccent : VitaColors.textPrimary)
                     Text(description)
                         .font(.system(size: 12))
                         .foregroundStyle(VitaColors.textSecondary)
@@ -284,10 +284,10 @@ private struct ModeCard: View {
                 Spacer()
             }
             .padding(16)
-            .background(isSelected ? VitaColors.accent.opacity(0.05) : VitaColors.glassBg)
+            .background(isSelected ? VitaColors.tealAccent.opacity(0.05) : VitaColors.glassBg)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? VitaColors.accent : VitaColors.glassBorder,
+                    .stroke(isSelected ? VitaColors.tealAccent : VitaColors.glassBorder,
                             lineWidth: isSelected ? 2 : 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: 12))

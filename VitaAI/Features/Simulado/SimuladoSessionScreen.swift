@@ -25,7 +25,7 @@ struct SimuladoSessionScreen: View {
                 ZStack {
                     VitaColors.surface.ignoresSafeArea()
                     if vm.state.isLoading || vm.state.currentQuestion == nil {
-                        ProgressView().tint(VitaColors.accent)
+                        ProgressView().tint(VitaColors.tealAccent)
                     } else {
                         sessionContent(vm: vm)
                     }
@@ -52,7 +52,7 @@ struct SimuladoSessionScreen: View {
             } else {
                 ZStack {
                     VitaColors.surface.ignoresSafeArea()
-                    ProgressView().tint(VitaColors.accent)
+                    ProgressView().tint(VitaColors.tealAccent)
                 }
             }
         }
@@ -98,9 +98,9 @@ struct SimuladoSessionScreen: View {
                 if let subj = question.subject, !subj.isEmpty {
                     Text(subj)
                         .font(.system(size: 10))
-                        .foregroundStyle(VitaColors.accent)
+                        .foregroundStyle(VitaColors.tealAccent)
                         .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(VitaColors.accent.opacity(0.1))
+                        .background(VitaColors.tealAccent.opacity(0.1))
                         .clipShape(Capsule())
                 }
             }
@@ -145,10 +145,10 @@ struct SimuladoSessionScreen: View {
                         } label: {
                             Text("Ver Explicação")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(VitaColors.accent)
+                                .foregroundStyle(VitaColors.tealAccent)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 46)
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(VitaColors.accent, lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(VitaColors.tealAccent, lineWidth: 1))
                         }
 
                         Button {
@@ -163,7 +163,7 @@ struct SimuladoSessionScreen: View {
                                 .foregroundStyle(VitaColors.surface)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 46)
-                                .background(VitaColors.accent)
+                                .background(VitaColors.tealAccent)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                     }
@@ -200,7 +200,7 @@ struct SimuladoSessionScreen: View {
                                 .foregroundStyle(VitaColors.surface)
                                 .padding(.horizontal, 32)
                                 .frame(height: 46)
-                                .background(selectedIdx != nil ? VitaColors.accent : VitaColors.accent.opacity(0.4))
+                                .background(selectedIdx != nil ? VitaColors.tealAccent : VitaColors.tealAccent.opacity(0.4))
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                         .disabled(selectedIdx == nil)
@@ -237,7 +237,7 @@ struct SimuladoSessionScreen: View {
                     let isMarked = vm.state.markedQuestions.contains(q.questionNo)
                     let isCurrent = idx == vm.state.currentQuestionIndex
 
-                    let bg: Color = isMarked ? VitaColors.dataAmber : isAnswered ? VitaColors.accent : VitaColors.glassBorder
+                    let bg: Color = isMarked ? VitaColors.dataAmber : isAnswered ? VitaColors.tealAccent : VitaColors.glassBorder
 
                     Button {
                         vm.goToQuestion(idx)
@@ -275,7 +275,7 @@ struct SimuladoSessionScreen: View {
                     .padding(.top, 20)
 
                 if vm.state.isLoadingExplanation {
-                    HStack { Spacer(); ProgressView().tint(VitaColors.accent); Spacer() }
+                    HStack { Spacer(); ProgressView().tint(VitaColors.tealAccent); Spacer() }
                         .frame(height: 80)
                 } else if let explanation = vm.state.currentExplanation {
                     Text(explanation.general)
@@ -348,21 +348,21 @@ private struct OptionRow: View {
     private var borderColor: Color {
         if showFeedback && isCorrect { return VitaColors.dataGreen }
         if isWrongChoice { return VitaColors.dataRed }
-        if isSelected { return VitaColors.accent }
+        if isSelected { return VitaColors.tealAccent }
         return VitaColors.glassBorder
     }
 
     private var bgColor: Color {
         if showFeedback && isCorrect { return VitaColors.dataGreen.opacity(0.12) }
         if isWrongChoice { return VitaColors.dataRed.opacity(0.12) }
-        if isSelected { return VitaColors.accent.opacity(0.1) }
+        if isSelected { return VitaColors.tealAccent.opacity(0.1) }
         return Color.clear
     }
 
     private var letterColor: Color {
         if showFeedback && isCorrect { return VitaColors.dataGreen }
         if isWrongChoice { return VitaColors.dataRed }
-        if isSelected { return VitaColors.accent }
+        if isSelected { return VitaColors.tealAccent }
         return VitaColors.textTertiary
     }
 

@@ -16,7 +16,7 @@ struct SimuladoHomeScreen: View {
             } else {
                 ZStack {
                     VitaColors.surface.ignoresSafeArea()
-                    ProgressView().tint(VitaColors.accent)
+                    ProgressView().tint(VitaColors.tealAccent)
                 }
             }
         }
@@ -47,7 +47,7 @@ struct SimuladoHomeScreen: View {
 
             if vm.state.isLoading {
                 Spacer()
-                ProgressView().tint(VitaColors.accent)
+                ProgressView().tint(VitaColors.tealAccent)
                 Spacer()
             } else if vm.state.attempts.isEmpty {
                 Spacer()
@@ -134,7 +134,7 @@ struct SimuladoHomeScreen: View {
                                     Button { vm.archiveAttempt(attempt.id) } label: {
                                         Label("Arquivar", systemImage: "archivebox")
                                     }
-                                    .tint(VitaColors.accent)
+                                    .tint(VitaColors.tealAccent)
                                 }
                                 .padding(.horizontal, 16)
                             }
@@ -233,12 +233,12 @@ private struct SemesterChip: View {
     var body: some View {
         Text(label)
             .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
-            .foregroundStyle(isSelected ? VitaColors.accent : VitaColors.textPrimary)
+            .foregroundStyle(isSelected ? VitaColors.tealAccent : VitaColors.textPrimary)
             .padding(.horizontal, 14)
             .padding(.vertical, 6)
-            .background(isSelected ? VitaColors.accent.opacity(0.15) : VitaColors.glassBg)
+            .background(isSelected ? VitaColors.tealAccent.opacity(0.15) : VitaColors.glassBg)
             .overlay(
-                Capsule().stroke(isSelected ? VitaColors.accent : VitaColors.glassBorder, lineWidth: 1)
+                Capsule().stroke(isSelected ? VitaColors.tealAccent : VitaColors.glassBorder, lineWidth: 1)
             )
             .clipShape(Capsule())
             .onTapGesture(perform: onTap)
@@ -269,9 +269,9 @@ private struct AttemptCard: View {
                     if let subj = attempt.subject, !subj.isEmpty {
                         Text(subj)
                             .font(.system(size: 10))
-                            .foregroundStyle(VitaColors.accent)
+                            .foregroundStyle(VitaColors.tealAccent)
                             .padding(.horizontal, 6).padding(.vertical, 2)
-                            .background(VitaColors.accent.opacity(0.1))
+                            .background(VitaColors.tealAccent.opacity(0.1))
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                     }
                     Text(attempt.mode == "exam" ? "Prova" : "Imediato")

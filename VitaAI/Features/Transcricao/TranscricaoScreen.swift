@@ -23,7 +23,7 @@ struct TranscricaoScreen: View {
             if let vm = viewModel {
                 TranscricaoContent(viewModel: vm, onBack: onBack)
             } else {
-                ProgressView().tint(VitaColors.accent)
+                ProgressView().tint(VitaColors.tealAccent)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(VitaColors.surface.ignoresSafeArea())
             }
@@ -140,13 +140,13 @@ private struct IdlePhase: View {
                 ZStack {
                     // Outer ambient glow
                     Circle()
-                        .fill(VitaColors.accent.opacity(0.08 + glowPhase * 0.04))
+                        .fill(VitaColors.tealAccent.opacity(0.08 + glowPhase * 0.04))
                         .frame(width: 140, height: 140)
                         .animation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true), value: glowPhase)
 
                     // Mid ring
                     Circle()
-                        .fill(VitaColors.accent.opacity(0.12 + glowPhase * 0.04))
+                        .fill(VitaColors.tealAccent.opacity(0.12 + glowPhase * 0.04))
                         .frame(width: 115, height: 115)
                         .animation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true).delay(0.3), value: glowPhase)
 
@@ -154,13 +154,13 @@ private struct IdlePhase: View {
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: [VitaColors.accent, VitaColors.accentDark],
+                                colors: [VitaColors.tealAccent, VitaColors.tealAccentDark],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
                         .frame(width: 96, height: 96)
-                        .shadow(color: VitaColors.accent.opacity(0.45), radius: 24, x: 0, y: 8)
+                        .shadow(color: VitaColors.tealAccent.opacity(0.45), radius: 24, x: 0, y: 8)
 
                     Image(systemName: "mic.fill")
                         .font(.system(size: 40, weight: .medium))
@@ -314,7 +314,7 @@ private struct ProcessingPhase: View {
 
             ProgressView()
                 .progressViewStyle(.circular)
-                .tint(VitaColors.accent)
+                .tint(VitaColors.tealAccent)
                 .scaleEffect(1.5)
 
             Text(label)
@@ -333,7 +333,7 @@ private struct ProcessingPhase: View {
                             Capsule()
                                 .fill(
                                     LinearGradient(
-                                        colors: [VitaColors.accent, VitaColors.accentDark],
+                                        colors: [VitaColors.tealAccent, VitaColors.tealAccentDark],
                                         startPoint: .leading,
                                         endPoint: .trailing
                                     )
@@ -381,10 +381,10 @@ private struct DonePhase: View {
                                 .font(VitaTypography.labelMedium)
                                 .fontWeight(selectedTab == index ? .semibold : .regular)
                                 .foregroundStyle(
-                                    selectedTab == index ? VitaColors.accent : VitaColors.textSecondary
+                                    selectedTab == index ? VitaColors.tealAccent : VitaColors.textSecondary
                                 )
                             Rectangle()
-                                .fill(selectedTab == index ? VitaColors.accent : Color.clear)
+                                .fill(selectedTab == index ? VitaColors.tealAccent : Color.clear)
                                 .frame(height: 2)
                         }
                         .frame(maxWidth: .infinity)
@@ -436,10 +436,10 @@ private struct TranscriptTab: View {
                             Text(copied ? "Copiado" : "Copiar")
                                 .font(VitaTypography.labelSmall)
                         }
-                        .foregroundStyle(copied ? VitaColors.dataGreen : VitaColors.accent)
+                        .foregroundStyle(copied ? VitaColors.dataGreen : VitaColors.tealAccent)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background((copied ? VitaColors.dataGreen : VitaColors.accent).opacity(0.1))
+                        .background((copied ? VitaColors.dataGreen : VitaColors.tealAccent).opacity(0.1))
                         .clipShape(Capsule())
                         .animation(.easeInOut(duration: 0.2), value: copied)
                     }
@@ -521,10 +521,10 @@ private struct FlashcardsTab: View {
                             Text("Nova gravação")
                                 .font(VitaTypography.labelSmall)
                         }
-                        .foregroundStyle(VitaColors.accent)
+                        .foregroundStyle(VitaColors.tealAccent)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
-                        .background(VitaColors.accent.opacity(0.1))
+                        .background(VitaColors.tealAccent.opacity(0.1))
                         .clipShape(Capsule())
                     }
                 }
@@ -616,9 +616,9 @@ private struct ErrorPhase: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 28)
                 .padding(.vertical, 14)
-                .background(VitaColors.accent)
+                .background(VitaColors.tealAccent)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: VitaColors.accent.opacity(0.3), radius: 10, x: 0, y: 4)
+                .shadow(color: VitaColors.tealAccent.opacity(0.3), radius: 10, x: 0, y: 4)
             }
             .buttonStyle(.plain)
 

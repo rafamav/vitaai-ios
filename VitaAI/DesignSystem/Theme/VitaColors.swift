@@ -45,4 +45,13 @@ enum VitaColors {
     static let dataAmber  = VitaTokens.PrimitiveColors.amber500     // #f59e0b
     static let dataBlue   = VitaTokens.PrimitiveColors.blue400      // #60a5fa
     static let dataIndigo = VitaTokens.PrimitiveColors.indigo400    // #a78bfa (card back accent)
+
+    // MARK: - Feature Theme Colors
+    // Teal palette — Simulados & Transcrição
+    static let tealAccent       = Color(red: 80.0/255, green: 200.0/255, blue: 180.0/255)   // rgba(80,200,180)
+    static let tealAccentDark   = Color(red: 60.0/255, green: 180.0/255, blue: 160.0/255)   // rgba(60,180,160)
+    static let tealBorder       = Color(red: 120.0/255, green: 220.0/255, blue: 200.0/255)  // rgba(120,220,200)
+    static let tealGlow         = Color(red: 60.0/255, green: 180.0/255, blue: 160.0/255)   // rgba(60,180,160)
+    static let tealBgStart      = Color(red: 31.0/255, green: 47.0/255, blue: 43.0/255)     // rgba(31,47,43)
+    static let tealBgEnd        = Color(red: 39.0/255, green: 55.0/255, blue: 47.0/255)     // rgba(39,55,47)
 }

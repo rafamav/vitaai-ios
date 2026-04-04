@@ -22,7 +22,7 @@ struct SimuladoDiagnosticsScreen: View {
             } else {
                 ZStack {
                     VitaColors.surface.ignoresSafeArea()
-                    ProgressView().tint(VitaColors.accent)
+                    ProgressView().tint(VitaColors.tealAccent)
                 }
             }
         }
@@ -63,10 +63,10 @@ struct SimuladoDiagnosticsScreen: View {
                         } label: {
                             Text(label)
                                 .font(.system(size: 12, weight: selectedPeriod == value ? .semibold : .regular))
-                                .foregroundStyle(selectedPeriod == value ? VitaColors.accent : VitaColors.textPrimary)
+                                .foregroundStyle(selectedPeriod == value ? VitaColors.tealAccent : VitaColors.textPrimary)
                                 .padding(.horizontal, 14).padding(.vertical, 6)
-                                .background(selectedPeriod == value ? VitaColors.accent.opacity(0.15) : VitaColors.glassBg)
-                                .overlay(Capsule().stroke(selectedPeriod == value ? VitaColors.accent : VitaColors.glassBorder, lineWidth: 1))
+                                .background(selectedPeriod == value ? VitaColors.tealAccent.opacity(0.15) : VitaColors.glassBg)
+                                .overlay(Capsule().stroke(selectedPeriod == value ? VitaColors.tealAccent : VitaColors.glassBorder, lineWidth: 1))
                                 .clipShape(Capsule())
                         }
                     }
@@ -77,7 +77,7 @@ struct SimuladoDiagnosticsScreen: View {
 
             if vm.state.isLoading {
                 Spacer()
-                ProgressView().tint(VitaColors.accent)
+                ProgressView().tint(VitaColors.tealAccent)
                 Spacer()
             } else if let diag = vm.state.diagnostics {
                 ScrollView {
@@ -160,7 +160,7 @@ private struct OverallStatsCard: View {
                 Spacer()
                 DiagMiniStat(label: "Média", value: "\(avgPercent)%", valueColor: VitaColors.dataGreen)
                 Spacer()
-                DiagMiniStat(label: "Melhor", value: "\(bestPercent)%", valueColor: VitaColors.accent)
+                DiagMiniStat(label: "Melhor", value: "\(bestPercent)%", valueColor: VitaColors.tealAccent)
                 Spacer()
             }
             HStack {
