@@ -31,7 +31,7 @@ struct FlashcardStatsView: View {
                 }
             } else {
                 ProgressView()
-                    .tint(VitaColors.accent)
+                    .tint(VitaColors.flashcardAccent)
             }
         }
         .onAppear {
@@ -314,10 +314,10 @@ private struct FlashcardHeatmapView: View {
     private func heatmapColor(count: Int) -> Color {
         switch count {
         case 0:        return VitaColors.surfaceElevated
-        case 1...3:    return VitaColors.accent.opacity(0.25)
-        case 4...7:    return VitaColors.accent.opacity(0.50)
-        case 8...14:   return VitaColors.accent.opacity(0.75)
-        default:       return VitaColors.accent
+        case 1...3:    return VitaColors.flashcardAccent.opacity(0.25)
+        case 4...7:    return VitaColors.flashcardAccent.opacity(0.50)
+        case 8...14:   return VitaColors.flashcardAccent.opacity(0.75)
+        default:       return VitaColors.flashcardAccent
         }
     }
 }
@@ -334,7 +334,7 @@ private struct RetentionLineChartView: View {
                 x: .value("Data", entry.date),
                 y: .value("Retenção", entry.retention)
             )
-            .foregroundStyle(VitaColors.accent)
+            .foregroundStyle(VitaColors.flashcardAccent)
             .lineStyle(StrokeStyle(lineWidth: 2))
             .interpolationMethod(.catmullRom)
 
@@ -345,7 +345,7 @@ private struct RetentionLineChartView: View {
             )
             .foregroundStyle(
                 LinearGradient(
-                    colors: [VitaColors.accent.opacity(0.25), .clear],
+                    colors: [VitaColors.flashcardAccent.opacity(0.25), .clear],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -356,7 +356,7 @@ private struct RetentionLineChartView: View {
                 x: .value("Data", entry.date),
                 y: .value("Retenção", entry.retention)
             )
-            .foregroundStyle(VitaColors.accent)
+            .foregroundStyle(VitaColors.flashcardAccent)
             .symbolSize(20)
         }
         .chartYScale(domain: 0...100)
@@ -414,7 +414,7 @@ private struct ForecastBarChartView: View {
             )
             .foregroundStyle(
                 LinearGradient(
-                    colors: [VitaColors.accent, VitaColors.dataBlue],
+                    colors: [VitaColors.flashcardAccent, VitaColors.flashcardAccentLight],
                     startPoint: .bottom,
                     endPoint: .top
                 )

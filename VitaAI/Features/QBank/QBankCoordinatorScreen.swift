@@ -16,7 +16,7 @@ struct QBankCoordinatorScreen: View {
             } else {
                 ZStack {
                     VitaColors.surface.ignoresSafeArea()
-                    ProgressView().tint(VitaColors.accent)
+                    ProgressView().tint(VitaColors.qbankAccent)
                 }
             }
         }
@@ -62,19 +62,19 @@ struct QBankCoordinatorScreen: View {
 // MARK: - Convex Glass Modifier
 
 private struct ConvexGlassModifier: ViewModifier {
-    var isCyan: Bool = false
+    var isBlue: Bool = false
 
     func body(content: Content) -> some View {
         content
             .background(
                 ZStack {
-                    if isCyan {
-                        Circle().fill(Color(red: 0.04, green: 0.10, blue: 0.12))
+                    if isBlue {
+                        Circle().fill(Color(red: 0.03, green: 0.05, blue: 0.10))
                         Circle().fill(
                             RadialGradient(
                                 stops: [
-                                    .init(color: Color(red: 0.13, green: 0.83, blue: 0.93).opacity(0.25), location: 0),
-                                    .init(color: Color(red: 0.13, green: 0.83, blue: 0.93).opacity(0.05), location: 0.5),
+                                    .init(color: VitaColors.qbankAccent.opacity(0.25), location: 0),
+                                    .init(color: VitaColors.qbankAccent.opacity(0.05), location: 0.5),
                                     .init(color: Color.black.opacity(0.20), location: 1),
                                 ],
                                 center: UnitPoint(x: 0.5, y: 0.25),
@@ -101,7 +101,7 @@ private struct ConvexGlassModifier: ViewModifier {
             )
             .overlay(
                 Circle().stroke(
-                    isCyan ? Color(red: 0.13, green: 0.83, blue: 0.93).opacity(0.2) : Color.white.opacity(0.12),
+                    isBlue ? VitaColors.qbankAccent.opacity(0.2) : Color.white.opacity(0.12),
                     lineWidth: 1
                 )
             )
@@ -112,13 +112,13 @@ private struct ConvexGlassModifier: ViewModifier {
 
 private struct ConvexGlassCircle<Content: View>: View {
     let size: CGFloat
-    var isCyan: Bool = false
+    var isBlue: Bool = false
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         content()
             .frame(width: size, height: size)
-            .modifier(ConvexGlassModifier(isCyan: isCyan))
+            .modifier(ConvexGlassModifier(isBlue: isBlue))
     }
 }
 
@@ -148,7 +148,7 @@ private struct QBankHomeContent: View {
 
             if vm.state.progressLoading {
                 Spacer()
-                ProgressView().tint(VitaColors.accent)
+                ProgressView().tint(VitaColors.qbankAccent)
                 Spacer()
             } else {
                 ScrollView {
@@ -163,7 +163,7 @@ private struct QBankHomeContent: View {
                                 icon: "play.fill",
                                 title: "Nova Sessão",
                                 subtitle: "Configure filtros e pratique com questões de provas reais",
-                                isCyan: false
+                                isBlue: false
                             ) {
                                 vm.goToDisciplines()
                             }
@@ -173,7 +173,7 @@ private struct QBankHomeContent: View {
                                     icon: "brain",
                                     title: "Estudo Inteligente",
                                     subtitle: "Prioriza questões erradas e não vistas para otimizar seu estudo",
-                                    isCyan: true,
+                                    isBlue: true,
                                     isLoading: vm.state.isCreatingSmartSession
                                 ) {
                                     vm.startSmartStudy()
@@ -317,7 +317,7 @@ private struct QBankStatsRow: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 14).fill(VitaColors.glassBg)
                 LinearGradient(
-                    colors: [VitaColors.accent.opacity(0.05), .clear],
+                    colors: [VitaColors.qbankAccent.opacity(0.05), .clear],
                     startPoint: .top, endPoint: .bottom
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -340,22 +340,22 @@ private struct QBankActionCTA: View {
     let icon: String
     let title: String
     let subtitle: String
-    var isCyan: Bool = false
+    var isBlue: Bool = false
     var isLoading: Bool = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 14) {
-                ConvexGlassCircle(size: 44, isCyan: isCyan) {
+                ConvexGlassCircle(size: 44, isBlue: isBlue) {
                     if isLoading {
                         ProgressView()
-                            .tint(isCyan ? VitaColors.accent : .white)
+                            .tint(isBlue ? VitaColors.qbankAccent : .white)
                             .scaleEffect(0.7)
                     } else {
                         Image(systemName: icon)
                             .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(isCyan ? VitaColors.accent : Color.white.opacity(0.9))
+                            .foregroundStyle(isBlue ? VitaColors.qbankAccent : Color.white.opacity(0.9))
                     }
                 }
 
@@ -604,7 +604,7 @@ private struct QBankEmptyState: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 16).fill(VitaColors.glassBg)
                 LinearGradient(
-                    colors: [VitaColors.accent.opacity(0.05), .clear],
+                    colors: [VitaColors.qbankAccent.opacity(0.05), .clear],
                     startPoint: .top, endPoint: .bottom
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 16))
@@ -637,7 +637,7 @@ private struct QBankDisciplineContent: View {
                 if !vm.state.selectedDisciplineIds.isEmpty {
                     Text("\(vm.state.selectedDisciplineIds.count) sel.")
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(VitaColors.accent)
+                        .foregroundStyle(VitaColors.qbankAccent)
                         .padding(.trailing, 8)
                 }
             }
@@ -659,7 +659,7 @@ private struct QBankDisciplineContent: View {
                             } label: {
                                 Text(label)
                                     .font(.system(size: 11, weight: index == vm.state.disciplineBreadcrumb.count - 1 ? .bold : .regular))
-                                    .foregroundStyle(index == vm.state.disciplineBreadcrumb.count - 1 ? VitaColors.accent : VitaColors.textTertiary)
+                                    .foregroundStyle(index == vm.state.disciplineBreadcrumb.count - 1 ? VitaColors.qbankAccent : VitaColors.textTertiary)
                             }
                         }
                     }
@@ -682,12 +682,12 @@ private struct QBankDisciplineContent: View {
                                         .font(.system(size: 8, weight: .bold))
                                 }
                             }
-                            .foregroundStyle(VitaColors.accent)
+                            .foregroundStyle(VitaColors.qbankAccent)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(VitaColors.accent.opacity(0.1))
+                            .background(VitaColors.qbankAccent.opacity(0.1))
                             .clipShape(Capsule())
-                            .overlay(Capsule().stroke(VitaColors.accent.opacity(0.2), lineWidth: 1))
+                            .overlay(Capsule().stroke(VitaColors.qbankAccent.opacity(0.2), lineWidth: 1))
                         }
                     }
                     .padding(.horizontal, 16)
@@ -697,7 +697,7 @@ private struct QBankDisciplineContent: View {
 
             if vm.state.filtersLoading {
                 Spacer()
-                ProgressView().tint(VitaColors.accent)
+                ProgressView().tint(VitaColors.qbankAccent)
                 Spacer()
             } else {
                 // Discipline list
@@ -775,12 +775,12 @@ private struct DisciplineCard: View {
                     Button(action: onToggle) {
                         Image(systemName: isSelected ? "checkmark.square.fill" : "square")
                             .font(.system(size: 18))
-                            .foregroundStyle(isSelected ? VitaColors.accent : VitaColors.textTertiary.opacity(0.5))
+                            .foregroundStyle(isSelected ? VitaColors.qbankAccent : VitaColors.textTertiary.opacity(0.5))
                     }
                     .frame(width: 24, height: 24)
                 } else {
                     Circle()
-                        .fill(VitaColors.accent.opacity(0.2))
+                        .fill(VitaColors.qbankAccent.opacity(0.2))
                         .frame(width: 8, height: 8)
                         .frame(width: 24, height: 24)
                 }
@@ -788,7 +788,7 @@ private struct DisciplineCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(discipline.title)
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(isSelected ? VitaColors.accent : VitaColors.textPrimary)
+                        .foregroundStyle(isSelected ? VitaColors.qbankAccent : VitaColors.textPrimary)
                         .lineLimit(2)
 
                     if discipline.questionCount > 0 {
@@ -820,7 +820,7 @@ private struct DisciplineCard: View {
             .background(VitaColors.glassBg)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? VitaColors.accent.opacity(0.3) : VitaColors.glassBorder, lineWidth: 1)
+                    .stroke(isSelected ? VitaColors.qbankAccent.opacity(0.3) : VitaColors.glassBorder, lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
@@ -851,7 +851,7 @@ private struct QBankConfigContent: View {
                 if vm.state.hasActiveFilters {
                     Button("Limpar") { vm.clearFilters() }
                         .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(VitaColors.accent)
+                        .foregroundStyle(VitaColors.qbankAccent)
                         .padding(.trailing, 8)
                 }
             }
@@ -861,7 +861,7 @@ private struct QBankConfigContent: View {
             if vm.state.filtersLoading {
                 Spacer()
                 VStack(spacing: 12) {
-                    ProgressView().tint(VitaColors.accent)
+                    ProgressView().tint(VitaColors.qbankAccent)
                     Text("Carregando filtros...")
                         .font(.system(size: 13))
                         .foregroundStyle(VitaColors.textTertiary)
@@ -951,10 +951,10 @@ private struct QBankConfigContent: View {
                 VStack(spacing: 8) {
                     if vm.state.sessionLoading {
                         VStack(spacing: 10) {
-                            ProgressView().tint(VitaColors.accent)
+                            ProgressView().tint(VitaColors.qbankAccent)
                             Text("Montando sua sessão...")
                                 .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(VitaColors.accent)
+                                .foregroundStyle(VitaColors.qbankAccent)
                         }
                         .padding(.vertical, 12)
                     } else {
@@ -992,7 +992,7 @@ private struct QBankSessionContent: View {
             VitaColors.surface.ignoresSafeArea()
             if vm.state.questionLoading || vm.state.currentQuestionDetail == nil {
                 VStack(spacing: 12) {
-                    ProgressView().tint(VitaColors.accent)
+                    ProgressView().tint(VitaColors.qbankAccent)
                     Text("Carregando questão...")
                         .font(.system(size: 13))
                         .foregroundStyle(VitaColors.textTertiary)
@@ -1046,9 +1046,9 @@ private struct QBankSessionContent: View {
                 if let inst = question.institutionName, !inst.isEmpty {
                     Text(inst)
                         .font(.system(size: 10))
-                        .foregroundStyle(VitaColors.accent)
+                        .foregroundStyle(VitaColors.qbankAccent)
                         .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(VitaColors.accent.opacity(0.1))
+                        .background(VitaColors.qbankAccent.opacity(0.1))
                         .clipShape(Capsule())
                         .lineLimit(1)
                 }
@@ -1061,7 +1061,7 @@ private struct QBankSessionContent: View {
                 ZStack(alignment: .leading) {
                     Rectangle().fill(VitaColors.glassBorder)
                     Rectangle()
-                        .fill(VitaColors.accent)
+                        .fill(VitaColors.qbankAccent)
                         .frame(width: geo.size.width * CGFloat(vm.state.sessionProgress))
                         .animation(.easeInOut(duration: 0.4), value: vm.state.sessionProgress)
                 }
@@ -1167,10 +1167,10 @@ private struct QBankSessionContent: View {
                         } label: {
                             Text("Detalhes")
                                 .font(.system(size: 14, weight: .medium))
-                                .foregroundStyle(VitaColors.accent)
+                                .foregroundStyle(VitaColors.qbankAccent)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 46)
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(VitaColors.accent, lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(VitaColors.qbankAccent, lineWidth: 1))
                         }
                         Button {
                             if vm.state.isLastQuestion { vm.finishSession() } else { vm.nextQuestion() }
@@ -1180,7 +1180,7 @@ private struct QBankSessionContent: View {
                                 .foregroundStyle(VitaColors.surface)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 46)
-                                .background(VitaColors.accent)
+                                .background(VitaColors.qbankAccent)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                     }
@@ -1191,7 +1191,7 @@ private struct QBankSessionContent: View {
                             .foregroundStyle(VitaColors.surface)
                             .frame(maxWidth: .infinity)
                             .frame(height: 46)
-                            .background(vm.state.selectedAlternativeId != nil ? VitaColors.accent : VitaColors.accent.opacity(0.4))
+                            .background(vm.state.selectedAlternativeId != nil ? VitaColors.qbankAccent : VitaColors.qbankAccent.opacity(0.4))
                             .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
                     .disabled(vm.state.selectedAlternativeId == nil)
@@ -1238,19 +1238,19 @@ private struct QBankAlternativeCard: View {
     private var borderColor: Color {
         if showFeedback && isCorrect { return VitaColors.dataGreen }
         if isWrongChoice { return VitaColors.dataRed }
-        if isSelected { return VitaColors.accent }
+        if isSelected { return VitaColors.qbankAccent }
         return VitaColors.glassBorder
     }
     private var bgColor: Color {
         if showFeedback && isCorrect { return VitaColors.dataGreen.opacity(0.10) }
         if isWrongChoice { return VitaColors.dataRed.opacity(0.10) }
-        if isSelected { return VitaColors.accent.opacity(0.08) }
+        if isSelected { return VitaColors.qbankAccent.opacity(0.08) }
         return Color.clear
     }
     private var letterColor: Color {
         if showFeedback && isCorrect { return VitaColors.dataGreen }
         if isWrongChoice { return VitaColors.dataRed }
-        if isSelected { return VitaColors.accent }
+        if isSelected { return VitaColors.qbankAccent }
         return VitaColors.textTertiary
     }
     private var letter: String {
@@ -1351,7 +1351,7 @@ private struct QBankExplanationSheet: View {
                                         ZStack(alignment: .leading) {
                                             RoundedRectangle(cornerRadius: 3).fill(VitaColors.glassBorder)
                                             RoundedRectangle(cornerRadius: 3)
-                                                .fill(alt.isCorrect ? VitaColors.dataGreen : VitaColors.accent.opacity(0.4))
+                                                .fill(alt.isCorrect ? VitaColors.dataGreen : VitaColors.qbankAccent.opacity(0.4))
                                                 .frame(width: geo.size.width * CGFloat(stat.percentage / 100).clamped(to: 0...1))
                                         }
                                     }
@@ -1699,13 +1699,13 @@ struct QBankChip: View {
         Button(action: action) {
             Text(label)
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(isSelected ? VitaColors.accent : VitaColors.textSecondary)
+                .foregroundStyle(isSelected ? VitaColors.qbankAccent : VitaColors.textSecondary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
-                .background(isSelected ? VitaColors.accent.opacity(0.12) : VitaColors.glassBg)
+                .background(isSelected ? VitaColors.qbankAccent.opacity(0.12) : VitaColors.glassBg)
                 .overlay(
                     Capsule().stroke(
-                        isSelected ? VitaColors.accent.opacity(0.3) : VitaColors.glassBorder,
+                        isSelected ? VitaColors.qbankAccent.opacity(0.3) : VitaColors.glassBorder,
                         lineWidth: 1
                     )
                 )
@@ -1767,7 +1767,7 @@ struct QBankConfigToggleRow: View {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 16))
-                    .foregroundStyle(isOn ? VitaColors.accent : VitaColors.textTertiary)
+                    .foregroundStyle(isOn ? VitaColors.qbankAccent : VitaColors.textTertiary)
                     .frame(width: 24)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -1783,13 +1783,13 @@ struct QBankConfigToggleRow: View {
 
                 Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 20))
-                    .foregroundStyle(isOn ? VitaColors.accent : VitaColors.textTertiary.opacity(0.4))
+                    .foregroundStyle(isOn ? VitaColors.qbankAccent : VitaColors.textTertiary.opacity(0.4))
             }
             .padding(12)
-            .background(isOn ? VitaColors.accent.opacity(0.06) : VitaColors.glassBg)
+            .background(isOn ? VitaColors.qbankAccent.opacity(0.06) : VitaColors.glassBg)
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isOn ? VitaColors.accent.opacity(0.2) : VitaColors.glassBorder, lineWidth: 1)
+                    .stroke(isOn ? VitaColors.qbankAccent.opacity(0.2) : VitaColors.glassBorder, lineWidth: 1)
             )
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }

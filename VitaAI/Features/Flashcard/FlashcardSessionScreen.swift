@@ -13,9 +13,9 @@ struct FlashcardSessionScreen: View {
     @State private var elapsedSeconds: Int = 0
     private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
-    // Progress bar gradient — matches web/Android
+    // Progress bar gradient — purple theme
     private let progressGradient = LinearGradient(
-        colors: [VitaColors.accent, Color(hex: 0x3B82F6)],
+        colors: [VitaColors.flashcardAccent, VitaColors.flashcardAccentLight],
         startPoint: .leading,
         endPoint: .trailing
     )
@@ -149,7 +149,7 @@ struct FlashcardSessionScreen: View {
 
         if isReviewing {
             ProgressView()
-                .tint(VitaColors.accent)
+                .tint(VitaColors.flashcardAccent)
                 .frame(height: 72)
         } else if vm.isFlipped {
             RatingButtonsView(
@@ -184,7 +184,7 @@ struct FlashcardSessionScreen: View {
         VStack(spacing: 20) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 56))
-                .foregroundStyle(VitaColors.accent)
+                .foregroundStyle(VitaColors.flashcardAccent)
 
             VStack(spacing: 8) {
                 Text("Nenhum card para revisar")
@@ -200,12 +200,12 @@ struct FlashcardSessionScreen: View {
 
             Button("Voltar", action: onBack)
                 .font(VitaTypography.labelLarge)
-                .foregroundStyle(VitaColors.accent)
+                .foregroundStyle(VitaColors.flashcardAccent)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
-                .background(VitaColors.accent.opacity(0.08))
+                .background(VitaColors.flashcardAccent.opacity(0.08))
                 .clipShape(Capsule())
-                .overlay(Capsule().stroke(VitaColors.accent.opacity(0.18), lineWidth: 1))
+                .overlay(Capsule().stroke(VitaColors.flashcardAccent.opacity(0.18), lineWidth: 1))
         }
         .padding(32)
     }
@@ -222,7 +222,7 @@ struct FlashcardSessionScreen: View {
 
             Button("Voltar", action: onBack)
                 .font(VitaTypography.labelLarge)
-                .foregroundStyle(VitaColors.accent)
+                .foregroundStyle(VitaColors.flashcardAccent)
         }
         .padding(32)
     }

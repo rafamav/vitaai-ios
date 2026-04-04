@@ -16,9 +16,9 @@ struct SessionSummaryScreen: View {
     @State private var displayedTime: Double = 0
     @State private var displayedStreak: Double = 0
 
-    // Gradient for primary CTA (matches web / Android cyan→blue)
+    // Gradient for primary CTA — purple theme
     private let ctaGradient = LinearGradient(
-        colors: [VitaColors.accent, VitaColors.dataBlue],
+        colors: [VitaColors.flashcardAccent, VitaColors.flashcardAccentLight],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
@@ -67,9 +67,9 @@ struct SessionSummaryScreen: View {
     // MARK: Trophy Icon
 
     private var trophyIcon: some View {
-        let isBg    = result.isPerfect ? VitaColors.accent.opacity(0.12)  : VitaColors.glassBg
-        let iBorder = result.isPerfect ? VitaColors.accent.opacity(0.20)  : VitaColors.glassBorder
-        let iColor  = result.isPerfect ? VitaColors.accent : VitaColors.textSecondary
+        let isBg    = result.isPerfect ? VitaColors.flashcardAccent.opacity(0.12)  : VitaColors.glassBg
+        let iBorder = result.isPerfect ? VitaColors.flashcardAccent.opacity(0.20)  : VitaColors.glassBorder
+        let iColor  = result.isPerfect ? VitaColors.flashcardAccent : VitaColors.textSecondary
 
         return ZStack {
             Circle()

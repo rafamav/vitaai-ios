@@ -1,21 +1,21 @@
 import SwiftUI
 
-// MARK: - Card accent colors (mirroring Android/web)
+// MARK: - Card accent colors — purple theme
 
-private let cyanBorder   = VitaColors.accent.opacity(0.12)   // front side border
-private let cyanGlow     = VitaColors.accent.opacity(0.06)   // front top glow
-private let cyanPillBg   = VitaColors.accent.opacity(0.08)
+private let purpleBorder  = VitaColors.flashcardAccent.opacity(0.12)
+private let purpleGlow    = VitaColors.flashcardAccent.opacity(0.06)
+private let purplePillBg  = VitaColors.flashcardAccent.opacity(0.08)
 
-private let indigoAccent  = Color(hex: 0xA78BFA)              // indigo-400 for back side
-private let indigoBorder  = Color(hex: 0xA78BFA, opacity: 0.12)
-private let indigoGlow    = Color(hex: 0xA78BFA, opacity: 0.06)
-private let indigoPillBg  = Color(hex: 0xA78BFA, opacity: 0.08)
+private let indigoAccent  = VitaColors.flashcardAccentLight
+private let indigoBorder  = VitaColors.flashcardAccentLight.opacity(0.12)
+private let indigoGlow    = VitaColors.flashcardAccentLight.opacity(0.06)
+private let indigoPillBg  = VitaColors.flashcardAccentLight.opacity(0.08)
 
-private let cardBg = Color(hex: 0x11111A, opacity: 0.92)
+private let cardBg = VitaColors.flashcardCardStart.opacity(0.92)
 
 // MARK: - FlashcardCardView
 
-/// Animated flip card with cyan (front) and indigo (back) themes.
+/// Animated flip card with purple (front) and light-purple (back) themes.
 /// Uses `rotation3DEffect` for the Y-axis flip, mirroring the back with negative rotation.
 struct FlashcardCardView: View {
 
@@ -54,14 +54,14 @@ struct FlashcardCardView: View {
         }
     }
 
-    // MARK: Front face (cyan theme)
+    // MARK: Front face (purple theme)
 
     private var frontFace: some View {
-        cardShell(borderColor: cyanBorder, glowColor: cyanGlow) {
+        cardShell(borderColor: purpleBorder, glowColor: purpleGlow) {
             VStack(spacing: 0) {
                 // Deck label pill
-                pillLabel(text: deckTitle.uppercased(), textColor: VitaColors.accent,
-                          bgColor: cyanPillBg, borderColor: cyanBorder)
+                pillLabel(text: deckTitle.uppercased(), textColor: VitaColors.flashcardAccent,
+                          bgColor: purplePillBg, borderColor: purpleBorder)
 
                 Spacer().frame(height: 20)
 
@@ -77,8 +77,8 @@ struct FlashcardCardView: View {
 
                 // "Tap to reveal" hint
                 pillLabel(text: "TOQUE PARA REVELAR",
-                          textColor: VitaColors.accent.opacity(0.6),
-                          bgColor: cyanPillBg,
+                          textColor: VitaColors.flashcardAccent.opacity(0.6),
+                          bgColor: purplePillBg,
                           borderColor: .clear,
                           fontSize: 9)
             }
