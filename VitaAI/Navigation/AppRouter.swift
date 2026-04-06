@@ -369,10 +369,7 @@ struct MainTabView: View {
             NotificationSettingsScreen()
         case .connections:
             ConnectionsScreen(
-                onCanvasConnect: { router.navigate(to: .portalConnect(type: "canvas")) },
-                onWebAlunoConnect: { router.navigate(to: .portalConnect(type: "webaluno")) },
-                onGoogleCalendarConnect: { router.navigate(to: .portalConnect(type: "google_calendar")) },
-                onGoogleDriveConnect: { router.navigate(to: .portalConnect(type: "google_drive")) },
+                onPortalConnect: { type in router.navigate(to: .portalConnect(type: type)) },
                 onBack: { router.goBack() }
             )
         case .paywall:

@@ -8,15 +8,14 @@ struct CapturedPortalPage {
 }
 
 // MARK: - ConnectionsScreen
-// Unified connector list using shared ConnectorCard + ConnectorStatusSheet.
-// All portal types supported, driven by ConnectorsViewModel.
+// University-aware connector list — mirrors the onboarding ConnectStep UX.
+// Shows the student's university portals (from API), Google integrations, and
+// an expandable "Outros portais" section for portal types not detected.
 
 struct ConnectionsScreen: View {
-    var onCanvasConnect:         (() -> Void)?
-    var onWebAlunoConnect:       (() -> Void)?
-    var onGoogleCalendarConnect: (() -> Void)?
-    var onGoogleDriveConnect:    (() -> Void)?
-    var onBack:                  (() -> Void)?
+    /// Single callback for navigating to any portal's connect screen.
+    var onPortalConnect: ((String) -> Void)?
+    var onBack: (() -> Void)?
 
     @Environment(\.appContainer) private var container
 
@@ -25,9 +24,7 @@ struct ConnectionsScreen: View {
 
     // Sheet visibility
     @State private var activeSheet: String?
-
-    // Direct WebView for WebAluno connect
-    @State private var showWebalunoWebView: Bool = false
+    @State private var showAllPortals = false
 
     // Design tokens
     private let goldSubtle = VitaColors.accentLight
@@ -35,37 +32,18 @@ struct ConnectionsScreen: View {
     private let cardBg = VitaColors.glassBg
     private let bg = VitaColors.surface
 
-    // MARK: - Portal definitions
-
-    private struct PortalDef {
-        let id: String
-        let letter: String
-        let name: String
-        let color: Color
-    }
-
-    private var academicPortals: [PortalDef] {
-        [
-            PortalDef(id: "webaluno", letter: "W", name: "WebAluno",
-                      color: Color(red: 0.231, green: 0.510, blue: 0.965)),
-            PortalDef(id: "canvas", letter: "C", name: "Canvas LMS",
-                      color: Color(red: 0.937, green: 0.267, blue: 0.267)),
-            PortalDef(id: "moodle", letter: "M", name: "Moodle",
-                      color: Color(red: 0.976, green: 0.451, blue: 0.086)),
-            PortalDef(id: "sigaa", letter: "S", name: "SIGAA",
-                      color: Color(red: 0.133, green: 0.773, blue: 0.369)),
-            PortalDef(id: "totvs", letter: "T", name: "TOTVS RM",
-                      color: Color(red: 0.408, green: 0.200, blue: 0.835)),
-            PortalDef(id: "lyceum", letter: "L", name: "Lyceum",
-                      color: Color(red: 0.114, green: 0.631, blue: 0.667)),
-            PortalDef(id: "sagres", letter: "Sa", name: "Sagres",
-                      color: Color(red: 0.820, green: 0.557, blue: 0.102)),
-            PortalDef(id: "blackboard", letter: "Bb", name: "Blackboard",
-                      color: Color(red: 0.267, green: 0.267, blue: 0.267)),
-            PortalDef(id: "platos", letter: "P", name: "Platos",
-                      color: Color(red: 0.827, green: 0.184, blue: 0.463)),
-        ]
-    }
+    // All known portal types (for "Outros portais" fallback)
+    private let allPortalTypes: [PortalTypeInfo] = [
+        PortalTypeInfo(type: "canvas"),
+        PortalTypeInfo(type: "webaluno"),
+        PortalTypeInfo(type: "moodle"),
+        PortalTypeInfo(type: "sigaa"),
+        PortalTypeInfo(type: "totvs"),
+        PortalTypeInfo(type: "lyceum"),
+        PortalTypeInfo(type: "sagres"),
+        PortalTypeInfo(type: "blackboard"),
+        PortalTypeInfo(type: "platos"),
+    ]
 
     // MARK: - Body
 
@@ -92,23 +70,12 @@ struct ConnectionsScreen: View {
                 await vm?.loadPortalConnections()
             }
         }
-        // Unified sheet for any connector
+        // Status sheet for connected portals
         .sheet(item: $activeSheet) { sheetId in
             sheetContent(for: sheetId)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .background(Color(red: 0.047, green: 0.035, blue: 0.027))
-        }
-        // Direct WebAluno WebView
-        .fullScreenCover(isPresented: $showWebalunoWebView) {
-            WebAlunoWebViewScreen(
-                onBack: { showWebalunoWebView = false },
-                onSessionCaptured: { cookie in
-                    showWebalunoWebView = false
-                    Task { await vm?.connectWebaluno(cookie: cookie) }
-                },
-                userEmail: container.authManager.userEmail
-            )
         }
         .vitaToastHost(toastState)
         .onChange(of: vm?.toastMessage) { msg in
@@ -132,51 +99,25 @@ struct ConnectionsScreen: View {
                     .padding(.horizontal, 14)
                     .padding(.top, 4)
 
-                // Section label
-                sectionLabel("Portais")
-                    .padding(.top, 18)
-
-                // Portal cards
-                VStack(spacing: 8) {
-                    if vm.universityPortals.isEmpty {
-                        ForEach(academicPortals, id: \.id) { portal in
-                            portalCardView(portal, vm: vm)
-                        }
-                    } else {
-                        ForEach(vm.universityPortals, id: \.id) { portal in
-                            let def = academicPortals.first(where: { $0.id == portal.portalType })
-                                ?? PortalDef(
-                                    id: portal.portalType,
-                                    letter: University.letter(for: portal.portalType),
-                                    name: portal.displayName.isEmpty ? University.displayName(for: portal.portalType) : portal.displayName,
-                                    color: VitaColors.accent
-                                )
-                            portalCardView(def, vm: vm)
-                        }
-                    }
-                }
-                .padding(.horizontal, 14)
+                // Institucional section
+                institucionalSection(vm: vm)
 
                 // Google section
                 sectionLabel("Google")
                     .padding(.top, 18)
 
                 VStack(spacing: 8) {
-                    googleCardView(
+                    portalCard(
                         letter: "G", name: "Google Calendar",
                         color: Color(red: 0.26, green: 0.52, blue: 0.96),
-                        state: vm.calendar,
-                        onConnect: { onGoogleCalendarConnect?() },
-                        onDisconnect: { Task { await vm.disconnect("google_calendar") } },
-                        onTap: { activeSheet = "google_calendar" }
+                        connectorId: "google_calendar",
+                        state: vm.calendar, vm: vm
                     )
-                    googleCardView(
+                    portalCard(
                         letter: "G", name: "Google Drive",
                         color: Color(red: 0.13, green: 0.59, blue: 0.33),
-                        state: vm.drive,
-                        onConnect: { onGoogleDriveConnect?() },
-                        onDisconnect: { Task { await vm.disconnect("google_drive") } },
-                        onTap: { activeSheet = "google_drive" }
+                        connectorId: "google_drive",
+                        state: vm.drive, vm: vm
                     )
                 }
                 .padding(.horizontal, 14)
@@ -197,44 +138,114 @@ struct ConnectionsScreen: View {
         }
     }
 
-    // MARK: - Portal Card (academic)
+    // MARK: - Institucional Section
 
     @ViewBuilder
-    private func portalCardView(_ portal: PortalDef, vm: ConnectorsViewModel) -> some View {
-        let connState = vm.state(for: portal.id)
+    private func institucionalSection(vm: ConnectorsViewModel) -> some View {
+        let hasUniversity = !vm.universityName.isEmpty
+        let detectedPortals = vm.universityPortals
+        let detectedTypes = Set(detectedPortals.map(\.portalType))
+        let otherPortals = allPortalTypes.filter { !detectedTypes.contains($0.type) }
 
-        ConnectorCard(
-            letter: portal.letter,
-            name: portal.name,
-            status: connState.status,
-            color: portal.color,
-            lastSync: connState.lastSync,
-            stats: connState.stats,
-            onConnect: {
-                switch portal.id {
-                case "webaluno": showWebalunoWebView = true
-                case "canvas": onCanvasConnect?()
-                default: break
+        // Section label: university name or generic
+        if hasUniversity {
+            sectionLabel(vm.universityName)
+                .padding(.top, 18)
+        } else {
+            sectionLabel("Portais Academicos")
+                .padding(.top, 18)
+        }
+
+        VStack(spacing: 8) {
+            if !detectedPortals.isEmpty {
+                // Detected portals for this university
+                ForEach(detectedPortals, id: \.id) { portal in
+                    let connState = vm.state(for: portal.portalType)
+                    ConnectorCard(
+                        letter: University.letter(for: portal.portalType),
+                        name: portal.displayName.isEmpty
+                            ? University.displayName(for: portal.portalType)
+                            : portal.displayName,
+                        status: connState.status,
+                        color: University.color(for: portal.portalType),
+                        lastSync: connState.lastSync,
+                        stats: connState.stats,
+                        isPrimary: portal.isPrimary,
+                        onConnect: { onPortalConnect?(portal.portalType) },
+                        onDisconnect: { Task { await vm.disconnect(portal.portalType) } },
+                        onTapConnected: { activeSheet = portal.portalType }
+                    )
                 }
-            },
-            onDisconnect: {
-                Task { await vm.disconnect(portal.id) }
-            },
-            onTapConnected: {
-                activeSheet = portal.id
+            } else if !hasUniversity {
+                // No university — show hint
+                noUniversityHint
             }
-        )
+
+            // "Outros portais" expandable
+            if !showAllPortals && !otherPortals.isEmpty {
+                Button {
+                    withAnimation(.spring(response: 0.3)) { showAllPortals = true }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle").font(.system(size: 13))
+                        Text("Outros portais")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundStyle(.white.opacity(0.35))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+
+            if showAllPortals {
+                ForEach(otherPortals) { portal in
+                    let connState = vm.state(for: portal.type)
+                    ConnectorCard(
+                        letter: portal.letter,
+                        name: portal.displayName,
+                        status: connState.status,
+                        color: portal.color,
+                        onConnect: { onPortalConnect?(portal.type) },
+                        onDisconnect: { Task { await vm.disconnect(portal.type) } },
+                        onTapConnected: { activeSheet = portal.type }
+                    )
+                }
+            }
+        }
+        .padding(.horizontal, 14)
     }
 
-    // MARK: - Google Card
+    // MARK: - No University Hint
+
+    private var noUniversityHint: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "building.columns")
+                .font(.system(size: 24))
+                .foregroundColor(goldSubtle.opacity(0.30))
+            Text("Nenhuma universidade detectada")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.white.opacity(0.5))
+            Text("Complete seu perfil para ver os portais da sua faculdade")
+                .font(.system(size: 11))
+                .foregroundColor(goldSubtle.opacity(0.30))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+        .background(cardBg)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(borderColor, lineWidth: 1))
+    }
+
+    // MARK: - Portal Card (generic)
 
     @ViewBuilder
-    private func googleCardView(
+    private func portalCard(
         letter: String, name: String, color: Color,
-        state: ConnectorState,
-        onConnect: @escaping () -> Void,
-        onDisconnect: @escaping () -> Void,
-        onTap: @escaping () -> Void
+        connectorId: String, state: ConnectorState,
+        vm: ConnectorsViewModel
     ) -> some View {
         ConnectorCard(
             letter: letter,
@@ -243,9 +254,9 @@ struct ConnectionsScreen: View {
             color: color,
             lastSync: state.lastSync,
             stats: state.stats,
-            onConnect: onConnect,
-            onDisconnect: onDisconnect,
-            onTapConnected: onTap
+            onConnect: { onPortalConnect?(connectorId) },
+            onDisconnect: { Task { await vm.disconnect(connectorId) } },
+            onTapConnected: { activeSheet = connectorId }
         )
     }
 
@@ -269,9 +280,7 @@ struct ConnectionsScreen: View {
                     Task {
                         switch connectorId {
                         case "canvas": await vm.syncCanvas()
-                        case "webaluno":
-                            activeSheet = nil
-                            showWebalunoWebView = true
+                        case "webaluno": onPortalConnect?("webaluno") // re-connect flow
                         case "google_calendar": await vm.syncCalendar()
                         case "google_drive": await vm.syncDrive()
                         default: break
