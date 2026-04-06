@@ -123,6 +123,27 @@ struct SyncStep: Identifiable {
     }
 }
 
+// MARK: - Phase ordering helper (moved from deleted CanvasConnectScreen)
+
+extension CanvasSyncOrchestrator.Phase {
+    private var order: Int {
+        switch self {
+        case .starting: return 0
+        case .fetchingCourses: return 1
+        case .fetchingData: return 2
+        case .filteringPDFs: return 3
+        case .downloadingPDFs: return 4
+        case .uploading: return 5
+        case .done: return 6
+        case .error: return -1
+        }
+    }
+
+    func isAfter(_ other: CanvasSyncOrchestrator.Phase) -> Bool {
+        order > other.order
+    }
+}
+
 // MARK: - Preset Steps
 
 extension SyncStep {

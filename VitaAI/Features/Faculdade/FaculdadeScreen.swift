@@ -80,7 +80,7 @@ struct FaculdadeScreen: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
 
-            NavigationLink(value: Route.webalunoConnect) {
+            NavigationLink(value: Route.portalConnect(type: "webaluno")) {
                 Text("Conectar WebAluno")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(VitaColors.surface)

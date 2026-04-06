@@ -225,7 +225,7 @@ struct MainTabView: View {
             )
         case .estudos:
             EstudosScreen(
-                onNavigateToCanvasConnect: { router.navigate(to: .canvasConnect) },
+                onNavigateToCanvasConnect: { router.navigate(to: .portalConnect(type: "canvas")) },
                 onNavigateToNotebooks: { router.navigate(to: .notebookList) },
                 onNavigateToMindMaps: { router.navigate(to: .mindMapList) },
                 onNavigateToFlashcardSession: { deckId in router.navigate(to: .flashcardSession(deckId: deckId)) },
@@ -343,22 +343,20 @@ struct MainTabView: View {
             SimuladoDiagnosticsScreen(
                 onBack: { router.goBack() }
             )
+        case .portalConnect(let type):
+            PortalConnectScreen(
+                portalType: type,
+                onBack: { router.goBack() }
+            )
+        // Legacy routes → unified PortalConnectScreen
         case .canvasConnect:
-            CanvasConnectScreen(
-                onBack: { router.goBack() }
-            )
+            PortalConnectScreen(portalType: "canvas", onBack: { router.goBack() })
         case .webalunoConnect:
-            WebAlunoConnectScreen(
-                onBack: { router.goBack() }
-            )
+            PortalConnectScreen(portalType: "webaluno", onBack: { router.goBack() })
         case .googleCalendarConnect:
-            GoogleCalendarConnectScreen(
-                onBack: { router.goBack() }
-            )
+            PortalConnectScreen(portalType: "google_calendar", onBack: { router.goBack() })
         case .googleDriveConnect:
-            GoogleDriveConnectScreen(
-                onBack: { router.goBack() }
-            )
+            PortalConnectScreen(portalType: "google_drive", onBack: { router.goBack() })
         case .insights:
             InsightsScreen()
         case .trabalhos:
@@ -371,10 +369,10 @@ struct MainTabView: View {
             NotificationSettingsScreen()
         case .connections:
             ConnectionsScreen(
-                onCanvasConnect: { router.navigate(to: .canvasConnect) },
-                onWebAlunoConnect: { router.navigate(to: .webalunoConnect) },
-                onGoogleCalendarConnect: { router.navigate(to: .googleCalendarConnect) },
-                onGoogleDriveConnect: { router.navigate(to: .googleDriveConnect) },
+                onCanvasConnect: { router.navigate(to: .portalConnect(type: "canvas")) },
+                onWebAlunoConnect: { router.navigate(to: .portalConnect(type: "webaluno")) },
+                onGoogleCalendarConnect: { router.navigate(to: .portalConnect(type: "google_calendar")) },
+                onGoogleDriveConnect: { router.navigate(to: .portalConnect(type: "google_drive")) },
                 onBack: { router.goBack() }
             )
         case .paywall:
@@ -398,7 +396,7 @@ struct MainTabView: View {
                 onNavigateToPdfViewer: { url in
                     router.navigate(to: .pdfViewer(url: url.absoluteString))
                 },
-                onNavigateToCanvasConnect: { router.navigate(to: .canvasConnect) }
+                onNavigateToCanvasConnect: { router.navigate(to: .portalConnect(type: "canvas")) }
             )
         case .provas:
             ProvasScreen(onBack: { router.goBack() })

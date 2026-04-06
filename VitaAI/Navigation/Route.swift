@@ -11,6 +11,9 @@ enum Route: Hashable {
     case agenda
     case insights
     case profile
+    case portalConnect(type: String)
+
+    // Legacy aliases — redirect to portalConnect(type:) in AppRouter
     case canvasConnect
     case webalunoConnect
     case googleCalendarConnect
