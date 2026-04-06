@@ -1737,6 +1737,7 @@
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				TARGETED_DEVICE_FAMILY = "1,2";
+				VITA_ATS_ALLOW_HTTP = true;
 			};
 			name = Debug;
 		};
@@ -1780,6 +1781,7 @@
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
+				VITA_ATS_ALLOW_HTTP = false;
 			};
 			name = Release;
 		};

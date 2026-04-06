@@ -372,7 +372,7 @@ struct ProfileScreen: View {
     private var estatisticas: some View {
         let questions = gamStats?.totalQuestionsAnswered ?? 1847
         let flashcards = gamStats?.totalCardsReviewed ?? 623
-        let studyHours = Int(profile?.totalStudyHours ?? 48)
+        let studyHours = 48  // TODO: load from getProgress() — was incorrectly on ProfileResponse
         let streak = gamStats?.currentStreak ?? 7
 
         return LazyVGrid(columns: [

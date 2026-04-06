@@ -807,14 +807,19 @@ struct ConnectionsScreen: View {
     private func loadPortalConnections() async {
         do {
             let data = try await container.api.getCanvasStatus()
-            guard data.connected, let connections = data.connections else {
+            // Always parse connections — even inactive ones — so UI reflects real state
+            guard let connections = data.connections, !connections.isEmpty else {
                 canvasStatus = .disconnected
                 webalunoStatus = .disconnected
                 return
             }
 
             for conn in connections {
-                let status: ConnectionItemStatus = conn.status == "expired" ? .expired : .connected
+                let status: ConnectionItemStatus = switch conn.status {
+                    case "expired": .expired
+                    case "inactive", "disconnected": .disconnected
+                    default: .connected
+                }
                 // Use lastPingAt for "session alive" indicator, lastSyncAt for "data freshness"
                 let syncTime = conn.lastPingAt ?? conn.lastSyncAt
 

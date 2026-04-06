@@ -50,7 +50,7 @@ final class CanvasConnectViewModel {
         do {
             let status = try await api.getCanvasStatus()
             state.isLoading = false
-            if let conn = status.canvasConnection {
+            if let conn = status.canvasConnection, conn.status == "active" {
                 state.isConnected = true
                 state.status = conn.status
                 if let url = conn.instanceUrl, !url.isEmpty {
@@ -58,7 +58,7 @@ final class CanvasConnectViewModel {
                 }
                 state.lastSyncAt = conn.lastSyncAt
             } else {
-                state.isConnected = status.connected
+                state.isConnected = false
             }
         } catch {
             state.isLoading = false
