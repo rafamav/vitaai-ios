@@ -40,7 +40,8 @@ struct WebAlunoConnectScreen: View {
                             onSessionCaptured: { cookie in
                                 showWebView = false
                                 vm.connectWithSession(cookie)
-                            }
+                            },
+                            userEmail: container.authManager.userEmail
                         )
                         .interactiveDismissDisabled(vm.state.isConnecting)
                     }

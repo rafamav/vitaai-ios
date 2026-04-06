@@ -433,8 +433,8 @@ struct PortalWebView: UIViewRepresentable {
 
         switch portalType {
         case "canvas":
-            // Canvas LMS: /login/canvas is the native login page
-            return "https://\(portalURL)/login/canvas"
+            // Canvas LMS: /login/google goes directly to Google SSO (bypasses native form)
+            return "https://\(portalURL)/login/google"
         case "webaluno":
             // WebAluno: append /webaluno/ if not already
             return base.hasSuffix("/webaluno/") ? base : "\(base)/webaluno/"
@@ -474,11 +474,20 @@ struct PortalWebView: UIViewRepresentable {
             guard !capturedSession else { return }
             navigationCount += 1
 
-            // Skip the first page load (login page itself) — wait for user to actually log in
-            // After 2+ navigations, the user likely submitted the login form
-            guard navigationCount >= 2 else { return }
-
             let currentURL = webView.url?.absoluteString ?? ""
+            let currentHost = webView.url?.host ?? ""
+            let currentPath = webView.url?.path ?? ""
+
+            // Detect successful login by checking if we're on the portal dashboard
+            // (not on a login/auth page anymore)
+            let isLoginPage = currentPath.contains("/login") || currentPath.contains("/auth")
+                || currentURL.contains("accounts.google.com")
+                || currentURL.contains("signin")
+            let isPortalDashboard = !currentHost.isEmpty && !isLoginPage && navigationCount >= 1
+
+            // For first navigation: only capture if we landed on the dashboard (cached session)
+            // For 2+ navigations: always capture (user completed login flow)
+            guard navigationCount >= 2 || isPortalDashboard else { return }
 
             // Capture ALL cookies from the portal domain — backend decides which ones matter
             webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { [weak self] cookies in
@@ -497,8 +506,9 @@ struct PortalWebView: UIViewRepresentable {
                 // Send ALL cookies as "name=value; name2=value2" — backend picks what it needs
                 let cookieString = relevantCookies.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
 
-                print("[PortalWebView] \(self.portalType): captured \(relevantCookies.count) cookies after navigation to \(currentURL)")
-                print("[PortalWebView] Cookie names: \(relevantCookies.map(\.name).joined(separator: ", "))")
+                NSLog("[PortalWebView] %@: captured %d cookies (%d bytes) after nav to %@", self.portalType, relevantCookies.count, cookieString.count, currentURL)
+                NSLog("[PortalWebView] Cookie names: %@", relevantCookies.map(\.name).joined(separator: ", "))
+                NSLog("[PortalWebView] Cookie domains: %@", relevantCookies.map { "\($0.name)@\($0.domain)" }.joined(separator: ", "))
 
                 self.capturedSession = true
                 DispatchQueue.main.async {

@@ -43,43 +43,6 @@ final class ProgressoViewModel {
         isLoading = true
         error = nil
 
-        if AppConfig.isE2EDemoMode {
-            let progress = MockData.progressResponse()
-            let stats = MockData.gamificationStats()
-            totalStudyHours = progress.totalStudyHours
-            avgAccuracy = progress.avgAccuracy
-            totalQuestions = progress.totalCards
-            subjects = progress.subjects
-            heatmap = progress.heatmap
-            weeklyHours = progress.weeklyHours
-            weeklyActualHours = progress.weeklyActualHours
-            weeklyGoalHours = progress.weeklyGoalHours
-            streakDays = stats.streakDays
-            longestStreak = stats.streakDays
-            userProgress = UserProgress(
-                totalXp: stats.totalXp,
-                level: stats.level,
-                currentLevelXp: stats.currentLevelXp,
-                xpToNextLevel: stats.xpToNextLevel,
-                currentStreak: stats.streakDays,
-                longestStreak: stats.streakDays,
-                badges: stats.achievements.filter(\.earned).map {
-                    VitaBadge(
-                        id: $0.id,
-                        name: $0.name,
-                        description: $0.description,
-                        icon: $0.icon,
-                        earnedAt: $0.earnedAt.map { Date(timeIntervalSince1970: Double($0) / 1000) },
-                        category: .milestone
-                    )
-                },
-                dailyXp: 35
-            )
-            leaderboard = MockData.leaderboardEntries()
-            isLoading = false
-            return
-        }
-
         var anySuccess = false
 
         // Load progress data (independent — partial success is OK)

@@ -8,28 +8,11 @@ struct CanvasConnectScreen: View {
     @Environment(\.appContainer) private var container
     @State private var viewModel: CanvasConnectViewModel?
     @State private var toastState = VitaToastState()
+    @State private var cookiesCaptured = false
 
     var body: some View {
         ZStack {
             VitaScreenBg()
-
-            // Ambient glow
-            Canvas { context, size in
-                let center = CGPoint(x: size.width * 0.15, y: size.height * 0.1)
-                let gradient = Gradient(colors: [VitaColors.accent.opacity(0.08), .clear])
-                context.drawLayer { ctx in
-                    ctx.fill(
-                        Path(ellipseIn: CGRect(
-                            x: center.x - size.width * 0.6,
-                            y: center.y - size.width * 0.6,
-                            width: size.width * 1.2,
-                            height: size.width * 1.2
-                        )),
-                        with: .radialGradient(gradient, center: center, startRadius: 0, endRadius: size.width * 0.6)
-                    )
-                }
-            }
-            .ignoresSafeArea()
 
             if let vm = viewModel {
                 mainContent(vm: vm)
@@ -47,12 +30,6 @@ struct CanvasConnectScreen: View {
             }
         }
         .vitaToastHost(toastState)
-        .onChange(of: viewModel?.state.successMessage) { msg in
-            if let msg {
-                toastState.show(msg, type: .success)
-                viewModel?.dismissMessages()
-            }
-        }
         .onChange(of: viewModel?.state.error) { err in
             if let err {
                 toastState.show(err, type: .error)
@@ -66,7 +43,6 @@ struct CanvasConnectScreen: View {
     @ViewBuilder
     private func mainContent(vm: CanvasConnectViewModel) -> some View {
         VStack(spacing: 0) {
-            // Top bar
             navBar
 
             if vm.state.isLoading {
@@ -75,19 +51,18 @@ struct CanvasConnectScreen: View {
                     .tint(VitaColors.accent)
                     .scaleEffect(1.2)
                 Spacer()
-            } else {
+            } else if vm.state.isConnected {
                 ScrollView {
                     VStack(spacing: 16) {
                         statusCard(state: vm.state)
-
-                        if vm.state.isConnected {
-                            connectedSection(vm: vm)
-                        } else {
-                            connectForm(vm: vm)
-                        }
+                        connectedSection(vm: vm)
                     }
                     .padding(20)
                 }
+            } else if vm.state.isSyncing || cookiesCaptured {
+                syncingView(vm: vm)
+            } else {
+                webViewLogin(vm: vm)
             }
         }
     }
@@ -117,7 +92,6 @@ struct CanvasConnectScreen: View {
 
             Spacer()
 
-            // Spacer to balance the back button width
             Color.clear
                 .frame(width: 70, height: 44)
         }
@@ -125,35 +99,197 @@ struct CanvasConnectScreen: View {
         .padding(.top, 8)
     }
 
+    // MARK: - WebView login
+
+    @ViewBuilder
+    private func webViewLogin(vm: CanvasConnectViewModel) -> some View {
+        VStack(spacing: 12) {
+            VitaGlassCard {
+                HStack(spacing: 12) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 20))
+                        .foregroundColor(VitaColors.accent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Faça login no Canvas")
+                            .font(VitaTypography.titleSmall)
+                            .fontWeight(.semibold)
+                            .foregroundColor(VitaColors.textPrimary)
+                        Text("Vita importa disciplinas, notas e materiais")
+                            .font(VitaTypography.bodySmall)
+                            .foregroundColor(VitaColors.textSecondary)
+                    }
+                    Spacer()
+                }
+                .padding(16)
+            }
+            .padding(.horizontal, 20)
+
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 9))
+                        .foregroundColor(VitaColors.textTertiary)
+                    Text(vm.state.instanceUrl.replacingOccurrences(of: "https://", with: ""))
+                        .font(.system(size: 10))
+                        .foregroundColor(VitaColors.textTertiary)
+                        .lineLimit(1)
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.03))
+
+                PortalWebView(
+                    portalType: "canvas",
+                    portalURL: vm.state.instanceUrl.replacingOccurrences(of: "https://", with: ""),
+                    onSessionCaptured: { cookie in
+                        cookiesCaptured = true
+                        vm.syncWithWebView(cookies: cookie, instanceUrl: vm.state.instanceUrl)
+                    }
+                )
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+            .padding(.horizontal, 20)
+        }
+        .padding(.top, 8)
+    }
+
+    // MARK: - Syncing view (Vita mascot + granular progress)
+
+    @ViewBuilder
+    private func syncingView(vm: CanvasConnectViewModel) -> some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            VitaMascot(state: .thinking, size: 100, showStaff: true)
+                .padding(.bottom, 24)
+
+            Text(vm.state.successMessage ?? "Vita conectando ao Canvas...")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(VitaColors.textPrimary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+                .animation(.easeInOut(duration: 0.3), value: vm.state.successMessage)
+
+            // Progress bar
+            if vm.state.isSyncing {
+                ProgressView(value: vm.state.syncPercent, total: 100)
+                    .tint(VitaColors.accent)
+                    .padding(.horizontal, 48)
+                    .padding(.top, 16)
+                    .animation(.easeInOut(duration: 0.5), value: vm.state.syncPercent)
+            }
+
+            // Sync steps
+            VStack(alignment: .leading, spacing: 12) {
+                let phase = vm.state.syncPhase
+                syncStepRow("Login detectado", done: true)
+                syncStepRow("Buscando disciplinas",
+                            done: phase.isAfter(.fetchingCourses),
+                            active: phase == .fetchingCourses)
+                syncStepRow("Buscando atividades e arquivos",
+                            done: phase.isAfter(.fetchingData),
+                            active: phase == .fetchingData)
+                syncStepRow("Identificando planos de ensino",
+                            done: phase.isAfter(.filteringPDFs),
+                            active: phase == .filteringPDFs)
+                syncStepRow("Baixando planos de ensino",
+                            done: phase.isAfter(.downloadingPDFs),
+                            active: phase == .downloadingPDFs)
+                syncStepRow("Enviando para Vita processar",
+                            done: phase.isAfter(.uploading),
+                            active: phase == .uploading)
+                syncStepRow("Extração completa",
+                            done: phase == .done)
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.03))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.06), lineWidth: 1))
+            )
+            .padding(.horizontal, 32)
+            .padding(.top, 24)
+
+            // Retry button when sync failed
+            if !vm.state.isSyncing && cookiesCaptured {
+                VStack(spacing: 12) {
+                    if let error = vm.state.error {
+                        Text(error)
+                            .font(VitaTypography.bodySmall)
+                            .foregroundColor(.red.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                    }
+
+                    VitaButton(
+                        text: "Tentar Novamente",
+                        action: {
+                            cookiesCaptured = false
+                        },
+                        variant: .primary,
+                        size: .lg,
+                        isEnabled: true,
+                        leadingSystemImage: "arrow.clockwise"
+                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 32)
+                }
+                .padding(.top, 20)
+            }
+
+            Spacer()
+        }
+        .padding(.bottom, 100) // Clear bottom nav bar
+    }
+
+    private func syncStepRow(_ text: String, done: Bool = false, active: Bool = false) -> some View {
+        HStack(spacing: 10) {
+            if done {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(Color.green)
+            } else if active {
+                ProgressView()
+                    .tint(VitaColors.accent)
+                    .scaleEffect(0.7)
+                    .frame(width: 16, height: 16)
+            } else {
+                Circle()
+                    .stroke(Color.white.opacity(0.15), lineWidth: 1.5)
+                    .frame(width: 16, height: 16)
+            }
+
+            Text(text)
+                .font(.system(size: 13, weight: done || active ? .medium : .regular))
+                .foregroundColor(done ? .white.opacity(0.7) : active ? .white.opacity(0.9) : .white.opacity(0.3))
+        }
+    }
+
     // MARK: - Status card
 
     private func statusCard(state: CanvasConnectViewState) -> some View {
         VitaGlassCard {
             HStack(spacing: 16) {
-                // Icon circle
                 ZStack {
                     Circle()
-                        .fill(
-                            state.isConnected
-                                ? VitaColors.dataGreen.opacity(0.15)
-                                : VitaColors.textTertiary.opacity(0.12)
-                        )
+                        .fill(VitaColors.dataGreen.opacity(0.15))
                         .frame(width: 48, height: 48)
-
-                    Image(systemName: state.isConnected ? "cloud.fill" : "cloud.slash.fill")
+                    Image(systemName: "cloud.fill")
                         .font(.system(size: 22))
-                        .foregroundColor(
-                            state.isConnected ? VitaColors.dataGreen : VitaColors.textSecondary
-                        )
+                        .foregroundColor(VitaColors.dataGreen)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(state.isConnected ? "Canvas Conectado" : "Canvas Desconectado")
+                    Text("Canvas Conectado")
                         .font(VitaTypography.titleSmall)
                         .fontWeight(.semibold)
                         .foregroundColor(VitaColors.textPrimary)
 
-                    if state.isConnected && !state.instanceUrl.isEmpty {
+                    if !state.instanceUrl.isEmpty {
                         Text(state.instanceUrl.replacingOccurrences(of: "https://", with: ""))
                             .font(VitaTypography.bodySmall)
                             .foregroundColor(VitaColors.textSecondary)
@@ -176,22 +312,18 @@ struct CanvasConnectScreen: View {
 
     @ViewBuilder
     private func connectedSection(vm: CanvasConnectViewModel) -> some View {
-        // Sync button
         VitaButton(
-            text: vm.state.isSyncing ? "Sincronizando..." : "Sincronizar Agora",
+            text: "Sincronizar Agora",
             action: { vm.syncNow() },
             variant: .primary,
             size: .lg,
-            isEnabled: !vm.state.isSyncing,
-            isLoading: vm.state.isSyncing,
-            leadingSystemImage: vm.state.isSyncing ? nil : "arrow.clockwise"
+            isEnabled: true,
+            leadingSystemImage: "arrow.clockwise"
         )
         .frame(maxWidth: .infinity)
 
-        // How it works card
         howItWorksCard
 
-        // Disconnect button
         VitaButton(
             text: vm.state.isDisconnecting ? "Desconectando..." : "Desconectar Canvas",
             action: { vm.disconnect() },
@@ -211,78 +343,16 @@ struct CanvasConnectScreen: View {
                     .fontWeight(.semibold)
                     .foregroundColor(VitaColors.textPrimary)
 
-                infoRow("Disciplinas, arquivos e atividades são importados do Canvas")
-                infoRow("PDFs são processados para gerar flashcards com IA")
-                infoRow("Eventos do calendário aparecem na sua agenda")
-                infoRow("Sincronize sempre que quiser dados atualizados")
+                infoRow("Disciplinas, arquivos e atividades importados")
+                infoRow("Planos de ensino processados pela IA Vita")
+                infoRow("Eventos do calendário na sua agenda")
+                infoRow("Sincronize quando quiser dados atualizados")
             }
             .padding(16)
         }
     }
 
-    // MARK: - Connect form
-
-    @ViewBuilder
-    private func connectForm(vm: CanvasConnectViewModel) -> some View {
-        // Instructions card
-        VitaGlassCard {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Conectar Canvas LMS")
-                    .font(VitaTypography.titleSmall)
-                    .fontWeight(.semibold)
-                    .foregroundColor(VitaColors.textPrimary)
-
-                Text(
-                    "Para conectar, você precisa do token de acesso do Canvas. " +
-                    "Acesse seu Canvas → Configurações → Token de Acesso → Gerar novo token."
-                )
-                .font(VitaTypography.bodySmall)
-                .foregroundColor(VitaColors.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(16)
-        }
-
-        // Instance URL
-        VitaInput(
-            value: Binding(
-                get: { vm.state.instanceUrlInput },
-                set: { vm.updateInstanceUrlInput($0) }
-            ),
-            label: "URL da Instituição",
-            placeholder: "https://suauni.instructure.com",
-            leadingSystemImage: "link",
-            keyboardType: .URL
-        )
-
-        // Token
-        VitaInput(
-            value: Binding(
-                get: { vm.state.tokenInput },
-                set: { vm.updateTokenInput($0) }
-            ),
-            label: "Token de Acesso",
-            placeholder: "Cole seu token aqui",
-            leadingSystemImage: "key",
-            isSecure: true,
-            submitLabel: .go,
-            onSubmit: { vm.connect() }
-        )
-
-        // Connect button
-        VitaButton(
-            text: vm.state.isConnecting ? "Conectando..." : "Conectar Canvas",
-            action: { vm.connect() },
-            variant: .primary,
-            size: .lg,
-            isEnabled: !vm.state.isConnecting && !vm.state.tokenInput.trimmingCharacters(in: .whitespaces).isEmpty,
-            isLoading: vm.state.isConnecting,
-            leadingSystemImage: vm.state.isConnecting ? nil : "graduationcap"
-        )
-        .frame(maxWidth: .infinity)
-    }
-
-    // MARK: - Info row
+    // MARK: - Helpers
 
     private func infoRow(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
@@ -290,21 +360,38 @@ struct CanvasConnectScreen: View {
                 .font(.system(size: 14))
                 .foregroundColor(VitaColors.accent)
                 .padding(.top, 1)
-
             Text(text)
                 .font(VitaTypography.bodySmall)
                 .foregroundColor(VitaColors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
-
             Spacer()
         }
     }
 
-    // MARK: - Helpers
-
     private func formatSyncDate(_ raw: String) -> String {
         let prefix = String(raw.prefix(16))
         return prefix.replacingOccurrences(of: "T", with: " ")
+    }
+}
+
+// MARK: - Phase ordering helper
+
+extension CanvasSyncOrchestrator.Phase {
+    private var order: Int {
+        switch self {
+        case .starting: return 0
+        case .fetchingCourses: return 1
+        case .fetchingData: return 2
+        case .filteringPDFs: return 3
+        case .downloadingPDFs: return 4
+        case .uploading: return 5
+        case .done: return 6
+        case .error: return -1
+        }
+    }
+
+    func isAfter(_ other: CanvasSyncOrchestrator.Phase) -> Bool {
+        order > other.order
     }
 }
 

@@ -55,8 +55,29 @@ final class DashboardViewModel {
         if let xp = dashboard.xp { xpLevel = xp.level }
         if !dashboard.subjects.isEmpty { subjects = dashboard.subjects }
         if !dashboard.agenda.isEmpty { agenda = dashboard.agenda }
-        if !dashboard.exams.isEmpty {
-            upcomingExams = dashboard.exams.map { exam in
+        // Map hero cards (new API) to upcoming exams
+        let examHeroes = dashboard.hero.filter { $0.type == "exam" }
+        if !examHeroes.isEmpty {
+            upcomingExams = examHeroes.map { card in
+                let daysText = card.pills.first(where: { $0.icon == "calendar" })?.text
+                    .replacingOccurrences(of: "Em ", with: "")
+                    .replacingOccurrences(of: " dias", with: "")
+                    .trimmingCharacters(in: .whitespaces)
+                let days = daysText.flatMap { Int($0) } ?? 0
+                return UpcomingExam(
+                    id: card.id,
+                    subject: card.subtitle ?? "",
+                    type: card.title,
+                    date: Date().addingTimeInterval(TimeInterval(days * 86400)),
+                    daysUntil: days,
+                    conceptCards: 0,
+                    practiceCards: 0
+                )
+            }
+        }
+        // Legacy exams fallback
+        if let exams = dashboard.exams, !exams.isEmpty, upcomingExams.isEmpty {
+            upcomingExams = exams.map { exam in
                 UpcomingExam(
                     id: exam.id,
                     subject: exam.subject,

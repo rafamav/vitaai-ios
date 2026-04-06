@@ -46,9 +46,11 @@ final class AuthManager: ObservableObject {
 
     func signIn(provider: String) {
         error = nil
+        isLoading = true
         let urlString = "\(AppConfig.authBaseURL)/api/auth/mobile-start?provider=\(provider)"
         guard let authURL = URL(string: urlString) else {
             error = "URL inválida"
+            isLoading = false
             return
         }
 
@@ -59,6 +61,7 @@ final class AuthManager: ObservableObject {
             Task { @MainActor in
                 guard let self else { return }
                 if let error {
+                    self.isLoading = false
                     if (error as NSError).code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
                         return // User cancelled
                     }
@@ -66,10 +69,12 @@ final class AuthManager: ObservableObject {
                     return
                 }
                 guard let url = callbackURL else {
+                    self.isLoading = false
                     self.error = "Nenhuma resposta recebida"
                     return
                 }
                 await self.handleCallback(url: url)
+                self.isLoading = false
             }
         }
         session.prefersEphemeralWebBrowserSession = false
@@ -215,15 +220,6 @@ final class AuthManager: ObservableObject {
             ])
         }
         VitaPostHogConfig.capture(event: "login", properties: ["method": "oauth"])
-    }
-
-    func enterDemoMode() {
-        // Already @MainActor — no need for Task wrapper which causes race conditions
-        Task {
-            await tokenStore.saveDemoUser()
-            userName = "Estudante"
-            isLoggedIn = true
-        }
     }
 
     func logout() {

@@ -3,13 +3,37 @@ import Foundation
 struct DashboardResponse: Decodable {
     var greeting: String = ""
     var subtitle: String = ""
-    var exams: [DashboardExam] = []
+    var hero: [DashboardHeroCard] = []
     var subjects: [DashboardSubject] = []
     var agenda: [DashboardAgendaItem] = []
     var flashcardsDueTotal: Int = 0
-    var studyRecommendations: [DashboardRecommendation] = []
     var xp: DashboardXP?
-    var todayReviewed: Int = 0
+
+    // Legacy compat
+    var exams: [DashboardExam]?
+    var studyRecommendations: [DashboardRecommendation]?
+    var todayReviewed: Int?
+}
+
+struct DashboardHeroCard: Decodable, Identifiable {
+    var id: String { "\(type)-\(title)" }
+    var type: String = ""
+    var title: String = ""
+    var subtitle: String?
+    var pills: [DashboardPill] = []
+    var action: DashboardAction?
+    var urgency: Int?
+}
+
+struct DashboardPill: Decodable {
+    var icon: String = ""
+    var text: String = ""
+}
+
+struct DashboardAction: Decodable {
+    var type: String = ""
+    var target: String = ""
+    var id: String?
 }
 
 struct DashboardExam: Decodable, Identifiable {
@@ -23,7 +47,6 @@ struct DashboardExam: Decodable, Identifiable {
 }
 
 struct DashboardSubject: Decodable, Identifiable {
-    // API returns: name, shortName, difficulty, vitaScore, vitaTier (no id)
     var name: String = ""
     var shortName: String?
     var difficulty: String?
@@ -41,14 +64,12 @@ struct DashboardAgendaItem: Decodable {
 }
 
 struct DashboardRecommendation: Decodable {
-    // API returns: title, dueCount, deckId
     var title: String = ""
     var dueCount: Int = 0
     var deckId: String = ""
 }
 
 struct DashboardXP: Decodable {
-    // API returns: {total: 55, level: 1}
     var total: Int = 0
     var level: Int = 0
 }

@@ -159,6 +159,11 @@ struct LoginScreen: View {
         .sheet(isPresented: $showEmailSheet) {
             EmailAuthSheet(authManager: authManager)
         }
+        .onChange(of: authManager.isLoading) { _, newValue in
+            if !newValue {
+                loadingProvider = .none
+            }
+        }
         .onAppear {
             withAnimation(.easeOut(duration: 1.5)) { imageOpacity = 1 }
             Task {

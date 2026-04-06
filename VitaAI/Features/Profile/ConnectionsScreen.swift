@@ -275,7 +275,10 @@ struct ConnectionsScreen: View {
                 onBack: { showWebalunoWebView = false },
                 onSessionCaptured: { cookie in
                     capturedSessionCookie = "PHPSESSID=\(cookie)"
-                }
+                    showWebalunoWebView = false
+                    Task { await connectWebalunoWithSession(cookie) }
+                },
+                userEmail: container.authManager.userEmail
             )
         }
         .vitaToastHost(toastState)
@@ -885,6 +888,22 @@ struct ConnectionsScreen: View {
                 canvasFiles       = 0
                 canvasAssignments = 0
             } catch { print("[Conectores] error: \(error)") }
+        }
+    }
+
+    private func connectWebalunoWithSession(_ cookie: String) async {
+        do {
+            toastState.show("Conectando WebAluno...", type: .success)
+            webalunoStatus = .connected
+            let _ = try await container.api.startVitaCrawl(
+                cookies: "PHPSESSID=\(cookie)",
+                instanceUrl: "https://ac3949.mannesoftprime.com.br"
+            )
+            toastState.show("WebAluno conectado! Extraindo dados...", type: .success)
+            await loadPortalConnections()
+        } catch {
+            print("[Conectores] WebAluno connect error: \(error)")
+            toastState.show("Erro ao conectar: \(error.localizedDescription)", type: .error)
         }
     }
 

@@ -78,6 +78,7 @@ final class ChatViewModel {
         let idx = messages.count - 1
 
         isStreaming = true
+        let streamStartTime = Date()
 
         // Encode image as base64 if present
         let imageBase64: String? = attachedImageData?.base64EncodedString()
@@ -105,6 +106,8 @@ final class ChatViewModel {
                         self.messages[idx].content = "\u{23f3} \(text)"
 
                     case .messageStop(let convId):
+                        // Strip [MEMORIA: ...] from end of response
+                        self.messages[idx].content = self.stripMemoriaTag(self.messages[idx].content)
                         if let convId {
                             self.currentConversationId = convId
                         }
@@ -133,6 +136,10 @@ final class ChatViewModel {
                 }
             }
 
+            // Record response duration for assistant message
+            if idx < self.messages.count && !self.messages[idx].isError {
+                self.messages[idx].responseDuration = Date().timeIntervalSince(streamStartTime)
+            }
             self.isStreaming = false
             self.streamingTask = nil
         }
@@ -220,5 +227,15 @@ final class ChatViewModel {
         currentConversationId = nil
         messages = []
         showHistory = false
+    }
+
+    // MARK: - Helpers
+
+    /// Strips "[MEMORIA: ...]" tags from the end of AI responses (system prompt artifact)
+    private func stripMemoriaTag(_ text: String) -> String {
+        guard let range = text.range(of: "\\[MEMORIA:.*\\]\\s*$", options: .regularExpression) else {
+            return text
+        }
+        return text[text.startIndex..<range.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

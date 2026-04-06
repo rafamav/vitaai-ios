@@ -25,10 +25,6 @@ final class AuthViewModel {
         authManager.signInWithApple()
     }
 
-    func enterDemoMode() {
-        authManager.enterDemoMode()
-    }
-
     func logout() {
         authManager.logout()
     }

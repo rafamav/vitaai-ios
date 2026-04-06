@@ -15,13 +15,9 @@ enum AppConfig {
     static let onboardingKey = "vita_is_onboarded"
     static let legacyOnboardingKey = "vita_onboarding_done"
 
-    static let demoUserName = "Rafael"
-    static let demoUserEmail = "qa@vita-ai.cloud"
-    static let demoUserImage = ""
-
     #if DEBUG
-    private static let defaultAPIBaseURL = "http://192.168.0.152:3110/api"
-    private static let defaultAuthBaseURL = "http://192.168.0.152:3110"
+    private static let defaultAPIBaseURL = "http://monstro.tail7e98e6.ts.net:3110/api"
+    private static let defaultAuthBaseURL = "http://monstro.tail7e98e6.ts.net:3110"
     #else
     private static let defaultAPIBaseURL = "https://vita-ai.cloud/api"
     private static let defaultAuthBaseURL = "https://vita-ai.cloud"
@@ -108,15 +104,6 @@ enum AppConfig {
             return authBaseURL(from: apiOverride)
         }
         return defaultAuthBaseURL
-    }
-
-    static var isE2EDemoMode: Bool {
-        hasLaunchFlag("--vita-e2e-demo", defaultsKey: "vita_e2e_demo", envKey: "VITA_E2E_DEMO")
-            || hasLaunchFlag("--vita-demo-login", defaultsKey: "vita_demo_login", envKey: "VITA_DEMO_LOGIN")
-    }
-
-    static var isE2EProdAuthMode: Bool {
-        hasLaunchFlag("--vita-e2e-prod-auth", defaultsKey: "vita_e2e_prod_auth", envKey: "VITA_E2E_PROD_AUTH")
     }
 
     static var shouldResetOnboarding: Bool {

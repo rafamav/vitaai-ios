@@ -164,9 +164,7 @@ final class OnboardingViewModel {
             subjectDifficulties: subjectDifficulties
         )
         await tokenStore.saveOnboardingData(data)
-        if !AppConfig.isE2EDemoMode {
-            await postOnboardingToBackend(data: data)
-        }
+        await postOnboardingToBackend(data: data)
         isSaving = false
     }
 

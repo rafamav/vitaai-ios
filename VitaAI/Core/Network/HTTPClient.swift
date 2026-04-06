@@ -76,6 +76,8 @@ actor HTTPClient {
                 request.setValue(forwardedHost, forHTTPHeaderField: "x-forwarded-host")
             }
             request.httpBody = encodedBody
+            let traceId = UUID().uuidString.prefix(8).lowercased()
+            request.setValue(String(traceId), forHTTPHeaderField: "X-Trace-Id")
             return request
         }
 
@@ -116,6 +118,9 @@ actor HTTPClient {
                 request.setValue(forwardedHost, forHTTPHeaderField: "x-forwarded-host")
             }
             request.httpBody = body
+            let traceId = UUID().uuidString.prefix(8).lowercased()
+            request.setValue(String(traceId), forHTTPHeaderField: "X-Trace-Id")
+            NSLog("[HTTPClient] traceId=%@ POST %@", traceId, url.absoluteString)
             return request
         }
         return try decoder.decode(T.self, from: data)

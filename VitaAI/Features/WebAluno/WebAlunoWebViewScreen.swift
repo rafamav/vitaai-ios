@@ -3,16 +3,21 @@ import WebKit
 
 // MARK: - Constants
 
+/// Landing page — loads first to establish Mannesoft domain cookies,
+/// then auto-triggers loginGoogle() to start OAuth flow.
 private let webalunoURL = "https://ac3949.mannesoftprime.com.br/webaluno/"
 
 // MARK: - WebAlunoWebViewScreen
 
 /// Presents the WebAluno portal in a WKWebView.
-/// On successful login, captures the PHPSESSID cookie and calls `onSessionCaptured`.
+/// Loads /webaluno/ to establish cookies, then auto-redirects to Google OAuth
+/// with login_hint so the user never types their email again.
 struct WebAlunoWebViewScreen: View {
     var onBack: () -> Void
     /// Called once when a valid PHPSESSID is detected after login
     var onSessionCaptured: (String) -> Void
+    /// User's institutional email from VitaAI login — used as login_hint for Google OAuth
+    var userEmail: String?
 
     @State private var isLoading: Bool = true
     @State private var loadProgress: Double = 0
@@ -33,9 +38,10 @@ struct WebAlunoWebViewScreen: View {
                         .animation(.easeInOut(duration: 0.2), value: loadProgress)
                 }
 
-                // WebView
+                // WebView — loads portal, auto-triggers Google OAuth with login_hint
                 WebAlunoWebView(
                     url: URL(string: webalunoURL)!,
+                    userEmail: userEmail,
                     isLoading: $isLoading,
                     loadProgress: $loadProgress,
                     onSessionCaptured: onSessionCaptured
@@ -63,7 +69,7 @@ struct WebAlunoWebViewScreen: View {
 
             Spacer()
 
-            Text("Entrar no WebAluno")
+            Text("Conectar WebAluno")
                 .font(VitaTypography.titleMedium)
                 .fontWeight(.semibold)
                 .foregroundColor(VitaColors.textPrimary)
@@ -75,7 +81,8 @@ struct WebAlunoWebViewScreen: View {
         }
         .padding(.horizontal, 8)
         .padding(.top, 8)
-        .vitaScreenBg()
+        .background(Color(red: 0.06, green: 0.04, blue: 0.03))
+        .zIndex(1)
     }
 }
 
@@ -83,6 +90,7 @@ struct WebAlunoWebViewScreen: View {
 
 struct WebAlunoWebView: UIViewRepresentable {
     let url: URL
+    let userEmail: String?
     @Binding var isLoading: Bool
     @Binding var loadProgress: Double
     var onSessionCaptured: (String) -> Void
@@ -104,18 +112,28 @@ struct WebAlunoWebView: UIViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
         // Allow all content — equivalent to Android's mixed content compat
-        configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
         configuration.allowsInlineMediaPlayback = true
 
+        // Build a real Safari UA so Google allows OAuth AND serves mobile layout.
+        // Default WKWebView UA: "...AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/XXX"
+        // Real Safari UA: "...AppleWebKit/605.1.15 (KHTML, like Gecko) Version/X.0 Mobile/XXX Safari/605.1.15"
+        // Google requires "Safari/" to allow OAuth (403: disallowed_useragent).
+        // Google requires "Mobile/" BEFORE "Safari/" to serve mobile layout.
+        // TLS fingerprint matches real Safari since WKWebView uses the same WebKit engine.
+        let osVersion = ProcessInfo.processInfo.operatingSystemVersion
+        let osStr = "\(osVersion.majorVersion)_\(osVersion.minorVersion)"
+        let safariUA = "Mozilla/5.0 (iPhone; CPU iPhone OS \(osStr) like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/\(osVersion.majorVersion).0 Mobile/15E148 Safari/605.1.15"
+
+        // Render pages at mobile viewport
+        configuration.defaultWebpagePreferences.preferredContentMode = .mobile
+
         let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.customUserAgent = safariUA
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
-        webView.backgroundColor = UIColor(VitaColors.surface)
-        webView.isOpaque = false
-        webView.scrollView.contentInsetAdjustmentBehavior = .never
-
-        // DO NOT set customUserAgent — WKWebView's default UA is a real Safari UA.
-        // Hardcoded UA mismatches TLS fingerprint and triggers Cloudflare bot detection.
+        webView.backgroundColor = UIColor.systemBackground
+        webView.isOpaque = true
 
         // Progress binding
         context.coordinator.webView = webView
@@ -140,6 +158,7 @@ struct WebAlunoWebView: UIViewRepresentable {
         let parent: WebAlunoWebView
         var webView: WKWebView?
         var sessionFound = false
+        var oauthTriggered = false
         var progressObservation: NSKeyValueObservation?
 
         init(parent: WebAlunoWebView) {
@@ -170,21 +189,100 @@ struct WebAlunoWebView: UIViewRepresentable {
                 self.parent.isLoading = false
             }
 
+            // Force mobile viewport on every page load — Google's login page
+            // may render at desktop width if it doesn't detect mobile correctly.
+            let viewportFix = """
+                (function() {
+                    var vp = document.querySelector('meta[name=viewport]');
+                    if (vp) {
+                        vp.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0';
+                    } else {
+                        vp = document.createElement('meta');
+                        vp.name = 'viewport';
+                        vp.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0';
+                        document.head.appendChild(vp);
+                    }
+                })();
+            """
+            webView.evaluateJavaScript(viewportFix, completionHandler: nil)
+
             guard !sessionFound else { return }
 
-            // Inspect cookies for PHPSESSID after page load
             let currentURL = webView.url?.absoluteString ?? ""
+            NSLog("[WebAluno] didFinish URL: %@", currentURL)
+
+            // On Google's email entry page: auto-click Next since login_hint pre-filled email.
+            // This makes the flow truly zero-friction — user never interacts with Google's page.
+            if currentURL.contains("accounts.google.com") {
+                let autoAdvance = """
+                    (function() {
+                        // Click the Next button on the email step
+                        var nextBtn = document.getElementById('identifierNext');
+                        if (nextBtn) {
+                            nextBtn.click();
+                            return 'clicked identifierNext';
+                        }
+                        // Click the Next button on the password step
+                        var passNext = document.getElementById('passwordNext');
+                        if (passNext) {
+                            passNext.click();
+                            return 'clicked passwordNext';
+                        }
+                        // For account chooser, click the matching account
+                        var accounts = document.querySelectorAll('[data-identifier]');
+                        for (var i = 0; i < accounts.length; i++) {
+                            accounts[i].click();
+                            return 'clicked account: ' + accounts[i].getAttribute('data-identifier');
+                        }
+                        return 'no action taken';
+                    })();
+                """
+                webView.evaluateJavaScript(autoAdvance) { result, error in
+                    NSLog("[WebAluno] Google auto-advance: %@", String(describing: result ?? error ?? "nil"))
+                }
+            }
+
+            // Auto-trigger Google OAuth once landing page loads.
+            // Uses login_hint from user's VitaAI email so Google skips the email entry screen.
+            if !oauthTriggered && currentURL.contains("/webaluno") && !currentURL.contains("autenticacao") && !currentURL.contains("accounts.google") {
+                oauthTriggered = true
+                let emailHint = parent.userEmail ?? ""
+                NSLog("[WebAluno] Landing page loaded, triggering Google OAuth (hint: %@)...", emailHint)
+                let js = """
+                    (function() {
+                        var clientId = '841344683161-55h62tlo6h5f0ea7ilrsp3psr29ubo0i.apps.googleusercontent.com';
+                        var redirectUri = encodeURIComponent('https://ac3949.mannesoftprime.com.br/autenticacao/oauth_google.php?tipo=1&origem=webaluno');
+                        var loginHint = '\(emailHint)';
+                        var url = 'https://accounts.google.com/o/oauth2/v2/auth'
+                            + '?client_id=' + clientId
+                            + '&redirect_uri=' + redirectUri
+                            + '&response_type=code'
+                            + '&scope=email%20profile'
+                            + '&hd=rede.ulbra.br'
+                            + (loginHint ? '&login_hint=' + encodeURIComponent(loginHint) : '');
+                        window.location.href = url;
+                        return 'redirecting to Google with hint: ' + loginHint;
+                    })();
+                """
+                webView.evaluateJavaScript(js) { result, error in
+                    NSLog("[WebAluno] OAuth trigger: %@", String(describing: result ?? error ?? "nil"))
+                }
+                return
+            }
+
+            // Inspect cookies for PHPSESSID after page load
             WKWebsiteDataStore.default().httpCookieStore.getAllCookies { [weak self] cookies in
                 guard let self else { return }
                 if let phpSession = self.extractPhpSessionId(from: cookies, for: currentURL) {
-                    // Only fire after the user has successfully logged in (URL changed past login page)
-                    // Detect login page — don't fire session callback until user is past login
-                    let isLoginPage = currentURL.contains("/login")
+                    // Don't fire during OAuth flow — only after landing on logged-in portal
+                    let isAuthFlow = currentURL.contains("accounts.google.com")
+                        || currentURL.contains("/autenticacao/")
+                        || currentURL.contains("/login")
                         || currentURL.hasSuffix("/webaluno/")
                         || currentURL.hasSuffix("/webaluno")
-                        || currentURL == webalunoURL
-                    guard !isLoginPage else { return }
+                    guard !isAuthFlow else { return }
 
+                    // We landed on a Mannesoft page that's NOT auth — user is logged in
                     self.sessionFound = true
                     DispatchQueue.main.async {
                         self.parent.onSessionCaptured(phpSession)
@@ -197,6 +295,22 @@ struct WebAlunoWebView: UIViewRepresentable {
             DispatchQueue.main.async {
                 self.parent.isLoading = false
             }
+        }
+
+        // MARK: - WKUIDelegate — handle popups (OAuth opens via window.open)
+
+        func webView(
+            _ webView: WKWebView,
+            createWebViewWith configuration: WKWebViewConfiguration,
+            for navigationAction: WKNavigationAction,
+            windowFeatures: WKWindowFeatures
+        ) -> WKWebView? {
+            // Don't create a new WebView — load the popup URL in the current one
+            if let url = navigationAction.request.url {
+                NSLog("[WebAluno] Popup intercepted → loading in same view: %@", url.absoluteString)
+                webView.load(URLRequest(url: url))
+            }
+            return nil
         }
 
         // MARK: - Session extraction
@@ -217,7 +331,8 @@ struct WebAlunoWebView: UIViewRepresentable {
         onBack: {},
         onSessionCaptured: { cookie in
             print("Session captured: \(cookie)")
-        }
+        },
+        userEmail: "rafaelfloureiro93@rede.ulbra.br"
     )
     .preferredColorScheme(.dark)
 }

@@ -95,13 +95,11 @@ final class AppContainer: ObservableObject {
         let logoutHandler: @Sendable @MainActor () -> Void = {
             authMgr.logout()
         }
-        if !AppConfig.isE2EDemoMode {
-            Task {
-                await httpClient.setOnUnauthorized(logoutHandler)
-                await chatClient.setOnUnauthorized(logoutHandler)
-                await osceSseClient.setOnUnauthorized(logoutHandler)
-                await transcricaoClient.setOnUnauthorized(logoutHandler)
-            }
+        Task {
+            await httpClient.setOnUnauthorized(logoutHandler)
+            await chatClient.setOnUnauthorized(logoutHandler)
+            await osceSseClient.setOnUnauthorized(logoutHandler)
+            await transcricaoClient.setOnUnauthorized(logoutHandler)
         }
 
         // Wire PushManager with API for token registration
@@ -157,13 +155,11 @@ final class AppContainer: ObservableObject {
         self.gamificationEvents = GamificationEventManager()
         self.appConfigService = AppConfigService.shared
 
-        if !AppConfig.isE2EDemoMode {
-            Task { @MainActor in
-                await AppConfigService.shared.loadIfNeeded(api: api)
-            }
+        Task { @MainActor in
+            await AppConfigService.shared.loadIfNeeded(api: api)
         }
 
-        if #available(iOS 17, *), !AppConfig.isE2EDemoMode {
+        if #available(iOS 17, *) {
             Task { @MainActor in
                 await (self._noteSyncManager as? NoteSyncManager)?.pull()
                 await (self._mindMapSyncManager as? MindMapSyncManager)?.pull()

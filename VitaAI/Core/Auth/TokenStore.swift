@@ -27,26 +27,17 @@ actor TokenStore {
 
     var token: String? {
         #if DEBUG
-        if AppConfig.isE2EDemoMode {
-            return nil
-        }
         if let ciToken = AppConfig.ciToken { return ciToken }
         #endif
         return keychain.read(key: Keys.sessionToken)
     }
 
     var isLoggedIn: Bool {
-        #if DEBUG
-        if AppConfig.isE2EDemoMode { return true }
-        #endif
-        return token != nil
+        token != nil
     }
 
     var isOnboarded: Bool {
         #if DEBUG
-        if AppConfig.isE2EDemoMode {
-            return AppConfig.isOnboardingComplete(in: defaults)
-        }
         if AppConfig.ciToken != nil { return true }
         #endif
         return AppConfig.isOnboardingComplete(in: defaults)
@@ -81,16 +72,6 @@ actor TokenStore {
         defaults.removeObject(forKey: Keys.userName)
         defaults.removeObject(forKey: Keys.userEmail)
         defaults.removeObject(forKey: Keys.userImage)
-    }
-
-    /// Demo mode no longer persists a fake token — the app handles demo state
-    /// via AuthManager.isLoggedIn without sending invalid tokens to the API.
-    func saveDemoUser() {
-        keychain.delete(key: Keys.sessionToken)
-        keychain.save(key: Keys.userName, value: AppConfig.demoUserName)
-        keychain.save(key: Keys.userEmail, value: AppConfig.demoUserEmail)
-        defaults.set(AppConfig.demoUserName, forKey: Keys.userName)
-        defaults.set(AppConfig.demoUserEmail, forKey: Keys.userEmail)
     }
 
     func clearSession() {

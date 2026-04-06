@@ -8,13 +8,14 @@ struct ChatMessage: Identifiable, Codable {
     var timestamp: Date = Date()
     var feedback: Int = 0 // 0=none, 1=up, -1=down
     var isError: Bool = false
+    var responseDuration: TimeInterval?
 
     // Image attachment (local only — not persisted via Codable)
     var imageData: Data?
     var imageMimeType: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, role, content, timestamp, feedback, isError
+        case id, role, content, timestamp, feedback, isError, responseDuration
     }
 
     var hasImage: Bool { imageData != nil }

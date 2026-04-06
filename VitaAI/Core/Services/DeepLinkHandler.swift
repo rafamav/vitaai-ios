@@ -97,6 +97,9 @@ final class DeepLinkHandler {
             }
             return .navigate(.notebookList)
 
+        // Connections / Conectores
+        case "connections": return .navigate(.connections)
+
         // Settings sub-screens
         case "settings":
             switch pathSegments.first {

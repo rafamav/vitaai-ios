@@ -97,31 +97,40 @@ struct MainTabView: View {
                 .padding(.horizontal, 12)
                 .padding(.bottom, 8)
 
-                NavigationStack(path: $router.path) {
-                    activeTabView
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
-                        .overlay(alignment: .topLeading) {
-                            NavControllerBackgroundClearer()
-                                .frame(width: 0, height: 0)
-                        }
-                        .safeAreaInset(edge: .bottom, spacing: 0) {
-                            Color.clear.frame(height: 80)
-                        }
-                        .navigationDestination(for: Route.self) { route in
-                            routeDestination(for: route)
-                        }
+                ZStack {
+                    NavigationStack(path: $router.path) {
+                        activeTabView
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .clipped()
+                            .overlay(alignment: .topLeading) {
+                                NavControllerBackgroundClearer()
+                                    .frame(width: 0, height: 0)
+                            }
+                            .safeAreaInset(edge: .bottom, spacing: 0) {
+                                Color.clear.frame(height: 80)
+                            }
+                            .navigationDestination(for: Route.self) { route in
+                                routeDestination(for: route)
+                            }
+                    }
+                    .background(.clear)
+                    .scrollContentBackground(.hidden)
+                    .toolbar(.hidden, for: .navigationBar)
+
+                    // Chat overlay — sits in content area (below top bar, above tab bar)
+                    if showChat {
+                        VitaChatScreen(onClose: { withAnimation(.easeInOut(duration: 0.25)) { showChat = false } })
+                            .padding(.bottom, 80) // space for tab bar
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
-                .background(.clear)
-                .scrollContentBackground(.hidden)
-                .toolbar(.hidden, for: .navigationBar)
             }
 
             // TabBar always visible at bottom
             VStack {
                 Spacer()
                 VitaTabBar(selectedTab: $router.selectedTab, onCenterTap: {
-                    showChat = true
+                    withAnimation(.easeInOut(duration: 0.25)) { showChat.toggle() }
                 }, onTabReselect: { _ in
                     router.popToRoot()
                 })
@@ -166,18 +175,16 @@ struct MainTabView: View {
                 .ignoresSafeArea()
         }
         .onChange(of: router.selectedTab) { _, _ in
-            // Dismiss popouts on tab change
+            // Dismiss popouts and chat on tab change
             showMenuPopout = false
             showNotifPopout = false
+            if showChat {
+                withAnimation(.easeInOut(duration: 0.25)) { showChat = false }
+            }
             // When switching tabs, pop all pushed routes so user sees the tab root
             if !router.path.isEmpty {
                 router.popToRoot()
             }
-        }
-        .sheet(isPresented: $showChat) {
-            VitaChatScreen()
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
         }
         .vitaXpToastHost(container.gamificationEvents.xpToast)
         .overlay {

@@ -141,3 +141,45 @@ struct WebalunoScheduleSummary: Codable {
     var subjects: Int = 0
     var daysWithClasses: Int = 0
 }
+
+// MARK: - Portal Extract (client-side HTML capture)
+
+struct PortalExtractRequestPagesInner: Codable {
+    var type: String?
+    var html: String?
+    var linkText: String?
+}
+
+struct PortalExtract200Response: Codable {
+    var success: Bool?
+    var grades: Int?
+    var schedule: Int?
+    var error: String?
+}
+
+// MARK: - Subjects
+
+struct SubjectsResponse: Codable {
+    var subjects: [AcademicSubject]
+}
+
+struct AcademicSubject: Codable, Identifiable {
+    var id: String
+    var name: String
+    var status: String?
+    var source: String?
+    var difficulty: String?
+}
+
+// MARK: - Server-Driven UI
+
+struct ScreenResponse: Codable {
+    var screenId: String?
+    var blocks: [ScreenBlock]?
+}
+
+struct ScreenBlock: Codable {
+    var type: String?
+    var data: [String: String]?
+}
+

@@ -492,14 +492,15 @@ actor VitaAPI {
         try await client.uploadMultipart("crowd/upload", images: images)
     }
 
-    // MARK: - Misc (NO BACKEND)
+    // MARK: - Portal connect
 
+    /// POST /api/portal/connect — registers a portal session with the backend.
     func startVitaCrawl(cookies: String, instanceUrl: String) async throws -> VitaCrawlResponse {
         let body = try JSONSerialization.data(withJSONObject: [
-            "cookies": cookies,
+            "sessionCookie": cookies,
             "instanceUrl": instanceUrl,
         ])
-        return try await client.postRaw("portal/vita-crawl", body: body)
+        return try await client.postRaw("portal/connect", body: body)
     }
 
     /// POST /api/portal/ingest — sends Canvas data fetched on-device to backend for LLM processing.

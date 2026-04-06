@@ -40,8 +40,9 @@ actor VitaChatClient {
                         return
                     }
 
+                    var userMessage: [String: Any] = ["role": "user", "content": message]
                     var requestDict: [String: Any] = [
-                        "message": message,
+                        "messages": [userMessage],
                         "voiceMode": voiceMode
                     ]
                     if let conversationId {

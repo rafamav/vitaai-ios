@@ -87,21 +87,6 @@ private extension VitaAIApp {
             if let name = injected.name { defaults.set(name, forKey: "vita_user_name") }
             if let email = injected.email { defaults.set(email, forKey: "vita_user_email") }
             if let image = injected.image { defaults.set(image, forKey: "vita_user_image") }
-            return
-        }
-
-        guard AppConfig.isE2EDemoMode else { return }
-
-        // Demo mode should look authenticated to the app without leaking a fake API token.
-        keychain.delete(key: "vita_session_token")
-        keychain.save(key: "vita_user_name", value: AppConfig.demoUserName)
-        keychain.save(key: "vita_user_email", value: AppConfig.demoUserEmail)
-        defaults.set(AppConfig.demoUserName, forKey: "vita_user_name")
-        defaults.set(AppConfig.demoUserEmail, forKey: "vita_user_email")
-        defaults.removeObject(forKey: "vita_user_image")
-
-        if !AppConfig.shouldResetOnboarding {
-            AppConfig.setOnboardingComplete(true, in: defaults)
         }
     }
 }
