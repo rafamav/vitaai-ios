@@ -25,8 +25,6 @@ struct MindMapEditorView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                VitaScreenBg()
-
                 if viewModel.isLoading {
                     ProgressView()
                         .tint(VitaColors.accent)

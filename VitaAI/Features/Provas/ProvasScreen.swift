@@ -25,10 +25,7 @@ struct ProvasScreen: View {
                     }
                 }
             } else {
-                ZStack {
-                    VitaScreenBg()
-                    ProgressView().tint(VitaColors.accent)
-                }
+                ProgressView().tint(VitaColors.accent)
             }
         }
         .onAppear {
@@ -67,8 +64,6 @@ private struct ProvasContent: View {
 
     var body: some View {
         ZStack {
-            VitaScreenBg()
-
             VStack(spacing: 0) {
                 // Back bar
                 HStack {

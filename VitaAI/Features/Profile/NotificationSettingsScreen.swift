@@ -167,7 +167,6 @@ struct NotificationSettingsScreen: View {
             }
             .padding(.top, 16)
         }
-        .vitaScreenBg()
         .navigationTitle("Notificações")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)

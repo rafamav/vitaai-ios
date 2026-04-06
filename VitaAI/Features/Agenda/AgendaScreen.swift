@@ -15,7 +15,6 @@ struct AgendaScreen: View {
                     .tint(VitaColors.accent)
             }
         }
-        .vitaScreenBg()
         .onAppear {
             if viewModel == nil {
                 viewModel = AgendaViewModel(api: container.api)

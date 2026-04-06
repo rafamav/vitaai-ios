@@ -60,7 +60,6 @@ struct EstudosScreen: View {
                     .tint(GoldAccent.primary)
             }
         }
-        .vitaScreenBg()
         .onAppear {
             if viewModel == nil {
                 viewModel = EstudosViewModel(api: container.api)

@@ -18,6 +18,7 @@ final class ConnectorsViewModel {
     // University data
     var universityPortals: [UniversityPortal] = []
     var universityName: String = ""
+    var universityCity: String = ""
 
     // Toast
     var toastMessage: String?
@@ -65,8 +66,12 @@ final class ConnectorsViewModel {
             if let uniName = profile.university, !uniName.isEmpty {
                 universityName = uniName
                 let response = try await api.getUniversities(query: uniName)
-                if let uni = response.universities.first, let portals = uni.portals, !portals.isEmpty {
-                    universityPortals = portals
+                if let uni = response.universities.first {
+                    universityName = uni.shortName.isEmpty ? uni.name : uni.shortName
+                    universityCity = uni.city
+                    if let portals = uni.portals, !portals.isEmpty {
+                        universityPortals = portals
+                    }
                 }
             }
         } catch {

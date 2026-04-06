@@ -24,7 +24,8 @@ struct WebAlunoWebViewScreen: View {
 
     var body: some View {
         ZStack {
-            VitaScreenBg()
+            VitaAmbientBackground { Color.clear }
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Top bar

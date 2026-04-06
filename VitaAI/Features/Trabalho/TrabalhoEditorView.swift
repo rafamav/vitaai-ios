@@ -43,10 +43,8 @@ struct TrabalhoEditorView: View {
     // MARK: - Loading
 
     private var loadingView: some View {
-        ZStack {
-            VitaScreenBg()
-            ProgressView().tint(VitaColors.accent)
-        }
+        ProgressView().tint(VitaColors.accent)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Main Editor
@@ -54,8 +52,6 @@ struct TrabalhoEditorView: View {
     @ViewBuilder
     private func editorContent(vm: TrabalhoEditorViewModel) -> some View {
         ZStack {
-            VitaScreenBg()
-
             VStack(spacing: 0) {
                 editorTopBar(vm: vm)
 
@@ -215,7 +211,6 @@ struct TrabalhoEditorView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .vitaScreenBg()
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(VitaColors.glassBorder)
@@ -237,7 +232,6 @@ struct TrabalhoEditorView: View {
                 set: { vm.content = $0 }
             ))
             .scrollContentBackground(.hidden)
-            VitaScreenBg()
             .font(.system(size: 15, design: .monospaced))
             .foregroundStyle(VitaColors.textPrimary)
             .tint(VitaColors.accent)

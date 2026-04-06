@@ -25,10 +25,7 @@ struct CourseDetailScreen: View {
                     onNavigateToCanvasConnect: onNavigateToCanvasConnect
                 )
             } else {
-                ZStack {
-                    VitaScreenBg()
-                    ProgressView().tint(folderColor)
-                }
+                ProgressView().tint(folderColor)
             }
         }
         .onAppear {
@@ -53,8 +50,6 @@ private struct CourseDetailContent: View {
 
     var body: some View {
         ZStack {
-            VitaScreenBg()
-
             VStack(spacing: 0) {
                 // Back bar
                 HStack {

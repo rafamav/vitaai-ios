@@ -33,8 +33,6 @@ struct PaywallScreen: View {
 
     var body: some View {
         ZStack {
-            VitaScreenBg()
-
             if let vm = viewModel {
                 mainContent(vm: vm)
             } else {

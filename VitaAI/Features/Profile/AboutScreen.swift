@@ -138,7 +138,6 @@ struct AboutScreen: View {
                 Spacer().frame(height: 100)
             }
         }
-        .vitaScreenBg()
         .navigationTitle("Sobre")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarColorScheme(.dark, for: .navigationBar)

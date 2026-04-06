@@ -19,8 +19,6 @@ struct PortalConnectScreen: View {
 
     var body: some View {
         ZStack {
-            VitaScreenBg()
-
             if let vm {
                 mainContent(vm: vm)
             } else {

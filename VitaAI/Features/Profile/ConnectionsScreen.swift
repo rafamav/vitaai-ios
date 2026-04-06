@@ -30,7 +30,6 @@ struct ConnectionsScreen: View {
     private let goldSubtle = VitaColors.accentLight
     private let borderColor = VitaColors.glassBorder
     private let cardBg = VitaColors.glassBg
-    private let bg = VitaColors.surface
 
     // All known portal types (for "Outros portais" fallback)
     private let allPortalTypes: [PortalTypeInfo] = [
@@ -49,8 +48,7 @@ struct ConnectionsScreen: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            bg.ignoresSafeArea()
-
+            // Starry ambient background (same as all screens)
             if let vm {
                 mainContent(vm: vm)
             } else {
@@ -102,8 +100,8 @@ struct ConnectionsScreen: View {
                 // Institucional section
                 institucionalSection(vm: vm)
 
-                // Google section
-                sectionLabel("Google")
+                // Integracoes section
+                sectionLabel("INTEGRACOES")
                     .padding(.top, 18)
 
                 VStack(spacing: 8) {
@@ -123,7 +121,7 @@ struct ConnectionsScreen: View {
                 .padding(.horizontal, 14)
 
                 // Como funciona
-                sectionLabel("Como funciona")
+                sectionLabel("COMO FUNCIONA")
                     .padding(.top, 20)
 
                 comoFunciona
@@ -147,13 +145,23 @@ struct ConnectionsScreen: View {
         let detectedTypes = Set(detectedPortals.map(\.portalType))
         let otherPortals = allPortalTypes.filter { !detectedTypes.contains($0.type) }
 
-        // Section label: university name or generic
+        // Section header
+        sectionLabel("INSTITUCIONAL")
+            .padding(.top, 18)
+
+        // University subtitle (name + city from API)
         if hasUniversity {
-            sectionLabel(vm.universityName)
-                .padding(.top, 18)
-        } else {
-            sectionLabel("Portais Academicos")
-                .padding(.top, 18)
+            HStack(spacing: 6) {
+                Image(systemName: "building.columns")
+                    .font(.system(size: 11))
+                    .foregroundColor(goldSubtle.opacity(0.40))
+                Text(universityDisplayLine(vm: vm))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.55))
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 8)
         }
 
         VStack(spacing: 8) {
@@ -181,18 +189,22 @@ struct ConnectionsScreen: View {
                 noUniversityHint
             }
 
-            // "Outros portais" expandable
-            if !showAllPortals && !otherPortals.isEmpty {
+            // "Outros portais" toggle
+            if !otherPortals.isEmpty {
                 Button {
-                    withAnimation(.spring(response: 0.3)) { showAllPortals = true }
+                    withAnimation(.spring(response: 0.3)) { showAllPortals.toggle() }
                 } label: {
                     HStack(spacing: 6) {
-                        Image(systemName: "plus.circle").font(.system(size: 13))
-                        Text("Outros portais")
+                        Image(systemName: showAllPortals ? "minus.circle" : "plus.circle")
+                            .font(.system(size: 13))
+                        Text(showAllPortals ? "Ocultar outros portais" : "Outros portais")
                             .font(.system(size: 12, weight: .medium))
+                        Spacer()
+                        Image(systemName: showAllPortals ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
                     }
                     .foregroundStyle(.white.opacity(0.35))
-                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 14)
                     .padding(.vertical, 12)
                     .background(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.06), lineWidth: 1))
                 }
@@ -212,9 +224,19 @@ struct ConnectionsScreen: View {
                         onTapConnected: { activeSheet = portal.type }
                     )
                 }
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(.horizontal, 14)
+    }
+
+    // MARK: - University Display
+
+    private func universityDisplayLine(vm: ConnectorsViewModel) -> String {
+        if vm.universityCity.isEmpty {
+            return vm.universityName
+        }
+        return "\(vm.universityName) \u{00B7} \(vm.universityCity)"
     }
 
     // MARK: - No University Hint
@@ -339,7 +361,7 @@ struct ConnectionsScreen: View {
         Text(text)
             .font(.system(size: 10, weight: .semibold))
             .foregroundColor(goldSubtle.opacity(0.35))
-            .tracking(0.5)
+            .tracking(0.8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 14)
             .padding(.bottom, 4)
@@ -348,20 +370,20 @@ struct ConnectionsScreen: View {
     // MARK: - Como Funciona
 
     private var comoFunciona: some View {
-        VStack(spacing: 10) {
-            howItWorksStep("1", "Conecte seu portal academico com suas credenciais")
-            howItWorksStep("2", "A Vita importa disciplinas, notas e horarios")
-            howItWorksStep("3", "Dados sincronizados automaticamente a cada 15 minutos")
-            howItWorksStep("4", "Desconecte a qualquer momento — seus dados sao excluidos")
+        VStack(alignment: .leading, spacing: 12) {
+            howItWorksRow("1", "Conecte seu portal academico com suas credenciais")
+            howItWorksRow("2", "Disciplinas, notas e horarios sao importados")
+            howItWorksRow("3", "Dados sincronizam automaticamente a cada 15 minutos")
+            howItWorksRow("4", "Desconecte a qualquer momento — seus dados sao excluidos")
         }
     }
 
-    private func howItWorksStep(_ number: String, _ text: String) -> some View {
+    private func howItWorksRow(_ number: String, _ text: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
             ZStack {
                 Circle()
                     .fill(VitaColors.glassInnerLight.opacity(0.12))
-                    .frame(width: 20, height: 20)
+                    .frame(width: 22, height: 22)
                     .overlay(
                         Circle().stroke(Color(red: 1.0, green: 0.784, blue: 0.471).opacity(0.12), lineWidth: 1)
                     )
@@ -372,9 +394,9 @@ struct ConnectionsScreen: View {
             Text(text)
                 .font(.system(size: 12))
                 .foregroundColor(goldSubtle.opacity(0.45))
-                .lineSpacing(4)
+                .lineSpacing(3)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

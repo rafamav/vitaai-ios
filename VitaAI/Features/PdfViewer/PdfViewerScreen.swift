@@ -16,8 +16,6 @@ struct PdfViewerScreen: View {
 
     var body: some View {
         ZStack {
-            VitaScreenBg()
-
             if viewModel.isLoading {
                 ProgressView()
                     .tint(VitaColors.accent)
@@ -218,7 +216,6 @@ private struct PdfPageView: View {
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
-            VitaScreenBg()
         }
         .task(id: pageIndex) {
             guard pageImage == nil else { return }

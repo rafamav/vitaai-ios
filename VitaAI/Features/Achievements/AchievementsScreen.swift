@@ -410,6 +410,5 @@ private struct AchievementDetailSheet: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
-        .vitaScreenBg()
     }
 }

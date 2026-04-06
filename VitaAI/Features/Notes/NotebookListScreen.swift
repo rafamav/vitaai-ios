@@ -32,8 +32,6 @@ struct NotebookListScreen: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                VitaScreenBg()
-
                 Group {
                     if viewModel.isLoading && viewModel.notebooks.isEmpty {
                         // Skeleton grid

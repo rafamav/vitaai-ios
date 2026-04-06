@@ -62,7 +62,6 @@ private struct OsceContent: View {
             }
             .animation(.easeInOut(duration: 0.3), value: viewModel.phase)
         }
-        .vitaScreenBg()
         .navigationBarHidden(true)
     }
 }

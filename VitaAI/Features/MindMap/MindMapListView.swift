@@ -33,8 +33,6 @@ struct MindMapListView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                VitaScreenBg()
-
                 Group {
                     if viewModel.isLoading && viewModel.mindMaps.isEmpty {
                         // Skeleton grid

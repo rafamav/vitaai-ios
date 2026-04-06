@@ -88,7 +88,6 @@ struct AtlasWebViewScreen: View {
                 Spacer(minLength: 120)
             }
         }
-        .vitaScreenBg()
         .navigationBarHidden(true)
     }
 
