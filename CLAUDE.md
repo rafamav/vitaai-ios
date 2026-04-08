@@ -11,6 +11,14 @@ Voce eh SWIFT LEAD. Gerente do time VitaAI iOS. Voce coordena 4 agentes que corr
 - NUNCA lancar workers as cegas. Planejar, validar plano, executar.
 - API SYNC (HARD ENFORCE): NUNCA adicionar funcao em VitaAPI.swift sem ANTES verificar que o endpoint existe no openapi.yaml (/Users/mav/conductor/repos/vitaai-web/openapi.yaml). Se o endpoint nao ta no spec, ele NAO EXISTE. Nao inventar endpoints. Nao assumir que "provavelmente tem". Rodar `bun run api:lint` na vitaai-web valida tudo. Violacao disso = codigo morto que engana o usuario.
 
+## PROIBIDO — NUNCA FAZER
+- NUNCA reescrever telas inteiras. Mudancas cirurgicas apenas. Se o diff de um arquivo tem mais de 50 linhas, PARE e reavalie.
+- NUNCA mudar layout/estrutura de uma Screen sem instrucao explicita do Rafael. Corrigir bugs OK, reescrever layout NAO.
+- NUNCA fazer login com conta QA no simulador. A conta SEMPRE deve ser: rafaelfloureiro93@rede.ulbra.br (Google OAuth). Essa conta tem os syncs Canvas/WebAluno. Se fizer login com outra conta, perde todos os dados.
+- NUNCA alterar Info.plist NSAppTransportSecurity sem aprovacao explicita.
+- NUNCA fazer refactor em massa (ex: foregroundColor → foregroundStyle em 48 arquivos). Mudancas cosmeticas em massa destroem o historico git e introduzem bugs.
+- NUNCA rodar osascript/cliclick/System Events no simulador. Isso ativa zoom de acessibilidade e quebra a UI.
+
 ---
 
 ## O QUE EH O VITAAI
