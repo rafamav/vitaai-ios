@@ -159,11 +159,8 @@ final class AppContainer: ObservableObject {
             await AppConfigService.shared.loadIfNeeded(api: api)
         }
 
-        if #available(iOS 17, *) {
-            Task { @MainActor in
-                await (self._noteSyncManager as? NoteSyncManager)?.pull()
-                await (self._mindMapSyncManager as? MindMapSyncManager)?.pull()
-            }
-        }
+        // Note: NoteSyncManager.pull() and MindMapSyncManager.pull() are deferred
+        // to MainTabView.task — they make API calls that can 401 and trigger logout
+        // before onboarding even starts (user has no profile yet → many endpoints fail).
     }
 }

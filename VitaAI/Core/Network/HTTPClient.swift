@@ -71,6 +71,7 @@ actor HTTPClient {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             if let token = await self.tokenStore.token {
                 request.setValue("\(AppConfig.sessionCookieName)=\(token)", forHTTPHeaderField: "Cookie")
+                request.setValue(token, forHTTPHeaderField: "X-Extension-Token")
             }
             if let forwardedHost = AppConfig.localForwardedHostHeader {
                 request.setValue(forwardedHost, forHTTPHeaderField: "x-forwarded-host")
@@ -113,6 +114,7 @@ actor HTTPClient {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             if let token = await self.tokenStore.token {
                 request.setValue("\(AppConfig.sessionCookieName)=\(token)", forHTTPHeaderField: "Cookie")
+                request.setValue(token, forHTTPHeaderField: "X-Extension-Token")
             }
             if let forwardedHost = AppConfig.localForwardedHostHeader {
                 request.setValue(forwardedHost, forHTTPHeaderField: "x-forwarded-host")
@@ -148,6 +150,7 @@ actor HTTPClient {
             req.httpMethod = "GET"
             if let token = await self.tokenStore.token {
                 req.setValue("\(AppConfig.sessionCookieName)=\(token)", forHTTPHeaderField: "Cookie")
+                req.setValue(token, forHTTPHeaderField: "X-Extension-Token")
             }
             if let forwardedHost = AppConfig.localForwardedHostHeader {
                 req.setValue(forwardedHost, forHTTPHeaderField: "x-forwarded-host")
@@ -192,6 +195,7 @@ actor HTTPClient {
             req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
             if let token = await self.tokenStore.token {
                 req.setValue("\(AppConfig.sessionCookieName)=\(token)", forHTTPHeaderField: "Cookie")
+                req.setValue(token, forHTTPHeaderField: "X-Extension-Token")
             }
             if let forwardedHost = AppConfig.localForwardedHostHeader {
                 req.setValue(forwardedHost, forHTTPHeaderField: "x-forwarded-host")

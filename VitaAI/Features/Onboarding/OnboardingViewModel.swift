@@ -177,6 +177,7 @@ final class OnboardingViewModel {
 
         let body = OnboardingPostRequest(
             moment: "graduacao",
+            studyGoal: "graduacao",
             year: data.semester > 0 ? data.semester : nil,
             selectedSubjects: data.subjects.isEmpty ? nil : data.subjects,
             subjectDifficulties: data.subjectDifficulties.isEmpty ? nil : data.subjectDifficulties

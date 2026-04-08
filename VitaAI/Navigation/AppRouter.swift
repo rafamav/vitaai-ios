@@ -35,7 +35,11 @@ struct AppRouter: View {
 
     var body: some View {
         Group {
-            if authManager.isLoading {
+            if authManager.isLoading || (authManager.isLoggedIn && !profileChecked) {
+                // Show loading while auth is initializing OR profile check is pending.
+                // CRITICAL: do NOT show MainTabView before profileChecked — it fires
+                // background API calls (gamification, subscriptions) that can 401 and
+                // trigger global logout before onboarding even starts.
                 ZStack {
                     VitaColors.surface.ignoresSafeArea()
                     ProgressView()
@@ -43,10 +47,13 @@ struct AppRouter: View {
                 }
             } else if !authManager.isLoggedIn {
                 LoginScreen(authManager: authManager)
-            } else if !isOnboarded {
-                VitaOnboarding(onLogout: {
-                    Task { await authManager.logout() }
-                }) {
+            } else if needsOnboarding {
+                VitaOnboarding(
+                    userName: authManager.userName ?? "",
+                    onLogout: {
+                        Task { await authManager.logout() }
+                    }
+                ) {
                     isOnboardedStored = true
                     legacyOnboardingStored = true
                     needsOnboarding = false
@@ -58,6 +65,7 @@ struct AppRouter: View {
         .task(id: authManager.isLoggedIn) {
             guard authManager.isLoggedIn else {
                 profileChecked = false
+                needsOnboarding = false
                 return
             }
             do {
@@ -70,8 +78,20 @@ struct AppRouter: View {
                     needsOnboarding = false
                     isOnboardedStored = true
                 }
+            } catch let error as APIError {
+                // 401 = token expired — let the global handler deal with it,
+                // but do NOT set needsOnboarding (we're about to be logged out).
+                if case .unauthorized = error {
+                    NSLog("[AppRouter] getProfile 401 — token expired, logout imminent")
+                    profileChecked = true
+                    return
+                }
+                // 404 / other = no profile = needs onboarding
+                needsOnboarding = true
+                isOnboardedStored = false
+                legacyOnboardingStored = false
             } catch {
-                // 404 = no profile = needs onboarding
+                // Network error / other — assume needs onboarding
                 needsOnboarding = true
                 isOnboardedStored = false
                 legacyOnboardingStored = false
@@ -97,11 +117,9 @@ struct AppRouter: View {
     }
 
 
-    private var isOnboarded: Bool {
-        if !profileChecked { return true } // show loading, not onboarding flash
-        if needsOnboarding { return false }
-        return isOnboardedStored || legacyOnboardingStored
-    }
+    // Note: onboarding check is now fully handled by the `needsOnboarding` state
+    // set from the profile check in `.task(id:)`. The `isOnboardedStored` and
+    // `legacyOnboardingStored` flags are kept as fallback for offline launches.
 }
 
 struct MainTabView: View {
@@ -235,6 +253,14 @@ struct MainTabView: View {
                 let previousLevel = stats?.level
                 if let result = try? await container.api.logActivity(action: "daily_login") {
                     container.gamificationEvents.handleActivityResponse(result, previousLevel: previousLevel)
+                }
+            }
+            // Deferred from AppContainer.init — only sync notes/mindmaps when
+            // user is fully onboarded and MainTabView is actually visible.
+            if #available(iOS 17, *) {
+                Task {
+                    await container.noteSyncManager.pull()
+                    await container.mindMapSyncManager.pull()
                 }
             }
         }

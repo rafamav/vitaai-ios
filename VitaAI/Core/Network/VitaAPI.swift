@@ -567,6 +567,7 @@ actor VitaAPI {
 
 struct OnboardingPostRequest: Encodable {
     let moment: String
+    let studyGoal: String
     var year: Int?
     var selectedSubjects: [String]?
     var subjectDifficulties: [String: String]?
