@@ -1,72 +1,141 @@
 import SwiftUI
 
+// MARK: - Login Screen
+// Drag interaction: Vita starts BIG at bottom (close to camera),
+// user drags up -> Vita shrinks and moves to center (pushed far away).
+// Tap on Vita = happy reaction. Small drag on Vita = wiggle.
+
 struct LoginScreen: View {
     let authManager: AuthManager
 
-    @State private var imageOpacity: Double = 0
-    @State private var showGoogle = false
-    @State private var showApple = false
-    @State private var showEmail = false
-    @State private var showFooter = false
+    // 0 = intro (Vita big/close at bottom), 1 = revealed (Vita small/far at center)
+    @State private var progress: Double = 0
+    @State private var revealed = false
     @State private var loadingProvider: LoadingProvider = .none
-    @State private var glowStarted = false
-    @State private var showEmailSheet = false
+    @State private var vitaTapped = false
+    @State private var vitaDragX: CGFloat = 0
 
-    private enum LoadingProvider {
-        case google, apple, none
-    }
+    private enum LoadingProvider { case google, apple, none }
+
+    private let snapThreshold = 0.4
 
     var body: some View {
+        let w = UIScreen.main.bounds.width
+        let h = UIScreen.main.bounds.height
+        let p = progress
+
+        // Vita: starts huge at very bottom (barely visible head), shrinks and rises to center
+        let mascotSize: CGFloat = 340 - 230 * p
+        let mascotY = h * (0.98 - 0.58 * p)
+
+        // State: sleeping -> waking -> awake, tap = happy
+        let mascotState: MascotState = {
+            if vitaTapped { return .happy }
+            if p > 0.5 { return .awake }
+            if p > 0.1 { return .waking }
+            return .sleeping
+        }()
+
         ZStack {
-            Color.black.ignoresSafeArea()
+            // Dark starry background
+            Color(red: 0.03, green: 0.02, blue: 0.04).ignoresSafeArea()
 
-            // Background logo image — fades smoothly into black via mask (no hard line)
-            VStack {
-                ZStack {
-                    Image("login_bg")
-                        .resizable()
-                        .scaledToFill()  // fills edge-to-edge, no black bars
-                        .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height * 0.82)
-                        .clipped()
-                        .opacity(imageOpacity)
+            Image("fundo-dashboard")
+                .resizable()
+                .scaledToFill()
+                .frame(width: w, height: h)
+                .clipped()
+                .opacity(0.25 + 0.15 * p)
+                .ignoresSafeArea()
 
-                    // Organic glow overlay
-                    if glowStarted {
-                        OrganicGlowCanvas()
+            // Mascot
+            VitaMascot(state: mascotState, size: mascotSize, showStaff: false)
+                .offset(x: vitaDragX)
+                .position(x: w / 2, y: mascotY)
+                .onTapGesture {
+                    guard revealed else { return }
+                    vitaTapped = true
+                    // Reset after bounce animation
+                    Task {
+                        try? await Task.sleep(for: .seconds(1.2))
+                        withAnimation(.easeOut(duration: 0.3)) { vitaTapped = false }
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: UIScreen.main.bounds.height * 0.82)
-                .mask(
-                    // Fade image to transparent at bottom — no hard clip line
-                    LinearGradient(
-                        stops: [
-                            .init(color: .black, location: 0),
-                            .init(color: .black, location: 0.50),
-                            .init(color: .black.opacity(0.3), location: 0.80),
-                            .init(color: .clear, location: 1.0)
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
+                .gesture(
+                    revealed ?
+                    DragGesture(minimumDistance: 5)
+                        .onChanged { value in
+                            withAnimation(.interactiveSpring()) {
+                                vitaDragX = value.translation.width * 0.4
+                            }
+                        }
+                        .onEnded { _ in
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.5)) {
+                                vitaDragX = 0
+                            }
+                            // Trigger happy on release
+                            vitaTapped = true
+                            Task {
+                                try? await Task.sleep(for: .seconds(1.0))
+                                withAnimation(.easeOut(duration: 0.3)) { vitaTapped = false }
+                            }
+                        }
+                    : nil
                 )
 
-                Spacer()
+            // Intro text
+            if p < 0.3 {
+                Text("Uma nova era de\nestudos est\u{00E1} aqui.")
+                    .font(.system(size: 34, weight: .light, design: .serif))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+                    .position(x: w / 2, y: h * 0.32)
+                    .opacity(1.0 - p / 0.25)
             }
 
-            // Buttons + footer — pinned to bottom third of screen
-            VStack(spacing: 0) {
-                Spacer(minLength: UIScreen.main.bounds.height * 0.72)  // buttons ~bottom 28%
+            // Swipe hint
+            if p < 0.2 {
+                VStack(spacing: 8) {
+                    Image(systemName: "chevron.up")
+                        .font(.system(size: 14, weight: .light))
+                        .foregroundStyle(.white.opacity(0.4))
+                    Text("ARRASTE PARA CIMA")
+                        .font(.system(size: 10, weight: .medium))
+                        .tracking(2.4)
+                        .foregroundStyle(.white.opacity(0.35))
+                }
+                .position(x: w / 2, y: h * 0.68)
+                .opacity(1.0 - p / 0.15)
+            }
 
+            // Reveal headline
+            if p > 0.6 {
+                VStack(spacing: 8) {
+                    Text("Conhe\u{00E7}a o Vita.")
+                        .font(.system(size: 38, weight: .light, design: .serif))
+                        .foregroundStyle(.white.opacity(0.9))
 
-                if authManager.isLoading {
-                    ProgressView()
-                        .tint(VitaColors.accent)
-                        .scaleEffect(1.2)
-                    Spacer().frame(height: 40)
-                } else {
-                    // Google
-                    if showGoogle {
+                    Text("O futuro dos seus estudos\ncome\u{00E7}a agora.")
+                        .font(.system(size: 18, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .multilineTextAlignment(.center)
+                }
+                .position(x: w / 2, y: h * 0.60)
+                .opacity(min(1, (p - 0.6) / 0.25))
+            }
+
+            // Buttons
+            if p > 0.85 {
+                VStack(spacing: 0) {
+                    Spacer()
+
+                    if authManager.isLoading {
+                        ProgressView()
+                            .tint(VitaColors.accent)
+                            .scaleEffect(1.2)
+                        Spacer().frame(height: 40)
+                    } else {
                         GlassAuthButton(
                             label: "Continuar com Google",
                             icon: AnyView(GoogleIcon()),
@@ -77,13 +146,9 @@ struct LoginScreen: View {
                             authManager.signInWithGoogle()
                         }
                         .padding(.horizontal, 36)
-                        .transition(.opacity.combined(with: .offset(y: 14)))  // Android: slideInVertically { h/3 } = 14pt
-                    }
 
-                    Spacer().frame(height: 12)
+                        Spacer().frame(height: 12)
 
-                    // Apple
-                    if showApple {
                         GlassAuthButton(
                             label: "Continuar com Apple",
                             icon: AnyView(
@@ -97,161 +162,70 @@ struct LoginScreen: View {
                             authManager.signInWithApple()
                         }
                         .padding(.horizontal, 36)
-                        .transition(.opacity.combined(with: .offset(y: 14)))  // Android: slideInVertically { h/3 } = 14pt
                     }
 
-                    Spacer().frame(height: 12)
-
-                    // Email
-                    if showEmail {
-                        GlassAuthButton(
-                            label: "Continuar com Email",
-                            icon: AnyView(
-                                Image(systemName: "envelope")
-                                    .font(.system(size: 16))
-                                    .foregroundColor(VitaColors.textSecondary)
-                            ),
-                            isLoading: false
-                        ) {
-                            showEmailSheet = true
-                        }
-                        .padding(.horizontal, 36)
-                        .transition(.opacity.combined(with: .offset(y: 14)))  // Android: slideInVertically { h/3 } = 14pt
+                    if let error = authManager.error {
+                        Text(error)
+                            .font(VitaTypography.bodySmall)
+                            .foregroundStyle(.red.opacity(0.8))
+                            .multilineTextAlignment(.center)
+                            .padding(.top, 12)
+                            .padding(.horizontal, 36)
                     }
-                }
 
-                // Error
-                if let error = authManager.error {
-                    Text(error)
-                        .font(VitaTypography.bodySmall)
-                        .foregroundStyle(.red.opacity(0.8))
-                        .multilineTextAlignment(.center)
-                        .padding(.top, 12)
-                        .padding(.horizontal, 36)
-                }
+                    Spacer().frame(height: 16)
 
-                Spacer().frame(height: 16)
-
-                // Legal footer — frame(maxWidth) ensures text wraps within screen bounds
-                if showFooter {
-                    (Text("Ao continuar voce concorda com os ")
+                    (Text("Ao continuar voc\u{00EA} concorda com os ")
                         .foregroundColor(VitaColors.textTertiary) +
                     Text("Termos de Uso")
                         .foregroundColor(VitaColors.textSecondary)
                         .underline() +
                     Text(" e ")
                         .foregroundColor(VitaColors.textTertiary) +
-                    Text("Politica de Privacidade")
+                    Text("Pol\u{00ED}tica de Privacidade")
                         .foregroundColor(VitaColors.textSecondary)
                         .underline())
                     .font(VitaTypography.labelSmall)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)   // forces wrapping within screen width
-                    .padding(.horizontal, 48)     // matches Android: Column(h=36) + Text(h=12) = 48dp
-                    .transition(.opacity)
-                }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 48)
 
-                Spacer().frame(height: 16)
+                    Spacer().frame(height: 16)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.opacity.combined(with: .offset(y: 20)))
+                .opacity(min(1, (p - 0.85) / 0.15))
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)  // fills ZStack so Spacer() pushes buttons to bottom
         }
-        .ignoresSafeArea()  // full bleed — no black bars at top/bottom from safe area
-        .sheet(isPresented: $showEmailSheet) {
-            EmailAuthSheet(authManager: authManager)
-        }
+        .ignoresSafeArea()
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    if !revealed {
+                        let drag = -value.translation.height / (UIScreen.main.bounds.height * 0.45)
+                        withAnimation(.interactiveSpring()) {
+                            progress = max(0, min(1, drag))
+                        }
+                    }
+                }
+                .onEnded { _ in
+                    if !revealed {
+                        if progress > snapThreshold {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                progress = 1.0
+                                revealed = true
+                            }
+                        } else {
+                            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                                progress = 0
+                            }
+                        }
+                    }
+                }
+        )
         .onChange(of: authManager.isLoading) { _, newValue in
-            if !newValue {
-                loadingProvider = .none
-            }
-        }
-        .onAppear {
-            withAnimation(.easeOut(duration: 1.5)) { imageOpacity = 1 }
-            Task {
-                try? await Task.sleep(for: .seconds(1.2))
-                withAnimation(.easeOut(duration: 0.8)) { showGoogle = true }
-                try? await Task.sleep(for: .seconds(0.1))
-                withAnimation(.easeOut(duration: 0.8)) { showApple = true }
-                try? await Task.sleep(for: .seconds(0.1))
-                withAnimation(.easeOut(duration: 0.8)) { showEmail = true }
-                try? await Task.sleep(for: .seconds(0.2))
-                withAnimation(.easeOut(duration: 0.6)) { showFooter = true }
-                glowStarted = true
-            }
-        }
-    }
-}
-
-// MARK: - Organic glow (matches Android BrandConfig glow system)
-
-private struct OrganicGlowCanvas: View {
-    var body: some View {
-        TimelineView(.animation) { timeline in
-            Canvas { context, size in
-                let t = timeline.date.timeIntervalSinceReferenceDate
-
-                // Co-prime durations = no visible loop
-                let glowA = (sin(t * 0.886) + 1) / 2  // ~7.1s period
-                let glowB = (sin(t * 1.461) + 1) / 2  // ~4.3s period
-                let glowC = (sin(t * 2.166) + 1) / 2  // ~2.9s period
-                let composite = glowA * 0.45 + glowB * 0.35 + glowC * 0.2
-
-                let cx = size.width * 0.5
-                let glowTop = size.height * 0.15
-                let glowBottom = size.height * 0.65
-
-                // 1. Core radial glow — organic breathing
-                let baseAlpha = composite * 0.18
-                let radius = size.width * (0.35 + composite * 0.08)
-                let centerDriftX = cx + sin(glowA * .pi) * size.width * 0.02
-                let centerDriftY = size.height * 0.38 + sin(glowB * .pi) * size.height * 0.01
-                context.fill(
-                    Path(ellipseIn: CGRect(x: centerDriftX - radius, y: centerDriftY - radius,
-                                          width: radius * 2, height: radius * 2)),
-                    with: .radialGradient(
-                        Gradient(colors: [
-                            VitaColors.accent.opacity(baseAlpha),
-                            VitaColors.accent.opacity(baseAlpha * 0.25),
-                            .clear
-                        ]),
-                        center: CGPoint(x: centerDriftX, y: centerDriftY),
-                        startRadius: 0, endRadius: radius
-                    )
-                )
-
-                // 2. Light sweep A — slow diagonal
-                let sweepA = fmod(t / 8.3, 1.0)
-                if sweepA > 0 && sweepA < 1 {
-                    let sxA = size.width * sweepA
-                    let intensity = 0.08 * (1 - 2 * abs(sweepA - 0.5))
-                    context.fill(
-                        Path(CGRect(x: 0, y: 0, width: size.width, height: size.height)),
-                        with: .linearGradient(
-                            Gradient(colors: [
-                                .clear,
-                                VitaColors.accent.opacity(intensity * 0.4),
-                                Color.white.opacity(intensity),
-                                VitaColors.accent.opacity(intensity * 0.4),
-                                .clear
-                            ]),
-                            startPoint: CGPoint(x: sxA - size.width * 0.12, y: glowTop),
-                            endPoint: CGPoint(x: sxA + size.width * 0.12, y: glowBottom)
-                        )
-                    )
-                }
-
-                // 3. Head highlight
-                let headAlpha = (glowB * 0.6 + glowC * 0.4) * 0.10
-                let headRadius = size.width * 0.13
-                let headCenter = CGPoint(x: cx, y: glowTop + size.height * 0.04)
-                context.fill(
-                    Path(ellipseIn: CGRect(x: headCenter.x - headRadius, y: headCenter.y - headRadius,
-                                          width: headRadius * 2, height: headRadius * 2)),
-                    with: .radialGradient(
-                        Gradient(colors: [VitaColors.accent.opacity(headAlpha), .clear]),
-                        center: headCenter, startRadius: 0, endRadius: headRadius
-                    )
-                )
-            }
+            if !newValue { loadingProvider = .none }
         }
     }
 }
@@ -260,11 +234,8 @@ private struct OrganicGlowCanvas: View {
 
 private struct GoogleIcon: View {
     var body: some View {
-        // Real Google G SVG paths rendered as SwiftUI shapes
-        ZStack {
-            Image(systemName: "g.circle.fill")
-                .font(.system(size: 20))
-                .foregroundStyle(Color.white)
-        }
+        Image(systemName: "g.circle.fill")
+            .font(.system(size: 20))
+            .foregroundStyle(Color.white)
     }
 }

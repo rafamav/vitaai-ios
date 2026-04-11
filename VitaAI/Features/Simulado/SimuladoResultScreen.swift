@@ -36,7 +36,7 @@ struct SimuladoResultScreen: View {
 
     private var loadingView: some View {
         ZStack {
-            resultBackground
+            Color.clear.ignoresSafeArea()
             ProgressView()
                 .tint(Color(red: 200/255, green: 155/255, blue: 70/255))
         }
@@ -173,7 +173,7 @@ private struct ResultBodyView: View {
 
     var body: some View {
         ZStack {
-            resultBackground
+            Color.clear.ignoresSafeArea()
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
                     // Header

@@ -125,6 +125,10 @@ final class EstudosViewModel {
     // Recent activity feed (Sessoes Recentes)
     var recentActivity: [ActivityFeedItem] = []
 
+    // Trabalhos pendentes (from /api/study/trabalhos)
+    var trabalhosPending: [TrabalhoItem] = []
+    var trabalhosOverdue: [TrabalhoItem] = []
+
     // State
     var isLoading = true
     var error: String? = nil
@@ -220,6 +224,7 @@ final class EstudosViewModel {
                 recentActivity = activityResp
             }
 
+
             flashcardsDue = progressResp.flashcardsDue
             streakDays    = progressResp.streakDays
             avgAccuracy   = progressResp.avgAccuracy
@@ -248,6 +253,12 @@ final class EstudosViewModel {
         } catch {
             print("[EstudosViewModel] API error: \(error)")
             self.error = error.localizedDescription
+        }
+
+        // Trabalhos — independent of main load (best-effort)
+        if let trabResp = try? await api.getTrabalhos() {
+            trabalhosPending = trabResp.pending
+            trabalhosOverdue = trabResp.overdue
         }
 
         isLoading = false

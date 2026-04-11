@@ -1,49 +1,28 @@
 import SwiftUI
 
-// MARK: - Teal color palette for Simulados (matches web mockup exactly)
+// MARK: - Simulado colors (remapped to gold palette, unified with VitaColors)
 private enum SimuladoColors {
-    // Background
-    static let bg = Color(red: 0.024, green: 0.039, blue: 0.055) // #060a0e
+    static let tealPrimary = VitaColors.accentLight
+    static let tealDark = VitaColors.accentDark
+    static let sectionLabel = VitaColors.sectionLabel
 
-    // Teal accent shades
-    static let tealPrimary = Color(red: 0.471, green: 0.863, blue: 0.941)    // rgba(120,220,240)
-    static let tealMedium = Color(red: 0.314, green: 0.784, blue: 0.863)     // rgba(80,200,220)
-    static let tealDark = Color(red: 0.235, green: 0.706, blue: 0.784)       // rgba(60,180,200)
-    // Section label: rgba(120,210,230,0.55) — slightly cooler than tealPrimary
-    static let sectionLabel = Color(red: 0.471, green: 0.824, blue: 0.902).opacity(0.55)
-
-    // Text
     static let textPrimary = Color.white.opacity(0.90)
-    static let textSecondary = Color(red: 0.627, green: 0.863, blue: 0.941).opacity(0.45) // rgba(160,220,240,0.45)
-    static let textMuted = Color(red: 0.627, green: 0.863, blue: 0.941).opacity(0.40)
+    static let textMuted = VitaColors.textSecondary
 
-    // Card
-    static let cardBg = LinearGradient(
-        colors: [
-            Color(red: 0.024, green: 0.055, blue: 0.078).opacity(0.94),
-            Color(red: 0.031, green: 0.063, blue: 0.086).opacity(0.90)
-        ],
-        startPoint: .top, endPoint: .bottom
-    )
-    static let cardBorder = Color(red: 0.314, green: 0.784, blue: 0.863).opacity(0.16) // rgba(80,200,220,0.16)
+    static let cardBorder = VitaColors.surfaceBorder
 
-    // CTA button
     static let ctaGradient = LinearGradient(
-        colors: [
-            Color(red: 0.157, green: 0.627, blue: 0.706).opacity(0.7),
-            Color(red: 0.118, green: 0.471, blue: 0.588).opacity(0.5)
-        ],
+        colors: [VitaColors.accent.opacity(0.65), VitaColors.accentDark.opacity(0.45)],
         startPoint: .topLeading, endPoint: .bottomTrailing
     )
 
-    // Badges
-    static let badgeDoneBg = Color(red: 0.235, green: 0.706, blue: 0.471).opacity(0.15)
-    static let badgeDoneText = Color(red: 0.471, green: 0.863, blue: 0.627).opacity(0.85)
-    static let badgeDoneBorder = Color(red: 0.235, green: 0.706, blue: 0.471).opacity(0.20)
+    static let badgeDoneBg = VitaColors.dataGreen.opacity(0.15)
+    static let badgeDoneText = VitaColors.dataGreen.opacity(0.85)
+    static let badgeDoneBorder = VitaColors.dataGreen.opacity(0.20)
 
-    static let badgeProgressBg = Color(red: 0.784, green: 0.627, blue: 0.235).opacity(0.15)
-    static let badgeProgressText = Color(red: 0.941, green: 0.784, blue: 0.392).opacity(0.85)
-    static let badgeProgressBorder = Color(red: 0.784, green: 0.627, blue: 0.235).opacity(0.20)
+    static let badgeProgressBg = VitaColors.accent.opacity(0.15)
+    static let badgeProgressText = VitaColors.accentLight.opacity(0.85)
+    static let badgeProgressBorder = VitaColors.accent.opacity(0.20)
 }
 
 // MARK: - SimuladoHomeScreen
@@ -63,8 +42,8 @@ struct SimuladoHomeScreen: View {
                 homeContent(vm: vm)
             } else {
                 ZStack {
-                    SimuladoColors.bg.ignoresSafeArea()
-                    ProgressView().tint(SimuladoColors.tealPrimary)
+                    Color.clear.ignoresSafeArea()
+                    ProgressView().tint(VitaColors.accent)
                 }
             }
         }
@@ -77,23 +56,6 @@ struct SimuladoHomeScreen: View {
     @ViewBuilder
     private func homeContent(vm: SimuladoViewModel) -> some View {
         ZStack {
-            // Background image
-            Image("bg-simulados")
-                .resizable()
-                .scaledToFill()
-                .ignoresSafeArea()
-
-            // Dark overlay gradient matching web
-            LinearGradient(
-                stops: [
-                    .init(color: Color(red: 0.016, green: 0.031, blue: 0.055).opacity(0.3), location: 0),
-                    .init(color: Color(red: 0.016, green: 0.031, blue: 0.055).opacity(0.1), location: 0.4),
-                    .init(color: Color(red: 0.016, green: 0.031, blue: 0.055).opacity(0.5), location: 1.0)
-                ],
-                startPoint: .top, endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
             if vm.state.isLoading {
                 ProgressView().tint(SimuladoColors.tealPrimary)
             } else if vm.state.attempts.isEmpty {
@@ -260,14 +222,7 @@ private struct SimuladoStatsHero: View {
             .padding(.bottom, 22)
         }
         .frame(maxWidth: .infinity)
-        .background(SimuladoTealGlassBackground())
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(SimuladoColors.cardBorder, lineWidth: 0.5)
-        )
-        .shadow(color: .black.opacity(0.50), radius: 25, y: 20)
-        .shadow(color: SimuladoColors.tealDark.opacity(0.09), radius: 14, y: 0)
+        .vitaGlassCard(cornerRadius: 18)
     }
 }
 
@@ -382,14 +337,7 @@ private struct SimuladoAttemptCard: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
-            .background(SimuladoTealGlassBackground())
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(SimuladoColors.cardBorder, lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(0.50), radius: 25, y: 20)
-            .shadow(color: SimuladoColors.tealDark.opacity(0.06), radius: 20, y: 8)
+            .vitaGlassCard(cornerRadius: 18)
         }
         .buttonStyle(.plain)
         .padding(.bottom, 10)
@@ -419,64 +367,3 @@ private struct SimuladoBarChartIcon: View {
     }
 }
 
-// MARK: - Teal Glass Background (3-layer matching web)
-
-private struct SimuladoTealGlassBackground: View {
-    var body: some View {
-        ZStack {
-            // Layer 1: base dark gradient
-            LinearGradient(
-                colors: [
-                    Color(red: 0.024, green: 0.055, blue: 0.078).opacity(0.94),
-                    Color(red: 0.031, green: 0.063, blue: 0.086).opacity(0.90)
-                ],
-                startPoint: .top, endPoint: .bottom
-            )
-
-            // Layer 2: corner radial lights (inner glow)
-            ZStack {
-                // Bottom-left glow
-                RadialGradient(
-                    colors: [SimuladoColors.tealDark.opacity(0.18), .clear],
-                    center: .bottomLeading, startRadius: 0, endRadius: 120
-                )
-                // Bottom-right glow
-                RadialGradient(
-                    colors: [SimuladoColors.tealDark.opacity(0.12), .clear],
-                    center: .bottomTrailing, startRadius: 0, endRadius: 120
-                )
-                // Top-left glow
-                RadialGradient(
-                    colors: [SimuladoColors.tealDark.opacity(0.09), .clear],
-                    center: .topLeading, startRadius: 0, endRadius: 100
-                )
-                // Top-right glow
-                RadialGradient(
-                    colors: [SimuladoColors.tealDark.opacity(0.06), .clear],
-                    center: .topTrailing, startRadius: 0, endRadius: 100
-                )
-            }
-
-            // Layer 3: top highlight line
-            VStack {
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.clear, SimuladoColors.tealPrimary.opacity(0.12), .clear],
-                            startPoint: .leading, endPoint: .trailing
-                        )
-                    )
-                    .frame(height: 1)
-                Spacer()
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.clear, SimuladoColors.tealDark.opacity(0.08), .clear],
-                            startPoint: .leading, endPoint: .trailing
-                        )
-                    )
-                    .frame(height: 1)
-            }
-        }
-    }
-}

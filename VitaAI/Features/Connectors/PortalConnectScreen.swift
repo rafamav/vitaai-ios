@@ -7,6 +7,7 @@ import SwiftUI
 
 struct PortalConnectScreen: View {
     let portalType: String
+    var defaultInstanceUrl: String = ""
     var onBack: () -> Void
 
     @Environment(\.appContainer) private var container
@@ -15,7 +16,7 @@ struct PortalConnectScreen: View {
 
     // WebView state (Canvas inline, WebAluno sheet)
     @State private var cookiesCaptured = false
-    @State private var showWebalunoWebView = false
+    @State private var showPortalWebView = false
 
     var body: some View {
         ZStack {
@@ -29,7 +30,7 @@ struct PortalConnectScreen: View {
         .navigationBarHidden(true)
         .onAppear {
             if vm == nil {
-                let viewModel = PortalConnectViewModel(portalType: portalType, api: container.api)
+                let viewModel = PortalConnectViewModel(portalType: portalType, api: container.api, defaultInstanceUrl: defaultInstanceUrl)
                 vm = viewModel
                 Task { await viewModel.loadStatus() }
             }
@@ -39,15 +40,16 @@ struct PortalConnectScreen: View {
             guard let vm, vm.isOAuth else { return }
             Task { await vm.loadStatus() }
         }
-        // WebAluno WebView sheet
-        .fullScreenCover(isPresented: $showWebalunoWebView) {
+        // Portal WebView sheet
+        .fullScreenCover(isPresented: $showPortalWebView) {
             WebAlunoWebViewScreen(
-                onBack: { showWebalunoWebView = false },
+                onBack: { showPortalWebView = false },
                 onSessionCaptured: { cookie in
-                    showWebalunoWebView = false
-                    vm?.connectWebaluno(cookie: cookie)
+                    showPortalWebView = false
+                    vm?.connectMannesoft(cookie: cookie)
                 },
-                userEmail: container.authManager.userEmail
+                userEmail: container.authManager.userEmail,
+                portalInstanceUrl: vm?.instanceUrl ?? defaultInstanceUrl
             )
         }
         .vitaToastHost(toastState)
@@ -213,7 +215,7 @@ struct PortalConnectScreen: View {
                         text: vm.isConnecting ? "Conectando..." : "Entrar no \(vm.displayName)",
                         action: {
                             guard !vm.isConnecting else { return }
-                            showWebalunoWebView = true
+                            showPortalWebView = true
                         },
                         variant: .primary,
                         size: .lg,

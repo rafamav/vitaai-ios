@@ -9,7 +9,9 @@ struct VitaNotifPopout: View {
     let onMarkAllRead: () -> Void
     let onSettingsTap: () -> Void
 
-    @State private var notifications: [NotifItem] = NotifItem.mockItems
+    @Environment(\.appContainer) private var container
+    @State private var notifications: [NotifItem] = []
+    @State private var isLoading = true
     @State private var isVisible = false
 
     private var unreadCount: Int {
@@ -33,6 +35,9 @@ struct VitaNotifPopout: View {
             withAnimation(.spring(duration: 0.2, bounce: 0.15)) {
                 isVisible = true
             }
+        }
+        .task {
+            await loadNotifications()
         }
     }
 
@@ -88,7 +93,15 @@ struct VitaNotifPopout: View {
                 .padding(.horizontal, 10)
 
             // Notification list
-            if notifications.isEmpty {
+            if isLoading {
+                VStack {
+                    Spacer()
+                    ProgressView()
+                        .tint(VitaColors.accent)
+                    Spacer()
+                }
+                .frame(height: 120)
+            } else if notifications.isEmpty {
                 emptyState
             } else {
                 ScrollView(.vertical, showsIndicators: false) {
@@ -198,6 +211,26 @@ struct VitaNotifPopout: View {
 
     // MARK: - Actions
 
+    private func loadNotifications() async {
+        isLoading = true
+        do {
+            let items = try await container.api.getNotifications()
+            notifications = items.map { n in
+                NotifItem(
+                    id: n.id,
+                    icon: n.icon,
+                    title: n.title,
+                    subtitle: n.description,
+                    time: n.time,
+                    isRead: n.read
+                )
+            }
+        } catch {
+            notifications = []
+        }
+        isLoading = false
+    }
+
     private func markAllRead() {
         withAnimation(.easeInOut(duration: 0.2)) {
             notifications = notifications.map {
@@ -226,39 +259,4 @@ struct NotifItem: Identifiable {
     let subtitle: String
     let time: String
     let isRead: Bool
-
-    static let mockItems: [NotifItem] = [
-        NotifItem(
-            id: "1",
-            icon: "\u{1F4DA}",
-            title: "Hora de revisar!",
-            subtitle: "15 flashcards de Farmacologia prontos",
-            time: "2 min",
-            isRead: false
-        ),
-        NotifItem(
-            id: "2",
-            icon: "\u{23F0}",
-            title: "Prova em 3 dias",
-            subtitle: "P2 Patologia Médica — 8 de abril",
-            time: "1h",
-            isRead: false
-        ),
-        NotifItem(
-            id: "3",
-            icon: "\u{1F3C6}",
-            title: "Conquista desbloqueada!",
-            subtitle: "7 dias seguidos de estudo",
-            time: "ontem",
-            isRead: true
-        ),
-        NotifItem(
-            id: "4",
-            icon: "\u{1F4CA}",
-            title: "Relatório semanal",
-            subtitle: "Você estudou 8.5h esta semana",
-            time: "2 dias",
-            isRead: true
-        ),
-    ]
 }

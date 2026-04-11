@@ -79,4 +79,9 @@ enum Route: Hashable {
 
     // MARK: - Planner (daily study plan — BYM-1152)
     case planner
+
+    // MARK: - Faculdade subpages (dashboard + push navigation)
+    case faculdadeAgenda
+    case faculdadeMaterias
+    case faculdadeDocumentos
 }

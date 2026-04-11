@@ -16,6 +16,10 @@ final class AppContainer: ObservableObject {
     let transcricaoClient: TranscricaoClient
     let authManager: AuthManager
 
+    // MARK: - Shared data
+    let dataManager: AppDataManager
+    let studyOverviewStore: StudyOverviewStore
+
     // MARK: - Billing / Subscription
     let subscriptionStatus: SubscriptionStatusProvider
 
@@ -88,6 +92,8 @@ final class AppContainer: ObservableObject {
         self.osceSseClient = osceSseClient
         self.transcricaoClient = transcricaoClient
         self.authManager = authManager
+        self.dataManager = AppDataManager(api: api)
+        self.studyOverviewStore = StudyOverviewStore(api: api)
         self.subscriptionStatus = SubscriptionStatusProvider(api: api)
 
         // Wire 401 interceptor → auto-logout on HTTPClient + all SSE clients

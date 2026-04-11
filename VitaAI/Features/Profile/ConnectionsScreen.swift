@@ -105,17 +105,35 @@ struct ConnectionsScreen: View {
                     .padding(.top, 18)
 
                 VStack(spacing: 8) {
-                    portalCard(
+                    integrationCard(
                         letter: "G", name: "Google Calendar",
                         color: Color(red: 0.26, green: 0.52, blue: 0.96),
                         connectorId: "google_calendar",
                         state: vm.calendar, vm: vm
                     )
-                    portalCard(
+                    integrationCard(
                         letter: "G", name: "Google Drive",
                         color: Color(red: 0.13, green: 0.59, blue: 0.33),
                         connectorId: "google_drive",
                         state: vm.drive, vm: vm
+                    )
+                    integrationCard(
+                        letter: "S", name: "Spotify",
+                        color: Color(red: 0.11, green: 0.73, blue: 0.33),
+                        connectorId: "spotify",
+                        state: vm.spotify, vm: vm
+                    )
+                    integrationCard(
+                        letter: "♥", name: "Apple Health",
+                        color: Color(red: 0.96, green: 0.26, blue: 0.36),
+                        connectorId: "apple_health",
+                        state: vm.appleHealth, vm: vm
+                    )
+                    integrationCard(
+                        letter: "W", name: "WhatsApp",
+                        color: Color(red: 0.15, green: 0.68, blue: 0.38),
+                        connectorId: "whatsapp",
+                        state: vm.whatsapp, vm: vm
                     )
                 }
                 .padding(.horizontal, 14)
@@ -282,6 +300,27 @@ struct ConnectionsScreen: View {
         )
     }
 
+    // MARK: - Integration Card (OAuth connectors)
+
+    @ViewBuilder
+    private func integrationCard(
+        letter: String, name: String, color: Color,
+        connectorId: String, state: ConnectorState,
+        vm: ConnectorsViewModel
+    ) -> some View {
+        ConnectorCard(
+            letter: letter,
+            name: name,
+            status: state.status,
+            color: color,
+            lastSync: state.lastSync,
+            stats: state.stats,
+            onConnect: { Task { await vm.connectIntegration(connectorId) } },
+            onDisconnect: { Task { await vm.disconnect(connectorId) } },
+            onTapConnected: { activeSheet = connectorId }
+        )
+    }
+
     // MARK: - Sheet Content
 
     @ViewBuilder
@@ -323,6 +362,9 @@ struct ConnectionsScreen: View {
         case "webaluno": ("graduationcap", "Sincroniza automaticamente a cada 15 min")
         case "google_calendar": ("calendar", nil)
         case "google_drive": ("externaldrive", nil)
+        case "spotify": ("music.note", nil)
+        case "apple_health": ("heart.fill", nil)
+        case "whatsapp": ("message.fill", nil)
         default: ("link", nil)
         }
     }

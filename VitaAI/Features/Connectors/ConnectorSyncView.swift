@@ -88,7 +88,7 @@ struct ConnectorSyncView: View {
             if done {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 16))
-                    .foregroundColor(Color.green)
+                    .foregroundColor(VitaColors.dataGreen)
             } else if active {
                 ProgressView()
                     .tint(VitaColors.accent)

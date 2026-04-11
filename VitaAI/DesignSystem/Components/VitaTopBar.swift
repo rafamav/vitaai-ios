@@ -47,9 +47,7 @@ struct VitaTopBar: View {
                         .shadow(color: Color(red: 0.784, green: 0.627, blue: 0.314).opacity(0.15), radius: 4)
 
                     if let url = userImageURL {
-                        AsyncImage(url: url) { image in
-                            image.resizable().scaledToFill()
-                        } placeholder: {
+                        CachedAsyncImage(url: url) {
                             avatarInitials
                         }
                         .frame(width: 30, height: 30)

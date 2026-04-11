@@ -71,6 +71,7 @@ actor VitaChatClient {
 
                         if let token = await self.tokenStore.token {
                             request.setValue("\(AppConfig.sessionCookieName)=\(token)", forHTTPHeaderField: "Cookie")
+                            request.setValue(token, forHTTPHeaderField: "X-Extension-Token")
                         } else {
                             NSLog("[VitaChatClient] WARNING: No token available")
                         }

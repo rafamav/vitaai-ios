@@ -118,7 +118,7 @@ struct ENAMEDBadge: View {
     let score: Int
 
     private var badgeColor: Color {
-        score >= 4 ? Color.green : score >= 3 ? VitaColors.accent : .white.opacity(0.4)
+        score >= 4 ? VitaColors.dataGreen : score >= 3 ? VitaColors.accent : .white.opacity(0.4)
     }
 
     var body: some View {

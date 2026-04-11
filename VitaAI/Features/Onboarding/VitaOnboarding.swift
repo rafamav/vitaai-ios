@@ -46,8 +46,8 @@ struct VitaOnboarding: View {
             }
 
             VStack(spacing: 0) {
-                // Top bar (progress dots + back button)
-                if step != .sleep {
+                // Top bar (progress dots + back/logout button)
+                if step != .sleep || onLogout != nil {
                     ZStack {
                         // Back button: left
                         HStack {

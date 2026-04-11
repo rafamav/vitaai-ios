@@ -152,9 +152,7 @@ struct VitaMenuPopout: View {
     private var avatarCircle: some View {
         Group {
             if let url = userImageURL {
-                AsyncImage(url: url) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
+                CachedAsyncImage(url: url) {
                     avatarInitials
                 }
                 .frame(width: 40, height: 40)

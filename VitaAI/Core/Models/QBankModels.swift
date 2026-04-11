@@ -92,8 +92,15 @@ extension QBankTopic: Decodable {
 
 struct QBankDifficultyStat: Decodable, Identifiable {
     var difficulty: String = ""
+    var label: String = ""
     var count: Int = 0
     var id: String { difficulty }
+
+    /// Display label: use API-provided label if available, else localize the key
+    var displayLabel: String {
+        if !label.isEmpty { return label }
+        return difficulty.difficultyLabel
+    }
 }
 
 // MARK: - Questions List

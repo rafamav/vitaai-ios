@@ -177,17 +177,17 @@ private struct InsightsContentView: View {
                 SubjectsSection(vm: vm)
                     .padding(.top, 8)
 
-                // ── WebAluno grades ────────────────────────────────────────────
-                if !vm.webalunoGrades.isEmpty {
+                // ── Portal grades ─────────────────────────────────────────────
+                if !vm.portalGrades.isEmpty {
                     SectionHeader(
-                        title: "Notas WebAluno",
-                        subtitle: "\(vm.webalunoGrades.count) disciplinas"
-                            + (vm.webalunoSummary.flatMap { $0.averageGrade }.map { " · Média \(String(format: "%.1f", $0))" } ?? "")
+                        title: "Notas do Portal",
+                        subtitle: "\(vm.portalGrades.count) disciplinas"
+                            + (vm.portalSummary.flatMap { $0.averageGrade }.map { " · Média \(String(format: "%.1f", $0))" } ?? "")
                     )
                     .staggerTransition(visible: gradesVisible)
 
-                    ForEach(Array(vm.webalunoGrades.enumerated()), id: \.element.id) { index, grade in
-                        WebalunoGradeRow(grade: grade, index: index)
+                    ForEach(Array(vm.portalGrades.enumerated()), id: \.element.id) { index, grade in
+                        PortalGradeRow(grade: grade, index: index)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 4)
                     }
@@ -701,10 +701,10 @@ private struct SubjectRow: View {
     }
 }
 
-// MARK: - WebalunoGradeRow
+// MARK: - PortalGradeRow
 
-private struct WebalunoGradeRow: View {
-    let grade: WebalunoGrade
+private struct PortalGradeRow: View {
+    let grade: GradeSubject
     let index: Int
 
     @State private var appeared = false
@@ -714,12 +714,12 @@ private struct WebalunoGradeRow: View {
     }
 
     private var statusText: String {
-        grade.status ?? "Cursando"
+        grade.status.isEmpty ? "Cursando" : grade.status
     }
 
     private var statusColor: Color {
         let s = statusText.lowercased()
-        if s.contains("aprovado") || s.contains("dispensado") { return VitaColors.dataGreen }
+        if s.contains("aprovado") || s.contains("dispensado") || s == "apr" { return VitaColors.dataGreen }
         if s.contains("reprovado") { return VitaColors.dataRed }
         return VitaColors.accent
     }
@@ -747,7 +747,7 @@ private struct WebalunoGradeRow: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(grade.subjectName ?? "")
+                    Text(grade.subjectName)
                         .font(VitaTypography.bodyMedium)
                         .fontWeight(.medium)
                         .foregroundStyle(VitaColors.textPrimary)
@@ -760,7 +760,7 @@ private struct WebalunoGradeRow: View {
                     }
 
                     if let att = grade.attendance {
-                        Text("Frequência: \(Int(att))%")
+                        Text("Frequência: \(att)%")
                             .font(VitaTypography.labelSmall)
                             .foregroundStyle(att >= 75 ? VitaColors.dataGreen : VitaColors.dataRed)
                     }

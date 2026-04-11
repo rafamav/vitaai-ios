@@ -225,10 +225,10 @@ struct SimuladoTemplate: Identifiable {
     let disciplineName: String?
     let iconName: String
 
+    /// Generic presets — discipline-specific templates should come from the API
     static let defaults: [SimuladoTemplate] = [
-        .init(id: 0, name: "Revisão Rápida",  count: 10, timed: true,  timeLimitMinutes: 20,  disciplineName: nil,           iconName: "bolt"),
-        .init(id: 1, name: "Simulado Padrão", count: 25, timed: true,  timeLimitMinutes: 50,  disciplineName: nil,           iconName: "checkmark.square"),
-        .init(id: 2, name: "Intensivo",        count: 50, timed: true,  timeLimitMinutes: 90,  disciplineName: nil,           iconName: "clock"),
-        .init(id: 3, name: "Cardiologia P1",   count: 25, timed: false, timeLimitMinutes: nil, disciplineName: "Cardiologia", iconName: "heart"),
+        .init(id: 0, name: "Revisão Rápida",  count: 10, timed: true,  timeLimitMinutes: 20,  disciplineName: nil, iconName: "bolt"),
+        .init(id: 1, name: "Simulado Padrão", count: 25, timed: true,  timeLimitMinutes: 50,  disciplineName: nil, iconName: "checkmark.square"),
+        .init(id: 2, name: "Intensivo",        count: 50, timed: true,  timeLimitMinutes: 90,  disciplineName: nil, iconName: "clock"),
     ]
 }

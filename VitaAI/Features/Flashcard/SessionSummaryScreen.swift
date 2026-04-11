@@ -63,7 +63,7 @@ struct SessionSummaryScreen: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(VitaColors.surface.ignoresSafeArea())
+        .background(Color.clear.ignoresSafeArea())
         .onAppear { animateCounters() }
     }
 

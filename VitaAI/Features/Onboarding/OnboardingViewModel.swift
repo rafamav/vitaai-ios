@@ -124,28 +124,29 @@ final class OnboardingViewModel {
             print("[Onboarding] Canvas courses fetch failed: \(error)")
         }
 
-        // Fallback: WebAluno grades (subjects come from grade entries)
+        // Fallback: portal grades (subjects come from grade entries)
         do {
-            let gradesResp = try await api.getWebalunoGrades()
-            let uniqueSubjects = Set(gradesResp.grades.map(\.subjectName).filter { !$0.isEmpty }).sorted()
+            let gradesResp = try await api.getGradesCurrent()
+            let allSubjects = gradesResp.current + gradesResp.completed
+            let uniqueSubjects = Set(allSubjects.map(\.subjectName).filter { !$0.isEmpty }).sorted()
             if !uniqueSubjects.isEmpty {
-                syncedSubjects = uniqueSubjects.map { SyncedSubject(name: $0, source: "webaluno") }
-                syncGrades = gradesResp.grades.count
+                syncedSubjects = uniqueSubjects.map { SyncedSubject(name: $0, source: "portal") }
+                syncGrades = allSubjects.count
                 return
             }
         } catch {
-            print("[Onboarding] WebAluno grades fetch failed: \(error)")
+            print("[Onboarding] Portal grades fetch failed: \(error)")
         }
 
-        // Fallback: WebAluno schedule
+        // Fallback: agenda schedule
         do {
-            let schedule = try await api.getWebalunoSchedule()
-            let uniqueSubjects = Set(schedule.schedule.map(\.subjectName).filter { !$0.isEmpty }).sorted()
+            let agenda = try await api.getAgenda()
+            let uniqueSubjects = Set(agenda.schedule.map(\.subjectName).filter { !$0.isEmpty }).sorted()
             if !uniqueSubjects.isEmpty {
-                syncedSubjects = uniqueSubjects.map { SyncedSubject(name: $0, source: "webaluno") }
+                syncedSubjects = uniqueSubjects.map { SyncedSubject(name: $0, source: "portal") }
             }
         } catch {
-            print("[Onboarding] WebAluno schedule fetch failed: \(error)")
+            print("[Onboarding] Agenda fetch failed: \(error)")
         }
     }
 

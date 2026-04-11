@@ -15,11 +15,11 @@ struct TranscricaoScreen: View {
     var body: some View {
         Group {
             if let vm = viewModel {
-                TranscricaoContent(viewModel: vm, onBack: onBack)
+                TranscricaoContent(viewModel: vm, onBack: onBack, api: container.api)
             } else {
                 ProgressView().tint(TealColors.accent)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(TealColors.screenBg.ignoresSafeArea())
+                    .background(Color.clear.ignoresSafeArea())
             }
         }
         .onAppear {
@@ -40,14 +40,13 @@ struct TranscricaoScreen: View {
 private struct TranscricaoContent: View {
     @Bindable var viewModel: TranscricaoViewModel
     let onBack: () -> Void
+    let api: VitaAPI
 
     @State private var selectedMode: TranscricaoRecordingMode = .offline
     @State private var selectedDiscipline: String = "Geral"
     @State private var selectedFilter: String = "Todas"
     @State private var selectedRecording: TranscricaoEntry? = nil
-
-    // Default disciplines shown before API subjects load
-    private let fallbackDisciplines = ["Geral", "Anatomia", "Farmacologia", "Patologia", "Bioquímica"]
+    @State private var disciplines: [String] = ["Geral"]
 
     /// Whether the pipeline is actively processing (upload/transcribe/summarize/flashcards)
     private var isProcessing: Bool {
@@ -61,9 +60,6 @@ private struct TranscricaoContent: View {
 
     var body: some View {
         ZStack {
-            // Teal ambient background
-            TealBackground()
-
             VStack(spacing: 0) {
                 switch viewModel.phase {
                 case .error:
@@ -97,31 +93,48 @@ private struct TranscricaoContent: View {
                                 .transition(.move(edge: .top).combined(with: .opacity))
                             }
 
-                            // Mode toggle
-                            TranscricaoModeToggle(selected: $selectedMode)
-                                .padding(.horizontal, 16)
-                                .padding(.top, isProcessing ? 4 : 10)
-                                .padding(.bottom, 12)
-                                .disabled(viewModel.phase == .recording || isProcessing)
-                                .opacity(isProcessing ? 0.5 : 1.0)
+                            // Recorder card (mode toggle + recorder area)
+                            VStack(spacing: 12) {
+                                TranscricaoModeToggle(selected: $selectedMode)
+                                    .disabled(viewModel.phase == .recording || isProcessing)
+                                    .opacity(isProcessing ? 0.5 : 1.0)
 
-                            // Recorder area
-                            TranscricaoRecorderArea(
-                                elapsedSeconds: viewModel.phase == .recording ? viewModel.elapsedSeconds : 0,
-                                isRecording: viewModel.phase == .recording,
-                                selectedDiscipline: $selectedDiscipline,
-                                disciplines: fallbackDisciplines,
-                                onToggle: {
-                                    if viewModel.phase == .recording {
-                                        viewModel.stopRecording()
-                                    } else {
-                                        Task { await viewModel.startRecording() }
+                                TranscricaoRecorderArea(
+                                    elapsedSeconds: viewModel.phase == .recording ? viewModel.elapsedSeconds : 0,
+                                    isRecording: viewModel.phase == .recording,
+                                    selectedDiscipline: $selectedDiscipline,
+                                    disciplines: disciplines,
+                                    onToggle: {
+                                        if viewModel.phase == .recording {
+                                            viewModel.stopRecording()
+                                        } else {
+                                            Task { await viewModel.startRecording() }
+                                        }
                                     }
-                                }
+                                )
+                                .disabled(isProcessing)
+                                .opacity(isProcessing ? 0.6 : 1.0)
+                            }
+                            .padding(16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 12/255, green: 9/255, blue: 7/255, opacity: 0.85),
+                                                Color(red: 14/255, green: 11/255, blue: 8/255, opacity: 0.75)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(VitaColors.accent.opacity(0.10), lineWidth: 0.5)
                             )
                             .padding(.horizontal, 16)
-                            .disabled(isProcessing)
-                            .opacity(isProcessing ? 0.6 : 1.0)
+                            .padding(.top, isProcessing ? 4 : 10)
 
                             // Live transcript (if in live mode and recording)
                             if viewModel.phase == .recording && selectedMode == .live && !viewModel.liveTranscript.isEmpty {
@@ -135,7 +148,7 @@ private struct TranscricaoContent: View {
                                 recordings: viewModel.recordings,
                                 isLoading: viewModel.recordingsLoading,
                                 selectedFilter: $selectedFilter,
-                                filterChips: ["Todas"] + fallbackDisciplines,
+                                filterChips: ["Todas"] + disciplines,
                                 onTap: { rec in selectedRecording = rec },
                                 onDelete: { rec in
                                     withAnimation {
@@ -155,6 +168,15 @@ private struct TranscricaoContent: View {
         // Detail sheet when tapping a recording
         .sheet(item: $selectedRecording) { rec in
             TranscricaoDetailSheet(recording: rec)
+        }
+        .task {
+            // Load user's real subjects from API
+            if let resp = try? await api.getSubjects() {
+                let names = resp.subjects.map(\.name).filter { !$0.isEmpty }
+                if !names.isEmpty {
+                    disciplines = ["Geral"] + names
+                }
+            }
         }
     }
 }

@@ -1,77 +1,33 @@
 import SwiftUI
 
-// MARK: - Teal Theme Colors (Transcrição-specific)
-// The transcription screen uses a teal accent instead of the app-wide gold/cyan.
+// MARK: - Transcrição Colors (remapped to gold palette, unified with VitaColors)
 
 enum TealColors {
-    static let accent      = Color(red: 80/255, green: 200/255, blue: 180/255)     // rgba(80,200,180)
-    static let accentLight = Color(red: 120/255, green: 220/255, blue: 200/255)    // rgba(120,220,200)
-    static let accentBright = Color(red: 150/255, green: 240/255, blue: 220/255)   // rgba(150,240,220)
+    static let accent       = VitaColors.accent
+    static let accentLight  = VitaColors.accentLight
+    static let accentBright = VitaColors.accentHover
 
-    // Glass card background (teal-tinted dark)
     static let cardBg = LinearGradient(
         colors: [
-            Color(red: 8/255, green: 12/255, blue: 11/255, opacity: 0.94),
-            Color(red: 10/255, green: 14/255, blue: 12/255, opacity: 0.90)
+            Color(red: 12/255, green: 9/255, blue: 7/255, opacity: 0.94),
+            Color(red: 14/255, green: 11/255, blue: 8/255, opacity: 0.90)
         ],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
 
-    // Background with teal radial glow
-    static let screenBg = Color(red: 0.031, green: 0.024, blue: 0.039)
+    static let screenBg = Color.clear
 
-    static let badgeGreen     = Color(red: 52/255, green: 211/255, blue: 153/255)
-    static let badgePending   = Color(red: 255/255, green: 200/255, blue: 100/255)
-    static let badgeRecording = Color(red: 255/255, green: 80/255, blue: 80/255)
+    static let badgeGreen     = VitaColors.dataGreen
+    static let badgePending   = VitaColors.accentHover
+    static let badgeRecording = VitaColors.dataRed
 }
 
 // MARK: - Teal Background
 
 struct TealBackground: View {
     var body: some View {
-        ZStack {
-            TealColors.screenBg.ignoresSafeArea()
-
-            // Warm brown undertone (subtle, gives depth)
-            RadialGradient(
-                colors: [
-                    Color(red: 0.18, green: 0.10, blue: 0.05).opacity(0.35),
-                    .clear
-                ],
-                center: UnitPoint(x: 0.5, y: 0.85),
-                startRadius: 0,
-                endRadius: 350
-            )
-            .ignoresSafeArea()
-
-            // Central teal glow
-            RadialGradient(
-                colors: [TealColors.accent.opacity(0.08), .clear],
-                center: .center,
-                startRadius: 0,
-                endRadius: 250
-            )
-            .ignoresSafeArea()
-
-            // Top-left teal accent
-            RadialGradient(
-                colors: [TealColors.accent.opacity(0.12), .clear],
-                center: UnitPoint(x: 0.08, y: 0.14),
-                startRadius: 0,
-                endRadius: 140
-            )
-            .ignoresSafeArea()
-
-            // Top-right teal accent
-            RadialGradient(
-                colors: [TealColors.accent.opacity(0.12), .clear],
-                center: UnitPoint(x: 0.92, y: 0.14),
-                startRadius: 0,
-                endRadius: 140
-            )
-            .ignoresSafeArea()
-        }
+        Color.clear.ignoresSafeArea()
     }
 }
 

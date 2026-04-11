@@ -4,16 +4,25 @@ import SwiftUI
 
 struct VitaNotification: Identifiable, Decodable {
     let id: String
-    let icon: String
+    let type: String
     let title: String
     let description: String
     let time: String
     let read: Bool
-}
 
-struct NotificationsResponse: Decodable {
-    let notifications: [VitaNotification]
-    let unreadCount: Int
+    var icon: String {
+        switch type {
+        case "gradePosted": return "\u{1F4CA}"
+        case "examAlert", "exam": return "\u{1F4DD}"
+        case "attendanceAlert": return "\u{26A0}\u{FE0F}"
+        case "newMaterial": return "\u{1F4DA}"
+        case "badge": return "\u{1F3C6}"
+        case "streak": return "\u{1F525}"
+        case "flashcard": return "\u{1F0CF}"
+        case "reminder": return "\u{23F0}"
+        default: return "\u{1F514}"
+        }
+    }
 }
 
 // MARK: - Sheet
@@ -152,8 +161,7 @@ struct VitaNotificationSheet: View {
     private func loadNotifications() async {
         isLoading = true
         do {
-            let response: NotificationsResponse = try await container.api.getNotifications()
-            notifications = response.notifications
+            notifications = try await container.api.getNotifications()
         } catch {
             // Fallback: show mock data so the sheet isn't empty during dev
             notifications = Self.mockNotifications
@@ -164,10 +172,10 @@ struct VitaNotificationSheet: View {
     // MARK: - Mock fallback
 
     static let mockNotifications: [VitaNotification] = [
-        .init(id: "1", icon: "🏆", title: "Conquista desbloqueada!", description: "Você ganhou o badge \"Maratonista\" por completar 10 simulados.", time: "2h", read: false),
-        .init(id: "2", icon: "📝", title: "Simulado em andamento", description: "Você tem um simulado de Farmacologia não finalizado.", time: "5h", read: false),
-        .init(id: "3", icon: "🔥", title: "Streak de 7 dias!", description: "Continue estudando para manter sua sequência.", time: "Ontem", read: true),
-        .init(id: "4", icon: "📊", title: "Notas lançadas", description: "Suas notas de Anatomia foram atualizadas no Canvas.", time: "2d", read: true),
-        .init(id: "5", icon: "💡", title: "Briefing do Vita", description: "Sua revisão diária de Fisiologia está pronta.", time: "3d", read: true),
+        .init(id: "1", type: "badge", title: "Conquista desbloqueada!", description: "Você ganhou o badge Maratonista por completar 10 simulados.", time: "2h", read: false),
+        .init(id: "2", type: "exam", title: "Simulado em andamento", description: "Você tem um simulado de Farmacologia não finalizado.", time: "5h", read: false),
+        .init(id: "3", type: "streak", title: "Streak de 7 dias!", description: "Continue estudando para manter sua sequencia.", time: "Ontem", read: true),
+        .init(id: "4", type: "gradePosted", title: "Notas lancadas", description: "Suas notas de Anatomia foram atualizadas no Canvas.", time: "2d", read: true),
+        .init(id: "5", type: "reminder", title: "Briefing do Vita", description: "Sua revisão diária de Fisiologia está pronta.", time: "3d", read: true),
     ]
 }

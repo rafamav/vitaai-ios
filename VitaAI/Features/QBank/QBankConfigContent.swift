@@ -168,7 +168,7 @@ struct QBankConfigContent: View {
                 bottomCTA
             }
         }
-        .background { QBankBackground() }
+        .background(Color.clear)
         .sheet(isPresented: $showInstitutionSheet) {
             QBankInstitutionSheet(vm: vm)
                 .presentationDetents([.medium, .large])
@@ -329,14 +329,7 @@ struct QBankConfigContent: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(vm.state.filters.difficulties) { dc in
-                        let label: String = {
-                            switch dc.difficulty {
-                            case "easy":   return "Fácil (\(dc.count))"
-                            case "medium": return "Medio (\(dc.count))"
-                            case "hard":   return "Difícil (\(dc.count))"
-                            default:       return "\(dc.difficulty) (\(dc.count))"
-                            }
-                        }()
+                        let label = "\(dc.displayLabel) (\(dc.count))"
                         let color: Color = {
                             switch dc.difficulty {
                             case "easy":  return VitaColors.dataGreen

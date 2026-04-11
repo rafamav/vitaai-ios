@@ -51,7 +51,7 @@ actor VitaAPI {
 
     // MARK: - Notifications
 
-    func getNotifications() async throws -> NotificationsResponse {
+    func getNotifications() async throws -> [VitaNotification] {
         try await client.get("notifications")
     }
 
@@ -93,9 +93,15 @@ actor VitaAPI {
         return try await client.post("study/flashcards/generate", body: Body(discipline: discipline, count: count))
     }
 
-    func generateFlashcardsAutoSeed() async throws -> [FlashcardDeckEntry] {
+    @discardableResult
+    func generateFlashcardsAutoSeed() async throws -> AutoSeedResponse {
         struct Body: Encodable { let autoSeed: Bool }
         return try await client.post("study/flashcards/generate", body: Body(autoSeed: true))
+    }
+
+    struct AutoSeedResponse: Decodable {
+        var generated: Int?
+        var totalCards: Int?
     }
 
     func reviewFlashcard(cardId: String, rating: Int, responseTimeMs: Int64) async throws {
@@ -131,6 +137,16 @@ actor VitaAPI {
 
     func startOsceCase(specialty: String) async throws -> OsceStartResponse {
         try await client.post("ai/osce", body: OsceStartRequest(specialty: specialty))
+    }
+
+    func getOsceSpecialties() async throws -> [String] {
+        try await client.get("ai/osce/specialties")
+    }
+
+    // MARK: - Study Overview (hero stats + subjects for StudySuite screens)
+
+    func getStudyOverview() async throws -> StudyOverviewResponse {
+        try await client.get("study/overview")
     }
 
     // MARK: - Transcrição
@@ -307,11 +323,11 @@ actor VitaAPI {
         try await client.get("portal/sync-progress", queryItems: [.init(name: "syncId", value: syncId)])
     }
 
-    func getWebalunoStatus() async throws -> WebalunoStatusResponse {
+    func getPortalStatus() async throws -> PortalStatusResponse {
         try await client.get("portal/status")
     }
 
-    func disconnectWebaluno() async throws {
+    func disconnectPortal() async throws {
         try await client.delete("portal/disconnect?portalType=mannesoft")
     }
 
@@ -342,6 +358,61 @@ actor VitaAPI {
         try await client.get("estudos/plan")
     }
 
+    // MARK: - Trabalhos (assignments)
+
+    func getTrabalhos() async throws -> TrabalhosResponse {
+        try await client.get("study/trabalhos")
+    }
+
+    // MARK: - Documents (PDFs synced from portal + manual uploads)
+
+    func getDocuments(subjectId: String? = nil) async throws -> [VitaDocument] {
+        var items: [URLQueryItem] = []
+        if let subjectId { items.append(.init(name: "subjectId", value: subjectId)) }
+        return try await client.get("documents", queryItems: items.isEmpty ? nil : items)
+    }
+
+    func dismissTrabalho(id: String) async throws {
+        let _: EmptyResponse = try await client.patch("study/trabalhos/\(id)/dismiss")
+    }
+
+    // MARK: - Trabalho Generate & Submit
+
+    struct TrabalhoGenerateRequest: Encodable {
+        var prompt: String?
+        var existingContent: String?
+    }
+
+    struct TrabalhoGenerateResponse: Decodable {
+        let content: String
+        let wordCount: Int
+    }
+
+    func generateTrabalho(id: String, prompt: String?, existingContent: String?) async throws -> TrabalhoGenerateResponse {
+        return try await client.post(
+            "study/trabalhos/\(id)/generate",
+            body: TrabalhoGenerateRequest(prompt: prompt, existingContent: existingContent)
+        )
+    }
+
+    struct TrabalhoSubmitRequest: Encodable {
+        var content: String?
+        var contentHtml: String?
+    }
+
+    struct TrabalhoSubmitResponse: Decodable {
+        let success: Bool
+        let canvasSubmissionId: Int?
+        let submittedAt: String?
+    }
+
+    func submitTrabalho(id: String, content: String) async throws -> TrabalhoSubmitResponse {
+        return try await client.post(
+            "study/trabalhos/\(id)/submit",
+            body: TrabalhoSubmitRequest(content: content)
+        )
+    }
+
     // ┌──────────────────────────────────────────────────────────────────┐
     // │  NO BACKEND YET — endpoints below have NO route.ts on server   │
     // │  Features calling these get 404 → catch → empty/error state    │
@@ -354,7 +425,7 @@ actor VitaAPI {
         try await client.get("portal/status")
     }
 
-    func connectCanvas(accessToken: String, instanceUrl: String = "https://ulbra.instructure.com") async throws -> CanvasConnectResponse {
+    func connectCanvas(accessToken: String, instanceUrl: String) async throws -> CanvasConnectResponse {
         try await client.post("canvas/connect", body: CanvasConnectRequest(accessToken: accessToken, instanceUrl: instanceUrl))
     }
 
@@ -399,26 +470,19 @@ actor VitaAPI {
         return try await client.post("subjects/manual", body: Body(name: name, difficulty: difficulty))
     }
 
-    // MARK: - WebAluno data (NO BACKEND: webaluno/connect, webaluno/sync, webaluno/grades, webaluno/schedule)
+    // MARK: - Grades
 
-    func connectWebaluno(cpf: String, password: String, instanceUrl: String = "https://ac3949.mannesoftprime.com.br") async throws -> WebalunoConnectResponse {
-        try await client.post("webaluno/connect", body: WebalunoConnectRequest(cpf: cpf, password: password, instanceUrl: instanceUrl))
+    func getGradesCurrent() async throws -> GradesCurrentResponse {
+        try await client.get("grades/current")
     }
 
-    func connectWebalunoWithSession(sessionCookie: String, instanceUrl: String = "https://ac3949.mannesoftprime.com.br") async throws -> WebalunoConnectResponse {
-        try await client.post("webaluno/connect", body: WebalunoConnectRequest(sessionCookie: sessionCookie, instanceUrl: instanceUrl))
-    }
-
-    func syncWebaluno() async throws -> WebalunoSyncResponse {
-        try await client.post("webaluno/sync")
-    }
-
-    func getWebalunoGrades() async throws -> WebalunoGradesResponse {
-        try await client.get("webaluno/grades")
-    }
-
-    func getWebalunoSchedule() async throws -> WebalunoScheduleResponse {
-        try await client.get("webaluno/schedule")
+    func getAgenda(from: String? = nil, to: String? = nil) async throws -> AgendaResponse {
+        var path = "agenda"
+        var params: [String] = []
+        if let from { params.append("from=\(from)") }
+        if let to { params.append("to=\(to)") }
+        if !params.isEmpty { path += "?" + params.joined(separator: "&") }
+        return try await client.get(path)
     }
 
     // MARK: - Google Calendar (NO BACKEND: google/calendar/*)
@@ -556,6 +620,20 @@ actor VitaAPI {
 
     func getNotificationPreferences() async throws -> NotificationPreferencesResponse {
         try await client.get("notifications/preferences")
+    }
+
+    // MARK: - Unified Integrations
+
+    func getIntegrations() async throws -> IntegrationsResponse {
+        try await client.get("integrations")
+    }
+
+    func startIntegrationOAuth(_ provider: String) async throws -> IntegrationOAuthResponse {
+        try await client.get("integrations/\(provider)")
+    }
+
+    func disconnectIntegration(_ provider: String) async throws {
+        try await client.delete("integrations/\(provider)")
     }
 
     func syncPushPreferences(_ prefs: PushPreferencesRequest) async throws {

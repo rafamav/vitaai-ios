@@ -24,10 +24,33 @@ struct ProgressResponse: Codable {
     var weeklyGoalHours: Double = 0
     var weeklyActualHours: Double = 0
     var dailyStudyGoalMinutes: Int = 120
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        streakDays = (try? c.decode(Int.self, forKey: .streakDays)) ?? 0
+        totalStudyHours = (try? c.decode(Double.self, forKey: .totalStudyHours)) ?? 0
+        avgAccuracy = (try? c.decode(Double.self, forKey: .avgAccuracy)) ?? 0
+        flashcardsDue = (try? c.decode(Int.self, forKey: .flashcardsDue)) ?? 0
+        totalCards = (try? c.decode(Int.self, forKey: .totalCards)) ?? 0
+        learnedCards = (try? c.decode(Int.self, forKey: .learnedCards)) ?? 0
+        totalAnswered = (try? c.decode(Int.self, forKey: .totalAnswered)) ?? 0
+        todayCompleted = (try? c.decode(Int.self, forKey: .todayCompleted)) ?? 0
+        todayTotal = (try? c.decode(Int.self, forKey: .todayTotal)) ?? 0
+        todayStudyMinutes = (try? c.decode(Int.self, forKey: .todayStudyMinutes)) ?? 0
+        subjects = (try? c.decode([SubjectProgress].self, forKey: .subjects)) ?? []
+        weekGrades = (try? c.decode([GradeEntry].self, forKey: .weekGrades)) ?? []
+        upcomingExams = (try? c.decode([ExamEntry].self, forKey: .upcomingExams)) ?? []
+        heatmap = (try? c.decode([Int].self, forKey: .heatmap)) ?? []
+        weeklyHours = (try? c.decode([Double].self, forKey: .weeklyHours)) ?? Array(repeating: 0, count: 7)
+        weeklyGoalHours = (try? c.decode(Double.self, forKey: .weeklyGoalHours)) ?? 0
+        weeklyActualHours = (try? c.decode(Double.self, forKey: .weeklyActualHours)) ?? 0
+        dailyStudyGoalMinutes = (try? c.decode(Int.self, forKey: .dailyStudyGoalMinutes)) ?? 120
+    }
 }
 
 struct SubjectProgress: Codable {
     var subjectId: String = ""
+    var name: String = ""
     var accuracy: Double = 0.0
     var hoursSpent: Double = 0.0
     var cardsDue: Int = 0
@@ -124,7 +147,6 @@ struct FlashcardDeckEntry: Codable, Identifiable {
 }
 
 struct FlashcardEntry: Codable, Identifiable {
-    // Fields from the REAL API (/api/mockup/flashcards)
     var id: String = ""
     var front: String = ""
     var back: String = ""
@@ -138,8 +160,8 @@ struct FlashcardEntry: Codable, Identifiable {
     var scheduledDays: Int?
     var tag: String?
     var deckId: String?
-    var disciplineId: String?
-    var sourceQuestionId: String?
+    var disciplineId: FlexString?
+    var sourceQuestionId: FlexString?
     var createdAt: String?
     var updatedAt: String?
     var deletedAt: String?
@@ -148,6 +170,23 @@ struct FlashcardEntry: Codable, Identifiable {
     var repetitions: Int { reps }
     var easeFactor: Double { difficulty ?? 2.5 }
     var interval: Int { scheduledDays ?? 0 }
+}
+
+/// Decodes both String and Int JSON values into a String
+struct FlexString: Codable, Hashable {
+    let value: String
+    init(_ value: String) { self.value = value }
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if let s = try? c.decode(String.self) { value = s }
+        else if let i = try? c.decode(Int.self) { value = String(i) }
+        else if let d = try? c.decode(Double.self) { value = String(Int(d)) }
+        else { value = "" }
+    }
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(value)
+    }
 }
 
 struct FlashcardRecommended: Decodable, Identifiable {

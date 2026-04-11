@@ -2,604 +2,292 @@ import SwiftUI
 import StoreKit
 import SafariServices
 
-// MARK: - Billing Strategy
-// iOS uses StoreKit 2 as primary payment channel (App Store requirement).
-// When StoreKit products fail to load (sandbox/region issues, App Store Connect misconfiguration),
-// a Stripe web-checkout fallback is offered so the user is never blocked.
-// Fallback: POST billing/checkout -> open SafariViewController with checkout URL.
-//
-// Visual layout matches assinatura-mobile-v1.html mockup:
-// - Current plan badge
-// - Horizontal scroll with Free / Premium / Pro plan cards
-// - Premium card has conic gradient border (3-layer glass)
-// - Pro card has purple accent
-// - Comparison table below
-
-// MARK: - Plan feature data
-
-private struct PlanFeature {
-    let text: String
-    let enabled: Bool
-}
-
-private let freePlanFeatures: [PlanFeature] = [
-    .init(text: "5 mensagens/dia com Vita", enabled: true),
-    .init(text: "50 questões/mês", enabled: true),
-    .init(text: "Flashcards básicos", enabled: true),
-    .init(text: "Entrada por voz", enabled: false),
-    .init(text: "Upload de PDFs", enabled: false),
-]
-
-private let premiumPlanFeatures: [PlanFeature] = [
-    .init(text: "Mensagens ilimitadas", enabled: true),
-    .init(text: "Questões ilimitadas", enabled: true),
-    .init(text: "Entrada por voz", enabled: true),
-    .init(text: "Upload de PDFs", enabled: true),
-    .init(text: "Simulados OSCE", enabled: false),
-]
-
-private let proPlanFeatures: [PlanFeature] = [
-    .init(text: "Tudo do Premium", enabled: true),
-    .init(text: "Simulados OSCE", enabled: true),
-    .init(text: "Atendimento prioritario", enabled: true),
-    .init(text: "Atlas 3D completo", enabled: true),
-    .init(text: "Acesso antecipado", enabled: true),
-]
-
-// Comparison table
-private struct CompareRow {
-    let feature: String
-    let free: String     // text or "check" / "cross"
-    let premium: String
-    let pro: String
-}
-
-private let compareData: [CompareRow] = [
-    .init(feature: "Mensagens IA", free: "5/dia", premium: "check", pro: "check"),
-    .init(feature: "Questões", free: "50/mês", premium: "check", pro: "check"),
-    .init(feature: "Voz", free: "cross", premium: "check", pro: "check"),
-    .init(feature: "PDFs", free: "cross", premium: "check", pro: "check"),
-    .init(feature: "OSCE", free: "cross", premium: "cross", pro: "check"),
-    .init(feature: "Prioridade", free: "cross", premium: "cross", pro: "check"),
-]
-
 // MARK: - VitaPaywallScreen
+// Rebuild 2026-04-11: starry background, VitaMascot watching from bottom,
+// 3 tiers (Free/Premium/Pro) in vertical stack. Large, reliable tap targets
+// (no horizontal carousel — old version had broken hit-testing).
+//
+// Feature placement is tier-based and CONTROLLED VIA `tierFeatures` below —
+// move features between tiers by editing that single array. UI reads from it.
+//
+// Payment: StoreKit 2 primary. Stripe web-checkout fallback if products fail to load.
 
-struct VitaPaywallScreen: View {
+// MARK: - Plan tier model
 
-    /// Called when the user dismisses / navigates back.
-    var onDismiss: (() -> Void)?
-    /// API used for Stripe checkout fallback. Injected so paywall stays testable.
-    var api: VitaAPI? = nil
+enum PlanTier: String, CaseIterable, Identifiable {
+    case free, premium, pro
+    var id: String { rawValue }
 
-    @State private var storeKit = StoreKitManager()
-    @State private var selectedPlan: PlanTier = .premium
-
-    // Stripe fallback state
-    @State private var isLoadingStripe = false
-    @State private var stripeError: String? = nil
-
-    // Staggered entrance animation
-    @State private var headerVisible = false
-    @State private var cardsVisible  = false
-    @State private var tableVisible  = false
-
-    // Purple accent for Pro tier
-    private let purpleAccent = Color(red: 0.545, green: 0.361, blue: 0.965)  // rgba(139,92,246)
-    private let purpleLight  = Color(red: 0.753, green: 0.518, blue: 0.988)  // rgba(192,132,252)
-
-    enum PlanTier: String, CaseIterable {
-        case free, premium, pro
+    var displayName: String {
+        switch self {
+        case .free:    return "Free"
+        case .premium: return "Premium"
+        case .pro:     return "Pro"
+        }
     }
 
-    // MARK: - Body
+    var monthlyPriceLabel: String {
+        switch self {
+        case .free:    return "R$ 0"
+        case .premium: return "R$ 24,90"
+        case .pro:     return "R$ 49,90"
+        }
+    }
+
+    var tagline: String {
+        switch self {
+        case .free:    return "Comece sem pagar"
+        case .premium: return "Destrava a IA do Vita"
+        case .pro:     return "Tudo que temos, sem limite"
+        }
+    }
+
+    /// Associated StoreKit product ID (nil = free).
+    var productID: String? {
+        switch self {
+        case .free:    return nil
+        case .premium: return StoreKitManager.premiumProductID
+        case .pro:     return StoreKitManager.proProductID
+        }
+    }
+}
+
+// MARK: - Feature catalog
+// Source of truth for which features belong to which tier.
+// Moving a feature between tiers = change `tier` field. UI auto-updates.
+
+private struct TierFeature: Identifiable {
+    let id: String
+    let label: String
+    let tier: PlanTier   // minimum tier required
+    let icon: String     // SF Symbol
+}
+
+private let tierFeatures: [TierFeature] = [
+    // Free tier
+    .init(id: "flashcards",  label: "Flashcards ilimitados",          tier: .free,    icon: "rectangle.stack.fill"),
+    .init(id: "qbank",       label: "QBank de questões ilimitado",    tier: .free,    icon: "questionmark.circle.fill"),
+    .init(id: "simulados",   label: "Simulados completos",            tier: .free,    icon: "doc.text.fill"),
+    .init(id: "conectores",  label: "Conectores ULBRA / Mannesoft",   tier: .free,    icon: "link.circle.fill"),
+    .init(id: "notas",       label: "Notas e caderno digital",        tier: .free,    icon: "note.text"),
+
+    // Premium tier
+    .init(id: "chat_ia",     label: "Vita Chat IA ilimitado",         tier: .premium, icon: "sparkles"),
+    .init(id: "osce",        label: "OSCE clínico interativo",        tier: .premium, icon: "stethoscope"),
+    .init(id: "atlas_3d",    label: "Atlas 3D de anatomia",           tier: .premium, icon: "brain.head.profile"),
+    .init(id: "upload_pdf",  label: "Upload e análise de PDFs",       tier: .premium, icon: "doc.badge.arrow.up"),
+
+    // Pro tier
+    .init(id: "transcricao", label: "Transcrição de aulas",           tier: .pro,     icon: "waveform"),
+    .init(id: "voz",         label: "Modo voz com o Vita",            tier: .pro,     icon: "mic.fill"),
+    .init(id: "vita_game",   label: "VITA GAME (em breve)",           tier: .pro,     icon: "gamecontroller.fill"),
+    .init(id: "early",       label: "Acesso antecipado a features",   tier: .pro,     icon: "star.fill"),
+    .init(id: "priority",    label: "Atendimento prioritário",        tier: .pro,     icon: "bolt.fill")
+]
+
+private func features(for tier: PlanTier) -> [TierFeature] {
+    tierFeatures.filter { $0.tier == tier }
+}
+
+/// Returns a feature list that represents EVERYTHING unlocked at the given tier
+/// (accumulates lower tiers — Pro includes Premium + Free).
+private func cumulativeFeatures(upTo tier: PlanTier) -> [TierFeature] {
+    switch tier {
+    case .free:    return features(for: .free)
+    case .premium: return features(for: .free) + features(for: .premium)
+    case .pro:     return features(for: .free) + features(for: .premium) + features(for: .pro)
+    }
+}
+
+// MARK: - Screen
+
+struct VitaPaywallScreen: View {
+    @Environment(\.appContainer) private var container
+    @State private var storeKit = StoreKitManager()
+
+    let onDismiss: () -> Void
+
+    @State private var selectedTier: PlanTier = .premium
+    @State private var mascotState: MascotState = .awake
+    @State private var headerVisible = false
+    @State private var cardsVisible = false
+    @State private var isLoadingStripe = false
+    @State private var stripeError: String? = nil
+    @State private var showSuccess = false
 
     var body: some View {
-        ZStack {
-            VitaColors.surface.ignoresSafeArea()
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
 
-            RadialGradient(
-                colors: [VitaColors.accent.opacity(0.10), .clear],
-                center: .top,
-                startRadius: 0,
-                endRadius: 380
-            )
-            .ignoresSafeArea()
-            .allowsHitTesting(false)
+            ZStack {
+                starryBackground(w: w, h: h)
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    topBar
-                    currentPlanBadge
-                        .padding(.top, 4)
+                ScrollView {
+                    VStack(spacing: 20) {
+                        topBar
+                            .padding(.top, 8)
+                            .opacity(headerVisible ? 1 : 0)
+                            .offset(y: headerVisible ? 0 : -12)
 
-                    // Plan cards label
-                    sectionLabel("Escolha seu plano")
-                        .padding(.top, 18)
+                        header
+                            .opacity(headerVisible ? 1 : 0)
+                            .offset(y: headerVisible ? 0 : -8)
 
-                    // Horizontal scroll plan cards
-                    planCardsScroll
-                        .padding(.top, 8)
+                        VStack(spacing: 14) {
+                            ForEach(PlanTier.allCases) { tier in
+                                PlanCard(
+                                    tier: tier,
+                                    isSelected: selectedTier == tier,
+                                    product: product(for: tier),
+                                    onTap: { select(tier) },
+                                    onSubscribe: { handleSubscribe(tier) },
+                                    isPurchasing: storeKit.isPurchasing && selectedTier == tier
+                                )
+                                .opacity(cardsVisible ? 1 : 0)
+                                .offset(y: cardsVisible ? 0 : 20)
+                                .animation(
+                                    .spring(response: 0.5, dampingFraction: 0.8)
+                                        .delay(Double(PlanTier.allCases.firstIndex(of: tier) ?? 0) * 0.08),
+                                    value: cardsVisible
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 16)
 
-                    // Comparison table
-                    sectionLabel("Comparativo")
-                        .padding(.top, 22)
-                    comparisonTable
-                        .padding(.horizontal, 14)
-                        .padding(.top, 8)
+                        errorBanner
 
-                    // Legal links
-                    legalLinks
-                        .padding(.top, 20)
+                        legalLinks
+                            .padding(.top, 8)
 
-                    if let error = stripeError {
-                        Text(error)
-                            .font(VitaTypography.bodySmall)
-                            .foregroundStyle(VitaColors.dataRed)
-                            .multilineTextAlignment(.center)
-                            .padding(.top, 12)
+                        // Leave room at bottom so mascot doesn't overlap last card
+                        Spacer().frame(height: 160)
                     }
+                    .padding(.bottom, 40)
+                }
+                .scrollIndicators(.hidden)
 
-                    Spacer().frame(height: 120)
+                // Vita mascot watching from below — anchored to bottom-right corner
+                VitaMascot(state: mascotState, size: 110, showStaff: true)
+                    .allowsHitTesting(false)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .padding(.trailing, -10)
+                    .padding(.bottom, -20)
+                    .allowsHitTesting(false)
+            }
+        }
+        .preferredColorScheme(.dark)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
+        .ignoresSafeArea(.container, edges: .bottom)
+        .task {
+            await storeKit.loadProducts()
+        }
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.4)) { headerVisible = true }
+            withAnimation(.easeOut(duration: 0.5).delay(0.15)) { cardsVisible = true }
+        }
+        .onChange(of: storeKit.isSubscribed) { _, newValue in
+            if newValue {
+                mascotState = .happy
+                showSuccess = true
+                Task {
+                    try? await Task.sleep(for: .seconds(1.8))
+                    onDismiss()
                 }
             }
         }
-        .task { await runEntranceSequence() }
-        .navigationBarHidden(true)
+        .onChange(of: storeKit.purchaseError) { _, newValue in
+            if newValue != nil {
+                mascotState = .awake
+            }
+        }
+        .overlay(alignment: .top) {
+            if showSuccess {
+                SuccessToast()
+                    .padding(.top, 60)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
     }
 
-    // MARK: - Top Bar
+    // MARK: - Subviews
+
+    private func starryBackground(w: CGFloat, h: CGFloat) -> some View {
+        ZStack {
+            Color(red: 0.03, green: 0.02, blue: 0.04).ignoresSafeArea()
+            Image("fundo-dashboard")
+                .resizable()
+                .scaledToFill()
+                .frame(width: w, height: h)
+                .clipped()
+                .opacity(0.35)
+                .ignoresSafeArea()
+            // Subtle gold glow from center-top
+            RadialGradient(
+                colors: [VitaColors.accent.opacity(0.12), .clear],
+                center: .top,
+                startRadius: 20,
+                endRadius: 500
+            )
+            .ignoresSafeArea()
+        }
+    }
 
     private var topBar: some View {
         HStack {
-            HStack(spacing: 10) {
-                if let dismiss = onDismiss {
-                    Button(action: dismiss) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.80))
-                            .frame(minWidth: 44, minHeight: 44)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("backButton")
-                }
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Assinatura")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(VitaColors.textPrimary)
-                    Text("Gerencie seu plano")
-                        .font(.system(size: 11))
-                        .foregroundStyle(VitaColors.textSecondary)
-                }
+            Button {
+                haptic(.light)
+                onDismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(VitaColors.textPrimary)
+                    .frame(width: 38, height: 38)
+                    .background(Circle().fill(.ultraThinMaterial))
             }
-
             Spacer()
+            Button("Restaurar") {
+                haptic(.light)
+                Task { await storeKit.restorePurchases() }
+            }
+            .font(VitaTypography.bodySmall.weight(.semibold))
+            .foregroundStyle(VitaColors.textSecondary)
         }
         .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .opacity(headerVisible ? 1 : 0)
-        .offset(y: headerVisible ? 0 : 16)
-        .animation(.spring(response: 0.45, dampingFraction: 0.82), value: headerVisible)
     }
 
-    // MARK: - Current Plan Badge
-
-    private var currentPlanBadge: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Plano atual")
-                    .font(.system(size: 11))
-                    .foregroundStyle(VitaColors.textTertiary)
-                Text("Free")
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(VitaColors.textPrimary)
-            }
-            Spacer()
-            Text("GRATUITO")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(VitaColors.textSecondary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 3)
-                .background(Color.white.opacity(0.05))
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(VitaColors.textWarm.opacity(0.08), lineWidth: 1)
-                )
-        }
-        .padding(14)
-        .background(VitaColors.glassBg)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(VitaColors.glassBorder, lineWidth: 1))
-        .padding(.horizontal, 14)
-        .opacity(headerVisible ? 1 : 0)
-    }
-
-    // MARK: - Section Label
-
-    private func sectionLabel(_ text: String) -> some View {
-        HStack {
-            Text(text.uppercased())
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(VitaColors.textTertiary)
-                .kerning(0.4)
-            Spacer()
-        }
-        .padding(.horizontal, 14)
-    }
-
-    // MARK: - Plan Cards Horizontal Scroll
-
-    private var planCardsScroll: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                freePlanCard
-                premiumPlanCard
-                proPlanCard
-            }
-            .padding(.horizontal, 14)
-        }
-        .opacity(cardsVisible ? 1 : 0)
-        .offset(y: cardsVisible ? 0 : 20)
-        .animation(.spring(response: 0.45, dampingFraction: 0.82), value: cardsVisible)
-    }
-
-    // MARK: - Free Plan Card
-
-    private var freePlanCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Free")
-                .font(.system(size: 18, weight: .bold))
+    private var header: some View {
+        VStack(spacing: 8) {
+            Text("Escolha seu plano")
+                .font(VitaTypography.titleLarge)
                 .foregroundStyle(VitaColors.textPrimary)
-                .kerning(-0.54)
-
-            Text("R$ 0")
-                .font(.system(size: 22, weight: .bold))
+            Text("7 dias grátis nos planos pagos")
+                .font(VitaTypography.bodySmall)
                 .foregroundStyle(VitaColors.textSecondary)
-                .padding(.top, 6)
-
-            featureList(freePlanFeatures, accentColor: VitaColors.accentLight)
-                .padding(.top, 14)
-
-            Button(action: {}) {
-                Text("Plano atual")
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(VitaColors.textTertiary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 11)
-                    .background(Color.white.opacity(0.04))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(VitaColors.textWarm.opacity(0.06), lineWidth: 1)
-                    )
-            }
-            .buttonStyle(.plain)
-            .disabled(true)
-            .padding(.top, 16)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 18)
-        .frame(width: 240)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color(red: 12/255, green: 9/255, blue: 7/255).opacity(0.92),
-                    Color(red: 14/255, green: 11/255, blue: 8/255).opacity(0.88)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(VitaColors.textWarm.opacity(0.06), lineWidth: 1)
-        )
-    }
-
-    // MARK: - Premium Plan Card (3-layer glass, conic border)
-
-    private var premiumPlanCard: some View {
-        ZStack(alignment: .topTrailing) {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("Premium")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(VitaColors.textPrimary)
-                    .kerning(-0.54)
-
-                HStack(alignment: .lastTextBaseline, spacing: 2) {
-                    Text("R$ 24,90")
-                        .font(.system(size: 26, weight: .bold))
-                        .foregroundStyle(VitaColors.accentLight.opacity(0.90))
-                        .kerning(-0.78)
-                    Text("/mês")
-                        .font(.system(size: 11))
-                        .foregroundStyle(VitaColors.textTertiary)
-                }
-                .padding(.top, 6)
-
-                featureList(premiumPlanFeatures, accentColor: VitaColors.accentLight)
-                    .padding(.top, 14)
-
-                Button(action: { handleSubscribe(.premium) }) {
-                    Text("Assinar Premium")
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(VitaColors.accentLight.opacity(0.92))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 11)
-                        .background(
-                            LinearGradient(
-                                colors: [
-                                    VitaColors.glassInnerLight.opacity(0.30),
-                                    VitaColors.glassInnerLight.opacity(0.18)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(VitaColors.accentHover.opacity(0.25), lineWidth: 1)
-                        )
-                        .shadow(color: VitaColors.glassInnerLight.opacity(0.15), radius: 8, y: 4)
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 16)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 18)
-
-            // POPULAR badge
-            Text("POPULAR")
-                .font(.system(size: 8, weight: .bold))
-                .foregroundStyle(VitaColors.accentLight.opacity(0.90))
-                .tracking(0.5)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 2)
-                .background(VitaColors.glassInnerLight.opacity(0.22))
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 4)
-                        .stroke(VitaColors.accentHover.opacity(0.20), lineWidth: 1)
-                )
-                .padding(.top, 12)
-                .padding(.trailing, 12)
-        }
-        .frame(width: 240)
-        .background(
-            ZStack {
-                LinearGradient(
-                    colors: [
-                        Color(red: 20/255, green: 14/255, blue: 8/255).opacity(0.95),
-                        Color(red: 14/255, green: 11/255, blue: 8/255).opacity(0.90)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                // Inner glow
-                RadialGradient(
-                    colors: [VitaColors.glassInnerLight.opacity(0.14), .clear],
-                    center: .bottomLeading,
-                    startRadius: 0,
-                    endRadius: 180
-                )
-                RadialGradient(
-                    colors: [VitaColors.glassInnerLight.opacity(0.08), .clear],
-                    center: .topTrailing,
-                    startRadius: 0,
-                    endRadius: 140
-                )
-            }
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        // Conic gradient border (matches mockup ::before)
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(
-                    AngularGradient(
-                        gradient: Gradient(stops: [
-                            .init(color: VitaColors.accentHover.opacity(0.40), location: 0.0),
-                            .init(color: VitaColors.accentHover.opacity(0.20), location: 0.17),
-                            .init(color: Color.white.opacity(0.03), location: 0.39),
-                            .init(color: Color.white.opacity(0.02), location: 0.61),
-                            .init(color: VitaColors.accentHover.opacity(0.16), location: 0.83),
-                            .init(color: VitaColors.accentHover.opacity(0.40), location: 1.0),
-                        ]),
-                        center: UnitPoint(x: 0.40, y: 0.80),
-                        startAngle: .degrees(200),
-                        endAngle: .degrees(560)
-                    ),
-                    lineWidth: 1
-                )
-        )
-        .shadow(color: .black.opacity(0.40), radius: 20, y: 16)
-        .shadow(color: VitaColors.glassInnerLight.opacity(0.08), radius: 12)
-    }
-
-    // MARK: - Pro Plan Card (purple accent)
-
-    private var proPlanCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Pro")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(VitaColors.textPrimary)
-                .kerning(-0.54)
-
-            HStack(alignment: .lastTextBaseline, spacing: 2) {
-                Text("R$ 49,90")
-                    .font(.system(size: 26, weight: .bold))
-                    .foregroundStyle(purpleLight.opacity(0.90))
-                    .kerning(-0.78)
-                Text("/mês")
-                    .font(.system(size: 11))
-                    .foregroundStyle(VitaColors.textTertiary)
-            }
-            .padding(.top, 6)
-
-            featureList(proPlanFeatures, accentColor: purpleLight)
-                .padding(.top, 14)
-
-            Button(action: { handleSubscribe(.pro) }) {
-                Text("Assinar Pro")
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(purpleLight.opacity(0.92))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 11)
-                    .background(
-                        LinearGradient(
-                            colors: [
-                                purpleAccent.opacity(0.25),
-                                purpleAccent.opacity(0.14)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(purpleAccent.opacity(0.22), lineWidth: 1)
-                    )
-                    .shadow(color: purpleAccent.opacity(0.12), radius: 8, y: 4)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 16)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 18)
-        .frame(width: 240)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color(red: 15/255, green: 8/255, blue: 20/255).opacity(0.95),
-                    Color(red: 14/255, green: 11/255, blue: 8/255).opacity(0.90)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(purpleAccent.opacity(0.16), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.40), radius: 20, y: 16)
-        .shadow(color: purpleAccent.opacity(0.06), radius: 10)
-    }
-
-    // MARK: - Feature List Helper
-
-    private func featureList(_ features: [PlanFeature], accentColor: Color) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ForEach(features.indices, id: \.self) { i in
-                let f = features[i]
-                HStack(spacing: 8) {
-                    if f.enabled {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(accentColor.opacity(0.65))
-                            .frame(width: 14, height: 14)
-                    } else {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(VitaColors.textWarm.opacity(0.15))
-                            .frame(width: 14, height: 14)
-                    }
-                    Text(f.text)
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(f.enabled ? VitaColors.textWarm.opacity(0.55) : VitaColors.textWarm.opacity(0.20))
-                }
-            }
-        }
-    }
-
-    // MARK: - Comparison Table
-
-    private var comparisonTable: some View {
-        VStack(spacing: 0) {
-            // Header row
-            HStack {
-                Text("RECURSO")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                Text("FREE")
-                    .frame(width: 56)
-                Text("PREM.")
-                    .frame(width: 56)
-                Text("PRO")
-                    .frame(width: 56)
-            }
-            .font(.system(size: 9, weight: .bold))
-            .foregroundStyle(VitaColors.textTertiary)
-            .tracking(0.5)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(Color.white.opacity(0.01))
-
-            ForEach(compareData.indices, id: \.self) { i in
-                let row = compareData[i]
-                HStack {
-                    Text(row.feature)
-                        .font(.system(size: 11.5))
-                        .foregroundStyle(VitaColors.textWarm.opacity(0.50))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    compareCell(row.free, tier: .free)
-                        .frame(width: 56)
-                    compareCell(row.premium, tier: .premium)
-                        .frame(width: 56)
-                    compareCell(row.pro, tier: .pro)
-                        .frame(width: 56)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-
-                if i < compareData.count - 1 {
-                    Rectangle()
-                        .fill(VitaColors.textWarm.opacity(0.03))
-                        .frame(height: 1)
-                }
-            }
-        }
-        .background(VitaColors.glassBg)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(VitaColors.glassBorder, lineWidth: 1))
-        .opacity(tableVisible ? 1 : 0)
-        .offset(y: tableVisible ? 0 : 16)
-        .animation(.spring(response: 0.45, dampingFraction: 0.82), value: tableVisible)
+        .padding(.top, 4)
     }
 
     @ViewBuilder
-    private func compareCell(_ value: String, tier: PlanTier) -> some View {
-        if value == "check" {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 14))
-                .foregroundStyle(tier == .pro ? purpleLight.opacity(0.65) : VitaColors.accentLight.opacity(0.65))
-        } else if value == "cross" {
-            Image(systemName: "xmark")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(VitaColors.textWarm.opacity(0.15))
-        } else {
-            Text(value)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(VitaColors.textTertiary)
+    private var errorBanner: some View {
+        if let err = storeKit.purchaseError ?? stripeError {
+            Text(err)
+                .font(VitaTypography.bodySmall)
+                .foregroundStyle(.red)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
         }
     }
 
-    // MARK: - Legal Links
-
     private var legalLinks: some View {
-        HStack(spacing: 4) {
-            Button {
+        HStack(spacing: 8) {
+            Button("Restaurar") {
                 Task { await storeKit.restorePurchases() }
-            } label: {
-                Text("Restaurar compra")
-                    .font(VitaTypography.bodySmall)
-                    .foregroundStyle(VitaColors.textTertiary)
             }
-            .buttonStyle(.plain)
+            .font(VitaTypography.bodySmall)
+            .foregroundStyle(VitaColors.textTertiary)
 
             Text("\u{00B7}")
                 .font(VitaTypography.bodySmall)
@@ -621,32 +309,38 @@ struct VitaPaywallScreen: View {
         }
     }
 
-    // MARK: - Helpers
+    // MARK: - Actions
 
-    private func haptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
-        UIImpactFeedbackGenerator(style: style).impactOccurred()
+    private func select(_ tier: PlanTier) {
+        guard selectedTier != tier else { return }
+        haptic(.light)
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+            selectedTier = tier
+        }
+        // Happy mascot reaction on paid selection
+        if tier != .free {
+            mascotState = .happy
+            Task {
+                try? await Task.sleep(for: .seconds(1.0))
+                if !storeKit.isPurchasing { mascotState = .awake }
+            }
+        }
     }
 
-    private func runEntranceSequence() async {
-        await storeKit.loadProducts()
-        withAnimation { headerVisible = true }
-        try? await Task.sleep(for: .milliseconds(120))
-        withAnimation { cardsVisible = true }
-        try? await Task.sleep(for: .milliseconds(120))
-        withAnimation { tableVisible = true }
+    private func product(for tier: PlanTier) -> Product? {
+        guard let id = tier.productID else { return nil }
+        return storeKit.products.first { $0.id == id }
     }
 
     private func handleSubscribe(_ tier: PlanTier) {
         haptic(.medium)
-        // Map tier to StoreKit product if available
-        let productID: String
-        switch tier {
-        case .free: return
-        case .premium: productID = StoreKitManager.monthlyProductID
-        case .pro: productID = StoreKitManager.annualProductID
+        guard tier != .free else {
+            onDismiss()
+            return
         }
+        mascotState = .thinking
 
-        if let product = storeKit.products.first(where: { $0.id == productID }) {
+        if let product = product(for: tier) {
             storeKit.clearError()
             Task { await storeKit.purchase(product) }
         } else {
@@ -655,26 +349,20 @@ struct VitaPaywallScreen: View {
         }
     }
 
-    /// Fetch Stripe checkout URL from backend and present via SFSafariViewController.
     private func openStripeCheckout(plan: String) async {
-        guard let api else {
-            stripeError = "Checkout via web não disponível."
-            return
-        }
         isLoadingStripe = true
         stripeError = nil
         defer { isLoadingStripe = false }
         do {
-            let response = try await api.getCheckoutUrl(plan: plan)
+            let response = try await container.api.getCheckoutUrl(plan: plan)
             guard let urlStr = response.url, let url = URL(string: urlStr) else {
-                stripeError = "URL de checkout invalida."
+                stripeError = "URL de checkout inválida."
                 return
             }
             guard
                 let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
                 let root  = scene.windows.first?.rootViewController
             else { return }
-
             let safari = SFSafariViewController(url: url)
             safari.preferredControlTintColor = UIColor(VitaColors.accent)
             safari.dismissButtonStyle = .close
@@ -682,6 +370,189 @@ struct VitaPaywallScreen: View {
         } catch {
             stripeError = "Não foi possível abrir o checkout. Tente novamente."
         }
+    }
+
+    private func haptic(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
+        UIImpactFeedbackGenerator(style: style).impactOccurred()
+    }
+}
+
+// MARK: - Plan Card
+
+private struct PlanCard: View {
+    let tier: PlanTier
+    let isSelected: Bool
+    let product: Product?
+    let onTap: () -> Void
+    let onSubscribe: () -> Void
+    let isPurchasing: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // Header: name + price
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 8) {
+                        Text(tier.displayName)
+                            .font(VitaTypography.titleMedium.weight(.bold))
+                            .foregroundStyle(VitaColors.textPrimary)
+                        if tier == .premium {
+                            Text("MAIS POPULAR")
+                                .font(.system(size: 9, weight: .heavy))
+                                .foregroundStyle(VitaColors.surface)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(
+                                    Capsule().fill(VitaColors.accent)
+                                )
+                        }
+                    }
+                    Text(tier.tagline)
+                        .font(VitaTypography.bodySmall)
+                        .foregroundStyle(VitaColors.textSecondary)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 0) {
+                    Text(product?.displayPrice ?? tier.monthlyPriceLabel)
+                        .font(VitaTypography.titleMedium.weight(.bold))
+                        .foregroundStyle(VitaColors.textPrimary)
+                    if tier != .free {
+                        Text("/mês")
+                            .font(VitaTypography.bodySmall)
+                            .foregroundStyle(VitaColors.textSecondary)
+                    }
+                }
+            }
+
+            if tier != .free {
+                Label("7 dias grátis", systemImage: "gift.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(VitaColors.accent)
+            }
+
+            Divider().overlay(VitaColors.textTertiary.opacity(0.3))
+
+            // Feature list for this tier's highlights
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(cumulativeFeatures(upTo: tier)) { feat in
+                    HStack(spacing: 10) {
+                        Image(systemName: feat.icon)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(iconColor(for: feat.tier))
+                            .frame(width: 20)
+                        Text(feat.label)
+                            .font(VitaTypography.bodySmall)
+                            .foregroundStyle(VitaColors.textPrimary)
+                            .lineLimit(1)
+                        Spacer()
+                    }
+                }
+            }
+
+            // Primary CTA — HUGE button, no carousel hit-testing issue
+            Button(action: onSubscribe) {
+                HStack(spacing: 8) {
+                    if isPurchasing {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: VitaColors.surface))
+                            .scaleEffect(0.8)
+                    }
+                    Text(ctaText)
+                        .font(VitaTypography.bodyMedium.weight(.bold))
+                }
+                .foregroundStyle(ctaForeground)
+                .frame(maxWidth: .infinity)
+                .frame(height: 52)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(ctaBackground)
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isPurchasing)
+        }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(tier == .premium
+                              ? VitaColors.accent.opacity(0.08)
+                              : Color.clear)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(borderColor, lineWidth: isSelected ? 2 : 1)
+        )
+        .scaleEffect(isSelected ? 1.01 : 1.0)
+        .shadow(color: isSelected ? VitaColors.accent.opacity(0.25) : .clear, radius: 20, y: 6)
+        .contentShape(Rectangle())
+        .onTapGesture { onTap() }
+        .animation(.spring(response: 0.35, dampingFraction: 0.75), value: isSelected)
+    }
+
+    // MARK: - Styling helpers
+
+    private func iconColor(for tier: PlanTier) -> Color {
+        switch tier {
+        case .free:    return VitaColors.textSecondary
+        case .premium: return VitaColors.accent
+        case .pro:     return VitaColors.accent
+        }
+    }
+
+    private var borderColor: Color {
+        if isSelected { return VitaColors.accent }
+        return VitaColors.textTertiary.opacity(0.3)
+    }
+
+    private var ctaText: String {
+        switch tier {
+        case .free:    return "Continuar grátis"
+        case .premium: return "Assinar Premium"
+        case .pro:     return "Assinar Pro"
+        }
+    }
+
+    private var ctaBackground: Color {
+        switch tier {
+        case .free:    return VitaColors.textTertiary.opacity(0.15)
+        case .premium: return VitaColors.accent
+        case .pro:     return VitaColors.accent
+        }
+    }
+
+    private var ctaForeground: Color {
+        switch tier {
+        case .free:    return VitaColors.textPrimary
+        case .premium: return VitaColors.surface
+        case .pro:     return VitaColors.surface
+        }
+    }
+}
+
+// MARK: - Success toast
+
+private struct SuccessToast: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(VitaColors.accent)
+            Text("Assinatura ativada!")
+                .font(VitaTypography.bodyMedium.weight(.semibold))
+                .foregroundStyle(VitaColors.textPrimary)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+        .background(
+            Capsule().fill(.ultraThinMaterial)
+        )
+        .overlay(
+            Capsule().stroke(VitaColors.accent.opacity(0.5), lineWidth: 1)
+        )
     }
 }
 

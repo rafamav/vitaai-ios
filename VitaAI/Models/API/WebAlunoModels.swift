@@ -3,19 +3,18 @@ import Foundation
 // MIGRATION: Partial migration to OpenAPI generated types.
 // PortalExtractRequestPagesInner -> generated (identical fields)
 // PortalExtract200Response -> generated (superset of manual fields)
-// WebalunoGrade: generated WebAlunoGrade uses String for grades, manual uses Double. Kept manual.
-// WebalunoScheduleBlock: generated WebAlunoSchedule lacks slots field. Kept manual.
-// PortalTotals, WebalunoCounts: custom init(from:) for safe defaults. Kept manual.
+
+// PortalTotals, PortalCounts: custom init(from:) for safe defaults. Kept manual.
 // ScreenResponse/ScreenBlock: generated uses different field names (sections vs blocks). Kept manual.
 
-struct WebalunoStatusResponse: Codable {
+struct PortalStatusResponse: Codable {
     var connected: Bool = false
     // New unified format
     var connections: [PortalConnectionInfo]?
     var totals: PortalTotals?
     // Legacy format (kept for backwards compat)
-    var connection: WebalunoConnectionInfo?
-    var counts: WebalunoCounts?
+    var connection: PortalConnectionLegacyInfo?
+    var counts: PortalCounts?
 }
 
 struct PortalConnectionInfo: Codable {
@@ -25,7 +24,7 @@ struct PortalConnectionInfo: Codable {
     var portalType: String?
     var status: String?
     var lastSyncAt: String?
-    var counts: WebalunoCounts?
+    var counts: PortalCounts?
 }
 
 struct PortalTotals: Codable {
@@ -49,13 +48,13 @@ struct PortalTotals: Codable {
     }
 }
 
-struct WebalunoConnectionInfo: Codable {
+struct PortalConnectionLegacyInfo: Codable {
     var instanceUrl: String?
     var status: String?
     var lastSyncAt: String?
 }
 
-struct WebalunoCounts: Codable {
+struct PortalCounts: Codable {
     var grades: Int
     var subjects: Int
     var schedule: Int
@@ -79,62 +78,16 @@ struct WebalunoCounts: Codable {
     }
 }
 
-struct WebalunoConnectRequest: Codable {
-    var cpf: String?
-    var password: String?
-    var sessionCookie: String?
-    var instanceUrl: String = "https://ac3949.mannesoftprime.com.br"
+// MARK: - Agenda (unified calendar)
+
+struct AgendaResponse: Codable {
+    var schedule: [AgendaClassBlock] = []
+    var evaluations: [AgendaEvaluation] = []
+    var summary: AgendaSummary = AgendaSummary()
 }
 
-struct WebalunoConnectResponse: Codable {
-    var success: Bool = false
-    var grades: Int = 0
-    var schedule: Int = 0
-    var syncErrors: [String]?
-    var error: String?
-}
-
-struct WebalunoSyncResponse: Codable {
-    var success: Bool = false
-    var grades: Int = 0
-    var schedule: Int = 0
-    var error: String?
-}
-
-struct WebalunoGradesResponse: Codable {
-    var grades: [WebalunoGrade] = []
-    var summary: WebalunoGradesSummary?
-    var lastSyncAt: String?
-}
-
-struct WebalunoGrade: Codable, Identifiable {
-    var id: String = ""
-    var subjectName: String = ""
-    var subjectCode: String?
-    var grade1: Double?
-    var grade2: Double?
-    var grade3: Double?
-    var finalGrade: Double?
-    var status: String?
-    var attendance: Double?
-    var semester: String?
-}
-
-struct WebalunoGradesSummary: Codable {
-    var total: Int = 0
-    var completed: Int = 0
-    var inProgress: Int = 0
-    var averageGrade: Double?
-    var semesters: Int = 0
-}
-
-struct WebalunoScheduleResponse: Codable {
-    var schedule: [WebalunoScheduleBlock] = []
-    var summary: WebalunoScheduleSummary?
-    var lastSyncAt: String?
-}
-
-struct WebalunoScheduleBlock: Codable {
+struct AgendaClassBlock: Codable, Identifiable {
+    var id: String { "\(dayOfWeek)-\(subjectName)-\(startTime)" }
     var subjectName: String = ""
     var dayOfWeek: Int = 0
     var startTime: String = ""
@@ -144,10 +97,103 @@ struct WebalunoScheduleBlock: Codable {
     var slots: Int = 1
 }
 
-struct WebalunoScheduleSummary: Codable {
+struct AgendaEvaluation: Codable, Identifiable {
+    var id: String = ""
+    var title: String = ""
+    var type: String = ""
+    var date: String?
+    var status: String = ""
+    var score: Double?
+    var subjectName: String?
+}
+
+struct AgendaSummary: Codable {
     var totalClasses: Int = 0
     var subjects: Int = 0
     var daysWithClasses: Int = 0
+    var upcomingEvaluations: Int = 0
+}
+
+// MARK: - Grades Current (consolidated per subject)
+
+struct GradesCurrentResponse: Codable {
+    var current: [GradeSubject] = []
+    var completed: [GradeSubject] = []
+    var summary: GradesSummary = GradesSummary()
+}
+
+struct GradeSubject: Codable, Identifiable {
+    var id: String { subjectName }
+    var subjectName: String = ""
+    var grade1: Double?
+    var grade2: Double?
+    var grade3: Double?
+    var finalGrade: Double?
+    var status: String = "cursando"
+    var attendance: Int?
+    var absences: Int?
+    var workload: Int?
+
+    private enum CodingKeys: String, CodingKey {
+        case subjectName, grade1, grade2, grade3, finalGrade, status, attendance, absences, workload
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        subjectName = (try? c.decode(String.self, forKey: .subjectName)) ?? ""
+        grade1 = Self.flexDouble(c, .grade1)
+        grade2 = Self.flexDouble(c, .grade2)
+        grade3 = Self.flexDouble(c, .grade3)
+        finalGrade = Self.flexDouble(c, .finalGrade)
+        status = (try? c.decode(String.self, forKey: .status)) ?? "cursando"
+        attendance = (try? c.decode(Int.self, forKey: .attendance))
+        absences = (try? c.decode(Int.self, forKey: .absences))
+        workload = (try? c.decode(Int.self, forKey: .workload))
+    }
+
+    private static func flexDouble(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) -> Double? {
+        if let d = try? c.decode(Double.self, forKey: key) { return d }
+        if let i = try? c.decode(Int.self, forKey: key) { return Double(i) }
+        return nil
+    }
+}
+
+struct GradesSummary: Codable {
+    var subjectsCount: Int = 0
+    var averageAttendance: Double?
+    var totalAbsences: Int = 0
+    var averageGrade: Double?
+    var totalWorkload: Int = 0
+
+    init(subjectsCount: Int = 0, averageAttendance: Double? = nil, totalAbsences: Int = 0, averageGrade: Double? = nil, totalWorkload: Int = 0) {
+        self.subjectsCount = subjectsCount
+        self.averageAttendance = averageAttendance
+        self.totalAbsences = totalAbsences
+        self.averageGrade = averageGrade
+        self.totalWorkload = totalWorkload
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        subjectsCount = (try? c.decode(Int.self, forKey: .subjectsCount)) ?? 0
+        // averageAttendance can be Int or Double from API
+        if let d = try? c.decode(Double.self, forKey: .averageAttendance) {
+            averageAttendance = d
+        } else if let i = try? c.decode(Int.self, forKey: .averageAttendance) {
+            averageAttendance = Double(i)
+        } else {
+            averageAttendance = nil
+        }
+        totalAbsences = (try? c.decode(Int.self, forKey: .totalAbsences)) ?? 0
+        if let d = try? c.decode(Double.self, forKey: .averageGrade) {
+            averageGrade = d
+        } else if let i = try? c.decode(Int.self, forKey: .averageGrade) {
+            averageGrade = Double(i)
+        } else {
+            averageGrade = nil
+        }
+        totalWorkload = (try? c.decode(Int.self, forKey: .totalWorkload)) ?? 0
+    }
 }
 
 // MARK: - Subjects

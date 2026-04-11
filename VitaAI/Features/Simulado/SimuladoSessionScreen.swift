@@ -48,18 +48,7 @@ struct SimuladoSessionScreen: View {
         Group {
             if let vm {
                 ZStack {
-                    // Background: #08060a + subtle blue radial gradients
-                    quizBg.ignoresSafeArea()
-                    RadialGradient(
-                        colors: [Color(red: 30/255, green: 80/255, blue: 160/255).opacity(0.10), Color.clear],
-                        center: UnitPoint(x: 0.5, y: 0.2),
-                        startRadius: 0, endRadius: 280
-                    ).ignoresSafeArea()
-                    RadialGradient(
-                        colors: [Color(red: 40/255, green: 100/255, blue: 180/255).opacity(0.06), Color.clear],
-                        center: UnitPoint(x: 0.8, y: 0.7),
-                        startRadius: 0, endRadius: 200
-                    ).ignoresSafeArea()
+                    Color.clear.ignoresSafeArea()
 
                     if vm.state.isLoading || vm.state.currentQuestion == nil {
                         loadingView
@@ -90,7 +79,7 @@ struct SimuladoSessionScreen: View {
                 }
             } else {
                 ZStack {
-                    quizBg.ignoresSafeArea()
+                    Color.clear.ignoresSafeArea()
                     loadingView
                 }
             }

@@ -1,0 +1,6529 @@
+openapi: 3.1.0
+info:
+  title: Vita AI API
+  version: 1.0.0
+  # 2026-04-09: internal phantom table cleanup (no API surface changes)
+  # 2026-04-09: cron-to-ingest auth fix (internal, no API surface changes)
+  # 2026-04-09: portal extraction uses vLLM direct, chat includes portal data (no API surface changes)
+  description: |
+    Source-of-truth API specification for Vita AI across all platforms (Android, iOS, Web).
+    Covers authentication, study tools, QBank, AI coaching, portal connectors, and more. Last updated: 2026-04-08.
+  contact:
+    name: BYMAV
+    email: rafamav@pixio.cloud
+
+servers:
+  - url: https://app.vita-ai.cloud
+    description: Production
+  - url: http://localhost:3000
+    description: Local development
+
+tags:
+  - name: auth
+    description: Authentication (better-auth + mobile flows)
+  - name: portal
+    description: Unified academic portal connectors (Canvas, WebAluno)
+  - name: study
+    description: Study tools - flashcards, mindmaps, sessions, exams, transcription
+  - name: qbank
+    description: Question bank - questions, sessions, progress
+  - name: simulados
+    description: Mock exams / simulated tests
+  - name: ai
+    description: AI coach, OSCE, transcription
+  - name: vita
+    description: Vita chat and student context
+  - name: studio
+    description: Studio - upload sources, generate study outputs
+  - name: user
+    description: User profile, progress, achievements, activity
+  - name: social
+    description: Leaderboard and social stats
+  - name: content
+    description: Documents, notes
+  - name: annotations
+    description: Document annotations (strokes, text boxes)
+  - name: notifications
+    description: Notifications, briefings, preferences
+  - name: platform
+    description: Health, errors, enrollments, grades, materials, push
+  - name: onboarding
+    description: User onboarding
+  - name: universities
+    description: University directory and disciplines
+  - name: billing
+    description: Stripe checkout and webhooks
+  - name: extension
+    description: Browser extension auth and summary
+
+security:
+  - cookieAuth: []
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: better-auth.session_token
+      description: Session cookie set by better-auth
+    extensionToken:
+      type: apiKey
+      in: header
+      name: X-Extension-Token
+      description: Token issued to the browser extension
+    stripeWebhook:
+      type: apiKey
+      in: header
+      name: stripe-signature
+      description: Stripe webhook signature
+
+  schemas:
+    # ── Common ──
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required: [error]
+
+    PlanLimitError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: plan_limit
+        message:
+          type: string
+          example: Upgrade your plan to continue
+        upgrade:
+          type: boolean
+          example: true
+
+    # ── Auth ──
+    AuthToken:
+      type: object
+      properties:
+        token:
+          type: string
+        name:
+          type: string
+          nullable: true
+        email:
+          type: string
+        image:
+          type: string
+          nullable: true
+      required: [token, email]
+
+    # ── Portal ──
+    PortalConnection:
+      type: object
+      properties:
+        id:
+          type: string
+        portalType:
+          type: string
+        portalName:
+          type: string
+          nullable: true
+        instanceUrl:
+          type: string
+        status:
+          type: string
+        lastSyncAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last time data was actually synced (ingest/scrape)
+        lastPingAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last successful keep-alive ping (session still valid)
+        counts:
+          type: object
+          properties:
+            subjects:
+              type: integer
+            evaluations:
+              type: integer
+            schedule:
+              type: integer
+            documents:
+              type: integer
+            semesters:
+              type: integer
+
+    PortalStatus:
+      type: object
+      properties:
+        connected:
+          type: boolean
+        connections:
+          type: array
+          items:
+            $ref: '#/components/schemas/PortalConnection'
+        totals:
+          type: object
+          properties:
+            subjects:
+              type: integer
+            evaluations:
+              type: integer
+            schedule:
+              type: integer
+            documents:
+              type: integer
+            semesters:
+              type: integer
+
+    CanvasIngestPayload:
+      type: object
+      properties:
+        instanceUrl:
+          type: string
+        user:
+          type: object
+        courses:
+          type: array
+          items:
+            $ref: '#/components/schemas/CanvasCourse'
+        assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/CanvasAssignment'
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/CanvasFile'
+        calendarEvents:
+          type: array
+          items:
+            $ref: '#/components/schemas/CanvasCalendarEvent'
+        errors:
+          type: array
+          items:
+            type: object
+        sessionCookies:
+          type: string
+          description: Canvas session cookies from iOS WKWebView for server-side keep-alive
+          nullable: true
+        pdfContents:
+          type: array
+          items:
+            $ref: '#/components/schemas/CanvasPdfContent'
+      required: [instanceUrl, courses, assignments, files, calendarEvents, errors]
+
+    CanvasCourse:
+      type: object
+      properties:
+        canvasCourseId:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+          nullable: true
+        term:
+          type: string
+          nullable: true
+        enrollmentType:
+          type: string
+        currentScore:
+          type: number
+          nullable: true
+        finalScore:
+          type: number
+          nullable: true
+        currentGrade:
+          type: string
+          nullable: true
+        finalGrade:
+          type: string
+          nullable: true
+        teachers:
+          type: array
+          items:
+            type: string
+      required: [canvasCourseId, name, enrollmentType, teachers]
+
+    CanvasAssignment:
+      type: object
+      properties:
+        canvasAssignmentId:
+          type: string
+        canvasCourseId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        dueAt:
+          type: string
+          format: date-time
+          nullable: true
+        pointsPossible:
+          type: number
+          nullable: true
+        score:
+          type: number
+          nullable: true
+        grade:
+          type: string
+          nullable: true
+        submittedAt:
+          type: string
+          format: date-time
+          nullable: true
+      required: [canvasAssignmentId, canvasCourseId, name]
+
+    CanvasFile:
+      type: object
+      properties:
+        canvasFileId:
+          type: string
+        canvasCourseId:
+          type: string
+        displayName:
+          type: string
+        contentType:
+          type: string
+        size:
+          type: integer
+        downloadUrl:
+          type: string
+          nullable: true
+      required: [canvasFileId, canvasCourseId, displayName, contentType, size]
+
+    CanvasCalendarEvent:
+      type: object
+      properties:
+        canvasEventId:
+          type: string
+        title:
+          type: string
+        startAt:
+          type: string
+          format: date-time
+          nullable: true
+        endAt:
+          type: string
+          format: date-time
+          nullable: true
+        contextType:
+          type: string
+          nullable: true
+      required: [canvasEventId, title]
+
+    CanvasPdfContent:
+      type: object
+      properties:
+        canvasFileId:
+          type: string
+        displayName:
+          type: string
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+        base64:
+          type: string
+      required: [canvasFileId, displayName, contentType, sizeBytes, base64]
+
+    WebAlunoIngestPayload:
+      type: object
+      properties:
+        instanceUrl:
+          type: string
+        grades:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebAlunoGrade'
+        curriculum:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebAlunoCurriculum'
+        schedule:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebAlunoSchedule'
+        evaluations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScraperEvaluation'
+        frequency:
+          type: array
+          items:
+            $ref: '#/components/schemas/WebAlunoFrequency'
+      required: [instanceUrl]
+
+    WebAlunoGrade:
+      type: object
+      properties:
+        subjectName:
+          type: string
+        subjectCode:
+          type: string
+          nullable: true
+        grade1:
+          type: string
+          nullable: true
+        grade2:
+          type: string
+          nullable: true
+        grade3:
+          type: string
+          nullable: true
+        finalGrade:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        attendance:
+          type: string
+          nullable: true
+      required: [subjectName]
+
+    WebAlunoCurriculum:
+      type: object
+      properties:
+        subjectName:
+          type: string
+        semester:
+          type: string
+          nullable: true
+        workload:
+          type: string
+          nullable: true
+        finalGrade:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+      required: [subjectName]
+
+    WebAlunoSchedule:
+      type: object
+      properties:
+        subjectName:
+          type: string
+        dayOfWeek:
+          type: integer
+        startTime:
+          type: string
+        endTime:
+          type: string
+        room:
+          type: string
+          nullable: true
+        professor:
+          type: string
+          nullable: true
+      required: [subjectName, dayOfWeek, startTime, endTime]
+
+    WebAlunoFrequency:
+      type: object
+      properties:
+        subjectName:
+          type: string
+        workload:
+          type: string
+          nullable: true
+        absences:
+          type: string
+          nullable: true
+        attendance:
+          type: string
+          nullable: true
+      required: [subjectName]
+
+    ScraperEvaluation:
+      type: object
+      properties:
+        subjectName:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+          nullable: true
+        date:
+          type: string
+          nullable: true
+        weight:
+          type: number
+          nullable: true
+        score:
+          type: number
+          nullable: true
+      required: [subjectName, title]
+
+    CanvasIngestResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        connectionId:
+          type: string
+        stats:
+          type: object
+          properties:
+            courses:
+              type: integer
+            files:
+              type: integer
+            assignments:
+              type: integer
+            calendarEvents:
+              type: integer
+            subjectsWritten:
+              type: integer
+            evaluationsWritten:
+              type: integer
+            calendarWritten:
+              type: integer
+            pdfExtraction:
+              type: integer
+            errors:
+              type: array
+              items:
+                type: string
+            courseMapping:
+              type: object
+
+    WebAlunoIngestResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        grades:
+          type: integer
+        curriculum:
+          type: integer
+        schedule:
+          type: integer
+        frequency:
+          type: integer
+        academic:
+          type: object
+          properties:
+            subjectsWritten:
+              type: integer
+            evalsWritten:
+              type: integer
+            schedWritten:
+              type: integer
+
+    PortalGrade:
+      type: object
+      properties:
+        id:
+          type: string
+        subjectName:
+          type: string
+        subjectCode:
+          type: string
+          nullable: true
+        grade1:
+          type: string
+          nullable: true
+        grade2:
+          type: string
+          nullable: true
+        grade3:
+          type: string
+          nullable: true
+        finalGrade:
+          type: string
+          nullable: true
+        status:
+          type: string
+        attendance:
+          type: string
+          nullable: true
+        absences:
+          type: string
+          nullable: true
+        workload:
+          type: string
+          nullable: true
+        semester:
+          type: string
+          nullable: true
+        professor:
+          type: string
+          nullable: true
+        turma:
+          type: string
+          nullable: true
+        source:
+          type: string
+
+    PortalScheduleItem:
+      type: object
+      properties:
+        id:
+          type: string
+        subjectName:
+          type: string
+        dayOfWeek:
+          type: integer
+        startTime:
+          type: string
+        endTime:
+          type: string
+        room:
+          type: string
+          nullable: true
+        professor:
+          type: string
+          nullable: true
+
+    PortalEvaluation:
+      type: object
+      properties:
+        id:
+          type: string
+        subjectId:
+          type: string
+        subjectName:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+        date:
+          type: string
+          format: date-time
+          nullable: true
+        pointsPossible:
+          type: number
+          nullable: true
+        score:
+          type: number
+          nullable: true
+        grade:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+        submitted:
+          type: boolean
+          nullable: true
+
+    PortalCalendarItem:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+        startAt:
+          type: string
+          format: date-time
+        endAt:
+          type: string
+          format: date-time
+          nullable: true
+        subjectName:
+          type: string
+          nullable: true
+
+    SyncProgress:
+      type: object
+      properties:
+        syncId:
+          type: string
+        phase:
+          type: string
+        percent:
+          type: number
+        label:
+          type: string
+        grades:
+          type: integer
+        schedule:
+          type: integer
+        pagesDiscovered:
+          type: integer
+        pagesProcessed:
+          type: integer
+        error:
+          type: string
+          nullable: true
+
+    # ── Study ──
+    FlashcardDeck:
+      type: object
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        title:
+          type: string
+        subjectId:
+          type: string
+          nullable: true
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/Flashcard'
+
+    Flashcard:
+      type: object
+      properties:
+        id:
+          type: string
+        deckId:
+          type: string
+        front:
+          type: string
+        back:
+          type: string
+        stability:
+          type: number
+          nullable: true
+        difficulty:
+          type: number
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        scheduledDays:
+          type: integer
+          nullable: true
+        reps:
+          type: integer
+          nullable: true
+        lapses:
+          type: integer
+          nullable: true
+        nextReviewAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastReviewAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    FlashcardReviewResult:
+      type: object
+      properties:
+        id:
+          type: string
+        stability:
+          type: number
+        difficulty:
+          type: number
+        state:
+          type: string
+        scheduledDays:
+          type: integer
+        reps:
+          type: integer
+        lapses:
+          type: integer
+        nextReviewAt:
+          type: string
+          format: date-time
+        rating:
+          type: integer
+        preview:
+          type: object
+          properties:
+            again:
+              type: object
+            hard:
+              type: object
+            good:
+              type: object
+            easy:
+              type: object
+
+    FlashcardStats:
+      type: object
+      properties:
+        totalCards:
+          type: integer
+        pendingCards:
+          type: integer
+        learnedCards:
+          type: integer
+        retentionRate:
+          type: number
+        avgReviewTime:
+          type: number
+        decks:
+          type: array
+          items:
+            type: object
+        forecast:
+          type: array
+          items:
+            type: object
+
+    Mindmap:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        sourceIds:
+          type: array
+          items:
+            type: string
+        nodes:
+          type: object
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Exam:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        subjectId:
+          type: string
+          nullable: true
+        date:
+          type: string
+          format: date
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    StudySession:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        duration:
+          type: integer
+        accuracy:
+          type: number
+          nullable: true
+        date:
+          type: string
+          format: date-time
+
+    StudyOverviewFlashcards:
+      type: object
+      required: [totalDecks, totalCards, dueNow, reviewedToday]
+      properties:
+        totalDecks:
+          type: integer
+        totalCards:
+          type: integer
+        dueNow:
+          type: integer
+        reviewedToday:
+          type: integer
+        lastReviewAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    StudyOverviewQBank:
+      type: object
+      required: [totalAnswered, accuracy, sessionsThisWeek]
+      properties:
+        totalAnswered:
+          type: integer
+        accuracy:
+          type: number
+          description: 0..1
+        sessionsThisWeek:
+          type: integer
+        lastSessionAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    StudyOverviewSimulados:
+      type: object
+      required: [totalAttempts]
+      properties:
+        totalAttempts:
+          type: integer
+        avgScore:
+          type: number
+          nullable: true
+        lastScore:
+          type: number
+          nullable: true
+        lastAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    StudyOverviewTranscricoes:
+      type: object
+      required: [total]
+      properties:
+        total:
+          type: integer
+        lastAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    StudyOverviewSubject:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    StudyOverviewResponse:
+      type: object
+      required: [flashcards, qbank, simulados, transcricoes, subjects]
+      properties:
+        flashcards:
+          $ref: '#/components/schemas/StudyOverviewFlashcards'
+        qbank:
+          $ref: '#/components/schemas/StudyOverviewQBank'
+        simulados:
+          $ref: '#/components/schemas/StudyOverviewSimulados'
+        transcricoes:
+          $ref: '#/components/schemas/StudyOverviewTranscricoes'
+        subjects:
+          type: array
+          items:
+            $ref: '#/components/schemas/StudyOverviewSubject'
+
+    StudyPlanItem:
+      type: object
+      properties:
+        id:
+          type: string
+        planId:
+          type: string
+          nullable: true
+        planTitle:
+          type: string
+          nullable: true
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        subjectId:
+          type: string
+          nullable: true
+        date:
+          type: string
+          format: date
+        duration:
+          type: integer
+          nullable: true
+        completed:
+          type: boolean
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    TrabalhosResponse:
+      type: object
+      properties:
+        pending:
+          type: array
+          items:
+            $ref: '#/components/schemas/Trabalho'
+        completed:
+          type: array
+          items:
+            $ref: '#/components/schemas/Trabalho'
+        overdue:
+          type: array
+          items:
+            $ref: '#/components/schemas/Trabalho'
+        total:
+          type: integer
+    Trabalho:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        subjectName:
+          type: string
+        type:
+          type: string
+          enum: [assignment, quiz, seminar]
+        status:
+          type: string
+        submitted:
+          type: boolean
+        submittedAt:
+          type: string
+          format: date-time
+          nullable: true
+        date:
+          type: string
+          format: date-time
+          nullable: true
+        daysUntil:
+          type: integer
+          nullable: true
+        pointsPossible:
+          type: number
+          nullable: true
+        score:
+          type: number
+          nullable: true
+        grade:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        descriptionHtml:
+          type: string
+          nullable: true
+        submissionTypes:
+          type: array
+          items:
+            type: string
+        canvasAssignmentId:
+          type: string
+          nullable: true
+        canGenerate:
+          type: boolean
+    Transcription:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+        fileName:
+          type: string
+          nullable: true
+        fileSize:
+          type: integer
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    VoiceSession:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        specialty:
+          type: string
+        caseId:
+          type: string
+          nullable: true
+        steps:
+          type: integer
+        score:
+          type: number
+        date:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ── QBank ──
+    QBankFilters:
+      type: object
+      properties:
+        institutions:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+        topics:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              name:
+                type: string
+        years:
+          type: array
+          items:
+            type: integer
+        difficulties:
+          type: array
+          items:
+            type: string
+        totalQuestions:
+          type: integer
+        totalAllStages:
+          type: integer
+          nullable: true
+        stage:
+          type: string
+          nullable: true
+
+    QBankQuestion:
+      type: object
+      properties:
+        id:
+          type: integer
+        statement:
+          type: string
+        year:
+          type: integer
+          nullable: true
+        difficulty:
+          type: string
+          nullable: true
+        institutionName:
+          type: string
+          nullable: true
+        alternatives:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              description:
+                type: string
+              sortOrder:
+                type: integer
+              isCorrect:
+                type: boolean
+        images:
+          type: array
+          items:
+            type: object
+        topics:
+          type: array
+          items:
+            type: object
+        statistics:
+          type: object
+          nullable: true
+        userAnswer:
+          type: object
+          nullable: true
+
+    QBankProgress:
+      type: object
+      properties:
+        totalAvailable:
+          type: integer
+        totalAnswered:
+          type: integer
+        totalCorrect:
+          type: integer
+        totalAnswers:
+          type: integer
+        accuracy:
+          type: number
+        byDifficulty:
+          type: array
+          items:
+            type: object
+        byTopic:
+          type: array
+          items:
+            type: object
+
+    QBankSession:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+          nullable: true
+        questionCount:
+          type: integer
+        answeredCount:
+          type: integer
+        correctCount:
+          type: integer
+        score:
+          type: number
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    QBankList:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        questionCount:
+          type: integer
+
+    # ── Simulados ──
+    SimuladoAttempt:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        subjectId:
+          type: string
+          nullable: true
+        timed:
+          type: boolean
+        timeLimitMinutes:
+          type: integer
+          nullable: true
+        totalQ:
+          type: integer
+        correctQ:
+          type: integer
+        wrongQ:
+          type: integer
+        blankQ:
+          type: integer
+        score:
+          type: number
+          nullable: true
+        timeSpent:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    SimuladoQuestion:
+      type: object
+      properties:
+        id:
+          type: string
+        statement:
+          type: string
+        options:
+          type: array
+          items:
+            type: string
+        correctIdx:
+          type: integer
+        subjectId:
+          type: string
+          nullable: true
+        topic:
+          type: string
+          nullable: true
+        chosenIdx:
+          type: integer
+          nullable: true
+        isCorrect:
+          type: boolean
+          nullable: true
+
+    # ── AI ──
+    ChatMessage:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [user, assistant, system]
+        content:
+          type: string
+      required: [role, content]
+
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ConversationMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+        content:
+          type: string
+        feedback:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+
+    OsceAttemptStart:
+      type: object
+      properties:
+        attemptId:
+          type: string
+        patientContext:
+          type: string
+        currentStep:
+          type: integer
+        totalSteps:
+          type: integer
+        stepName:
+          type: string
+        prompt:
+          type: string
+
+    OsceStepResponse:
+      type: object
+      properties:
+        stepScore:
+          type: number
+        feedback:
+          type: string
+        isComplete:
+          type: boolean
+        nextStep:
+          type: integer
+          nullable: true
+        nextPrompt:
+          type: string
+          nullable: true
+        nextStepName:
+          type: string
+          nullable: true
+        totalScore:
+          type: number
+          nullable: true
+        grade:
+          type: string
+          nullable: true
+        allStepScores:
+          type: array
+          items:
+            type: number
+          nullable: true
+        xpAwarded:
+          type: integer
+          nullable: true
+
+    # ── Studio ──
+    StudioOutput:
+      type: object
+      properties:
+        id:
+          type: string
+        outputType:
+          type: string
+          enum: [summary, flashcards, mindmap, quiz]
+        title:
+          type: string
+        sourceName:
+          type: string
+        sourceId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+        content:
+          type: object
+
+    StudioSource:
+      type: object
+      properties:
+        id:
+          type: string
+        fileName:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    # ── User ──
+    Profile:
+      type: object
+      properties:
+        id:
+          type: string
+        displayName:
+          type: string
+          nullable: true
+        email:
+          type: string
+        image:
+          type: string
+          nullable: true
+        moment:
+          type: string
+          nullable: true
+        year:
+          type: integer
+          nullable: true
+        semester:
+          type: integer
+          nullable: true
+        highSchoolYear:
+          type: integer
+          nullable: true
+        examBoard:
+          type: string
+          nullable: true
+        studyGoalId:
+          type: string
+          nullable: true
+        university:
+          type: string
+          nullable: true
+        universityState:
+          type: string
+          nullable: true
+        universityId:
+          type: string
+          nullable: true
+        universityLms:
+          type: string
+          nullable: true
+        subjects:
+          type: array
+          items:
+            type: object
+        stats:
+          type: object
+        onboardingCompleted:
+          type: boolean
+
+    UserProgress:
+      type: object
+      properties:
+        streakDays:
+          type: integer
+        totalStudyHours:
+          type: number
+        avgAccuracy:
+          type: number
+        flashcardsDue:
+          type: integer
+        heatmap:
+          type: array
+          items:
+            type: object
+          description: Last 91 days of activity
+        weeklyHours:
+          type: array
+          items:
+            type: number
+          description: Study hours per day of current week (7 entries)
+
+    Achievements:
+      type: object
+      properties:
+        level:
+          type: integer
+        totalXp:
+          type: integer
+        currentLevelXp:
+          type: integer
+        xpToNextLevel:
+          type: integer
+        streakDays:
+          type: integer
+        tier:
+          type: string
+        achievements:
+          type: array
+          items:
+            type: object
+
+    ActivityEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        action:
+          type: string
+        xpAwarded:
+          type: integer
+          nullable: true
+        metadata:
+          type: object
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    # ── Content ──
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        fileName:
+          type: string
+        fileUrl:
+          type: string
+        subjectId:
+          type: string
+          nullable: true
+        totalPages:
+          type: integer
+          nullable: true
+        currentPage:
+          type: integer
+          nullable: true
+        readProgress:
+          type: number
+          nullable: true
+        isFavorite:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    Note:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+          nullable: true
+        subjectId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ── Notifications ──
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        time:
+          type: string
+        read:
+          type: boolean
+        group:
+          type: string
+        route:
+          type: string
+          nullable: true
+        priority:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    Briefing:
+      type: object
+      properties:
+        id:
+          type: string
+        subject:
+          type: string
+        module:
+          type: string
+          nullable: true
+        summary:
+          type: string
+        keypoints:
+          type: array
+          items:
+            type: string
+        suggestedQuestions:
+          type: array
+          items:
+            type: string
+        connections:
+          type: string
+        filesAnalyzed:
+          type: integer
+
+    # ── Platform ──
+    HealthCheck:
+      type: object
+      properties:
+        status:
+          type: string
+        db:
+          type: string
+        uptime:
+          type: number
+        version:
+          type: string
+        checks:
+          type: object
+          nullable: true
+
+    Enrollment:
+      type: object
+      properties:
+        id:
+          type: string
+        subjectName:
+          type: string
+        grade1:
+          type: string
+          nullable: true
+        grade2:
+          type: string
+          nullable: true
+        grade3:
+          type: string
+          nullable: true
+        finalGrade:
+          type: string
+          nullable: true
+        status:
+          type: string
+          nullable: true
+
+    Grade:
+      type: object
+      properties:
+        id:
+          type: string
+        subjectId:
+          type: string
+        label:
+          type: string
+        value:
+          type: number
+        maxValue:
+          type: number
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    Material:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+        subject:
+          type: string
+        size:
+          type: integer
+        addedAt:
+          type: string
+          format: date-time
+
+    # ── Universities ──
+    University:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        shortName:
+          type: string
+          nullable: true
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        enameConcept:
+          type: integer
+          nullable: true
+        portals:
+          type: array
+          items:
+            $ref: '#/components/schemas/UniversityPortal'
+
+    UniversityPortal:
+      type: object
+      properties:
+        id:
+          type: string
+        portalType:
+          type: string
+        portalName:
+          type: string
+        instanceUrl:
+          type: string
+          nullable: true
+        authMethod:
+          type: string
+          nullable: true
+
+    Discipline:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        semester:
+          type: integer
+          nullable: true
+
+    # ── Leaderboard ──
+    LeaderboardEntry:
+      type: object
+      properties:
+        rank:
+          type: integer
+        name:
+          type: string
+        xp:
+          type: integer
+        streak:
+          type: integer
+        isCurrentUser:
+          type: boolean
+        initials:
+          type: string
+
+    Dashboard:
+      type: object
+      properties:
+        greeting:
+          type: string
+        subtitle:
+          type: string
+        hero:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardHeroCard'
+        subjects:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardSubject'
+        agenda:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardAgendaItem'
+        flashcardsDueTotal:
+          type: integer
+        xp:
+          type: object
+          properties:
+            total:
+              type: integer
+            level:
+              type: integer
+
+    DashboardHeroCard:
+      type: object
+      required: [type, label, labelTone, title, subtitle, pills, cta, action, urgency, backgroundImage]
+      properties:
+        type:
+          type: string
+          enum: [exam, revision, streak, grade_alert, deadline]
+          description: |
+            Semantic type for analytics and routing. DO NOT use in client to decide
+            label/cta/background — those come from their own fields. Clients should
+            only branch on `type` for routing (e.g. grade_alert opens disciplineDetail).
+        label:
+          type: string
+          description: |
+            Short uppercase label rendered above the title (e.g. "PROVA",
+            "RISCO DE REPROVAR"). Fully server-driven so clients don't duplicate copy.
+        labelTone:
+          type: string
+          enum: [danger, warning, info, accent, neutral]
+          description: |
+            Semantic tone for the label color. Clients map this to their own
+            design tokens (VitaColors on iOS, Compose colors on Android). Never
+            send raw hex from backend — backend speaks semantics, clients speak pixels.
+        title:
+          type: string
+        subtitle:
+          type: string
+        pills:
+          type: array
+          items:
+            type: object
+            properties:
+              icon:
+                type: string
+              text:
+                type: string
+        action:
+          type: object
+          properties:
+            type:
+              type: string
+            target:
+              type: string
+            id:
+              type: string
+              nullable: true
+        urgency:
+          type: integer
+          description: 0-100, higher = more urgent
+        cta:
+          $ref: '#/components/schemas/DashboardHeroCardCta'
+        backgroundImage:
+          $ref: '#/components/schemas/DashboardHeroCardBackground'
+        gradeAlertMeta:
+          $ref: '#/components/schemas/GradeAlertMeta'
+          nullable: true
+          description: |
+            Only present when type=grade_alert. Exposes the weighted grade-risk
+            model so clients can show the "why" and Vita (coach IA) can reason
+            without confusing absolute scores with weighted performance.
+
+    GradeAlertMeta:
+      type: object
+      description: |
+        Weighted grade-risk metadata. The backend groups all graded evaluations
+        of a subject, computes pointsEarned = sum(score * weight) against
+        totalWeight=10 (ULBRA standard), and classifies into one of 3 categories
+        to avoid false positives like "Nota 1.1" when the evaluation weight is 2
+        (which is actually 55%, not a failing grade).
+
+        Categories:
+        - risco_reprovacao: max possible final grade < passingGrade (math-impossible to pass)
+        - alerta_projecao:  student needs score > passingGrade on remaining evals AND assessed weight >= 30%
+        - nota_fraca_isolada: one evaluation < 30% of its own weight, subject still recoverable
+
+        Gate: the backend NEVER emits alerta_projecao when assessed weight < 30%
+        of total weight (too early in the semester to alert).
+      required:
+        - riskCategory
+        - pointsEarned
+        - pointsRemaining
+        - assessedWeight
+        - totalWeight
+      properties:
+        riskCategory:
+          type: string
+          enum: [risco_reprovacao, alerta_projecao, nota_fraca_isolada]
+          description: Which of the 3 categories triggered this alert
+        scorePercent:
+          type: integer
+          nullable: true
+          description: |
+            % of max achieved on the triggering evaluation (score/weight*100).
+            Only set when a single isolated eval triggered the alert.
+        projectedAvg:
+          type: number
+          nullable: true
+          description: |
+            Projected final average assuming student scores exactly passingGrade
+            on remaining evaluations. Neutral projection, not pessimistic.
+        pointsEarned:
+          type: number
+          description: Sum of (score * weight) across all graded evaluations of this subject
+        pointsRemaining:
+          type: number
+          description: Weight of evaluations still to be taken (totalWeight - assessedWeight)
+        minNeeded:
+          type: number
+          nullable: true
+          description: |
+            Minimum average needed on remaining evaluations to reach passingGrade.
+            Null when there are no remaining evaluations.
+        assessedWeight:
+          type: number
+          description: Sum of weights of evaluations already graded (0-10)
+        totalWeight:
+          type: number
+          description: Total weight of all evaluations for the subject (ULBRA default = 10)
+
+    DashboardHeroCardCta:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          description: CTA button copy (e.g. "Estudar agora", "Revisar flashcards")
+        icon:
+          type: string
+          nullable: true
+          description: Optional SF Symbol / Material icon name
+
+    DashboardHeroCardBackground:
+      type: object
+      required: [asset]
+      properties:
+        asset:
+          type: string
+          description: |
+            Asset name (convention shared by iOS and Android asset catalogs).
+            Backend picks based on subject/type. Clients fall back to a default
+            if the asset is missing locally.
+
+    DashboardSubject:
+      type: object
+      properties:
+        name:
+          type: string
+        shortName:
+          type: string
+        difficulty:
+          type: string
+          nullable: true
+        vitaScore:
+          type: number
+          nullable: true
+          description: 0-100 mastery score
+        vitaTier:
+          type: string
+          nullable: true
+          description: "tier label: bronze, silver, gold, diamond"
+
+    DashboardAgendaItem:
+      type: object
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        daysUntil:
+          type: integer
+        date:
+          type: string
+
+    # ═══ Server-Driven UI ═══
+
+    ScreenResponse:
+      type: object
+      required: [screenId, sections]
+      properties:
+        screenId:
+          type: string
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScreenSection'
+
+    ScreenSection:
+      type: object
+      required: [type, props]
+      properties:
+        type:
+          type: string
+          enum:
+            - hero-carousel
+            - hero-stat
+            - section-label
+            - tools-grid
+            - subject-scroll
+            - stat-grid
+            - stat-row
+            - glass-card
+            - agenda-list
+            - deck-list
+            - row-list
+            - leaderboard
+            - heatmap
+            - bar-chart
+            - progress-ring
+            - empty-state
+            - action-button
+        props:
+          type: object
+          additionalProperties: true
+
+    ScreenAction:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [navigate, sheet, link]
+        target:
+          type: string
+        screenId:
+          type: string
+        id:
+          type: string
+        url:
+          type: string
+
+  responses:
+    Unauthorized:
+      description: Not authenticated
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    PlanLimit:
+      description: Plan limit reached - upgrade required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PlanLimitError'
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+paths:
+  # ════════════════════════════════════════
+  # AUTH
+  # ════════════════════════════════════════
+  /api/auth/mobile-start:
+    get:
+      tags: [auth]
+      operationId: mobileAuthStart
+      summary: Start mobile OAuth flow
+      security: []
+      parameters:
+        - name: provider
+          in: query
+          schema:
+            type: string
+            default: google
+        - name: callbackURL
+          in: query
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to OAuth provider
+
+  /api/auth/mobile-callback:
+    get:
+      tags: [auth]
+      operationId: mobileAuthCallback
+      summary: OAuth callback - redirects to app deep link
+      security: []
+      responses:
+        '302':
+          description: Redirect to vitaai://auth/callback with token, name, email, image, or error query params
+
+  /api/auth/mobile-apple:
+    post:
+      tags: [auth]
+      operationId: mobileAppleAuth
+      summary: Sign in with Apple identity token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                identityToken:
+                  type: string
+                fullName:
+                  type: string
+                  nullable: true
+                email:
+                  type: string
+                  nullable: true
+                nonce:
+                  type: string
+                  nullable: true
+              required: [identityToken]
+      responses:
+        '200':
+          description: Apple auth successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthToken'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/auth/{path}:
+    get:
+      tags: [auth]
+      operationId: betterAuthCatchAllGet
+      summary: better-auth catch-all (GET)
+      security: []
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Varies by better-auth sub-route
+    post:
+      tags: [auth]
+      operationId: betterAuthCatchAllPost
+      summary: better-auth catch-all (POST)
+      security: []
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Varies by better-auth sub-route
+
+  # ════════════════════════════════════════
+  # INTERNAL / CRON
+  # ════════════════════════════════════════
+
+  /api/cron/portal-sync:
+    get:
+      tags: [internal]
+      operationId: cronPortalSync
+      summary: Periodic portal sync worker (keep-alive + full re-sync, logs to sync_logs)
+      description: Protected by CRON_SECRET bearer token. Not for client use. Writes audit trail to vita.sync_logs.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Sync results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  processed:
+                    type: integer
+                  results:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/cron/notifications:
+    get:
+      tags: [internal]
+      operationId: cronNotifications
+      summary: Daily notification worker - exam alerts, flashcard reminders, grade alerts
+      description: |
+        Protected by CRON_SECRET bearer token. Not for client use.
+        Checks all users for upcoming exams (7/3/1 day alerts), flashcards due,
+        and low grades needing recovery. Idempotent via deterministic notification IDs.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Notification results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  sent:
+                    type: integer
+                  users:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/portal/force-sync:
+    post:
+      tags: [internal]
+      operationId: portalForceSync
+      summary: Force Canvas re-sync with API token
+      description: Protected by CRON_SECRET. Accepts a Canvas Personal Access Token to re-scrape and ingest data.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connectionId:
+                  type: string
+                  nullable: true
+                token:
+                  type: string
+              required: [token]
+      responses:
+        '200':
+          description: Sync results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  scrape:
+                    type: object
+                  ingest:
+                    type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/mcp:
+    post:
+      tags: [internal]
+      operationId: mcpEndpoint
+      summary: MCP (Model Context Protocol) endpoint for AI agents
+      description: Internal MCP server endpoint for AI agent tools. Not for client use.
+      responses:
+        '200':
+          description: MCP response
+
+  # ════════════════════════════════════════
+  # PORTAL
+  # ════════════════════════════════════════
+  /api/portal/filter-files:
+    post:
+      tags: [portal]
+      operationId: portalFilterFiles
+      summary: LLM-based file filter — classify which files are planos de ensino
+      security:
+        - cookieAuth: []
+        - extensionToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      displayName:
+                        type: string
+                      contentType:
+                        type: string
+                      size:
+                        type: integer
+                    required: [id, displayName]
+              required: [files]
+      responses:
+        '200':
+          description: Filtered file IDs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  relevantFileIds:
+                    type: array
+                    items:
+                      type: string
+                  fallback:
+                    type: boolean
+                    description: True if regex fallback was used (LLM unavailable)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # /api/canvas/status — REMOVED. Use /api/portal/status instead.
+
+  /api/portal/status:
+    get:
+      tags: [portal]
+      operationId: portalStatus
+      summary: Get portal connection status
+      security:
+        - cookieAuth: []
+        - extensionToken: []
+      responses:
+        '200':
+          description: Connection status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/portal/connect:
+    post:
+      tags: [portal]
+      operationId: portalConnect
+      summary: Connect to academic portal via session cookie
+      security:
+        - cookieAuth: []
+        - extensionToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sessionCookie:
+                  type: string
+                instanceUrl:
+                  type: string
+                syncId:
+                  type: string
+                  nullable: true
+                portalName:
+                  type: string
+                  nullable: true
+              required: [sessionCookie, instanceUrl]
+      responses:
+        '200':
+          description: Connection initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  syncId:
+                    type: string
+                  portalType:
+                    type: string
+                  grades:
+                    type: integer
+                  schedule:
+                    type: integer
+                  pagesDiscovered:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/portal/ingest:
+    post:
+      tags: [portal]
+      operationId: portalIngest
+      summary: Ingest data from Canvas or WebAluno portal (warns on missing cookies)
+      # 2026-04-09: internal phantom table cleanup (no API surface changes)
+  # 2026-04-09: cron-to-ingest auth fix (internal, no API surface changes)
+  # 2026-04-09: portal extraction uses vLLM direct, chat includes portal data (no API surface changes)
+      description: |
+        Accepts polymorphic payload: Canvas format (with courses, assignments, files, calendarEvents)
+        or WebAluno format (with grades, curriculum, schedule, frequency).
+      security:
+        - cookieAuth: []
+        - extensionToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/CanvasIngestPayload'
+                - $ref: '#/components/schemas/WebAlunoIngestPayload'
+      responses:
+        '200':
+          description: Ingest successful. Response shape depends on payload type.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/CanvasIngestResponse'
+                  - $ref: '#/components/schemas/WebAlunoIngestResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/portal/disconnect:
+    delete:
+      tags: [portal]
+      operationId: portalDisconnect
+      summary: Disconnect a portal connection
+      security:
+        - cookieAuth: []
+        - extensionToken: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connectionId:
+                  type: string
+                  nullable: true
+                portalType:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Disconnected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/portal/keep-alive:
+    post:
+      tags: [portal]
+      operationId: portalKeepAlive
+      summary: Ping active portal sessions to prevent expiration
+      # 2026-04-09: internal phantom table cleanup (no API surface changes)
+  # 2026-04-09: cron-to-ingest auth fix (internal, no API surface changes)
+  # 2026-04-09: portal extraction uses vLLM direct, chat includes portal data (no API surface changes)
+      description: |
+        Sends a lightweight request to active portal connections to keep PHP sessions alive.
+        If a session has expired (login page returned), marks the connection as 'expired'.
+        Optionally triggers data extraction if the last sync was over 1 hour ago.
+      security:
+        - cookieAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connectionId:
+                  type: string
+                  description: Optional - ping only this connection. If omitted, pings all active connections.
+      responses:
+        '200':
+          description: Keep-alive results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total:
+                    type: integer
+                  alive:
+                    type: integer
+                  expired:
+                    type: integer
+                  errors:
+                    type: integer
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        connectionId:
+                          type: string
+                        instanceUrl:
+                          type: string
+                        status:
+                          type: string
+                          enum: [alive, expired, error]
+                        syncTriggered:
+                          type: boolean
+                        error:
+                          type: string
+                          nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/portal/extract:
+    post:
+      tags: [portal]
+      operationId: portalExtract
+      summary: Extract data from HTML pages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      html:
+                        type: string
+                      linkText:
+                        type: string
+                instanceUrl:
+                  type: string
+                university:
+                  type: string
+                  nullable: true
+                syncId:
+                  type: string
+                  nullable: true
+                portalName:
+                  type: string
+                  nullable: true
+              required: [pages, instanceUrl]
+      responses:
+        '200':
+          description: Extraction result (returns immediately, processes in background)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  syncId:
+                    type: string
+                    description: Poll via /api/portal/sync-progress?syncId=X for progress
+                  grades:
+                    type: integer
+                    description: Initially 0, updated via sync-progress polling
+                  schedule:
+                    type: integer
+                    description: Initially 0, updated via sync-progress polling
+                  pagesExtracted:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/portal/proxy:
+    get:
+      tags: [portal]
+      operationId: portalProxyGet
+      summary: Proxy GET request to portal URL
+      security: []
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Proxied HTML content
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [portal]
+      operationId: portalProxyPost
+      summary: Proxy POST request to portal URL
+      security: []
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Proxied HTML content
+          content:
+            text/html:
+              schema:
+                type: string
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/portal/server-scrape:
+    post:
+      tags: [portal]
+      operationId: portalServerScrape
+      summary: Server-side scrape of portal with credentials
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+                instanceUrl:
+                  type: string
+                  nullable: true
+                university:
+                  type: string
+                  nullable: true
+                portalId:
+                  type: string
+                  nullable: true
+              required: [email, password]
+      responses:
+        '200':
+          description: Scrape initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  syncId:
+                    type: string
+                  grades:
+                    type: integer
+                  schedule:
+                    type: integer
+                  pagesDiscovered:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/portal/sync-progress:
+    get:
+      tags: [portal]
+      operationId: portalSyncProgress
+      summary: Get sync progress by syncId
+      parameters:
+        - name: syncId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sync progress
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncProgress'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/portal/data:
+    get:
+      tags: [portal]
+      operationId: portalData
+      summary: Get all portal data (grades, schedule, evaluations, calendar)
+      responses:
+        '200':
+          description: All portal data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  connected:
+                    type: boolean
+                  connections:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PortalConnection'
+                  grades:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PortalGrade'
+                  schedule:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PortalScheduleItem'
+                  evaluations:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PortalEvaluation'
+                  calendar:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PortalCalendarItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/portal/bridge:
+    get:
+      tags: [portal]
+      operationId: portalBridge
+      summary: Serve bridge.js script for portal page extraction (injected by iOS/Android WebView)
+      responses:
+        '200':
+          description: Bridge JavaScript file
+          content:
+            application/javascript:
+              schema:
+                type: string
+
+  /api/portal/session:
+    post:
+      tags: [portal]
+      operationId: portalSession
+      summary: Connect portal via proxy-captured session (fetch HTML, LLM extract, save)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sessionCookie:
+                  type: string
+                  description: "'proxy-captured' or raw PHPSESSID value"
+                instanceUrl:
+                  type: string
+                syncId:
+                  type: string
+                portalName:
+                  type: string
+              required: [sessionCookie, instanceUrl]
+      responses:
+        '200':
+          description: Extraction result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  syncId:
+                    type: string
+                  portalType:
+                    type: string
+                  grades:
+                    type: integer
+                  schedule:
+                    type: integer
+                  pagesDiscovered:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ════════════════════════════════════════
+  # STUDY
+  # ════════════════════════════════════════
+
+  /api/estudos/plan:
+    get:
+      tags: [study]
+      operationId: getStudyPlan
+      summary: Get prioritized study plan based on difficulty, grades, accuracy, and exam proximity
+      responses:
+        '200':
+          description: Prioritized list of subjects to study
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    subjectId:
+                      type: string
+                    name:
+                      type: string
+                    icon:
+                      type: string
+                    difficulty:
+                      type: string
+                    priorityScore:
+                      type: number
+                    confidence:
+                      type: string
+                      enum: [high, medium, low]
+                    reasons:
+                      type: array
+                      items:
+                        type: string
+                    accuracy:
+                      type: object
+                      nullable: true
+                      properties:
+                        total:
+                          type: integer
+                        correct:
+                          type: integer
+                        accuracy:
+                          type: number
+                    grade:
+                      type: object
+                      nullable: true
+                      properties:
+                        value:
+                          type: number
+                        maxValue:
+                          type: number
+                        normalized:
+                          type: number
+                    nextExam:
+                      type: object
+                      nullable: true
+                      properties:
+                        title:
+                          type: string
+                        date:
+                          type: string
+                        daysUntil:
+                          type: integer
+                    topics:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          questionsAvailable:
+                            type: integer
+                    resources:
+                      type: object
+                      properties:
+                        questionsTotal:
+                          type: integer
+                        topicsCount:
+                          type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/planner:
+    get:
+      tags: [study]
+      operationId: getPlanner
+      summary: Get study planner items for a date range
+      parameters:
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Study plans with items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    userId:
+                      type: string
+                    startDate:
+                      type: string
+                      format: date-time
+                    endDate:
+                      type: string
+                      format: date-time
+                    items:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          subjectName:
+                            type: string
+                          date:
+                            type: string
+                            format: date-time
+                          durationMinutes:
+                            type: integer
+                          completed:
+                            type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [study]
+      operationId: createPlannerItem
+      summary: Create a study plan item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subjectName:
+                  type: string
+                date:
+                  type: string
+                dayOfWeek:
+                  type: integer
+                duration:
+                  type: integer
+                durationMinutes:
+                  type: integer
+              required: [subjectName]
+      responses:
+        '200':
+          description: Created plan item
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  item:
+                    type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/study/flashcards:
+    get:
+      tags: [study]
+      operationId: getFlashcardDecks
+      summary: List flashcard decks with cards
+      parameters:
+        - name: subjectId
+          in: query
+          schema:
+            type: string
+        - name: due
+          in: query
+          schema:
+            type: boolean
+        - name: cardsLimit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: deckLimit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: List of decks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FlashcardDeck'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [study]
+      operationId: createFlashcard
+      summary: Create a single flashcard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                front:
+                  type: string
+                back:
+                  type: string
+                deckId:
+                  type: string
+                  nullable: true
+                subjectId:
+                  type: string
+                  nullable: true
+                deckTitle:
+                  type: string
+                  nullable: true
+              required: [front, back]
+      responses:
+        '201':
+          description: Flashcard created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Flashcard'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/PlanLimit'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/study/flashcards/generate:
+    post:
+      tags: [study]
+      operationId: generateFlashcards
+      summary: AI-generate flashcards for a discipline
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                discipline:
+                  type: string
+                  nullable: true
+                count:
+                  type: integer
+                  default: 30
+                autoSeed:
+                  type: boolean
+      responses:
+        '200':
+          description: Generated flashcards (response varies by mode)
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/study/flashcards/{id}/review:
+    post:
+      tags: [study]
+      operationId: reviewFlashcard
+      summary: Submit a flashcard review rating (FSRS algorithm)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 4
+              required: [rating]
+      responses:
+        '200':
+          description: Review result with next scheduling preview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlashcardReviewResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/study/flashcards/stats:
+    get:
+      tags: [study]
+      operationId: getFlashcardStats
+      summary: Get flashcard statistics and forecast
+      responses:
+        '200':
+          description: Flashcard stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FlashcardStats'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/study/mindmaps:
+    get:
+      tags: [study]
+      operationId: getMindmaps
+      summary: List mindmaps
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: List of mindmaps
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Mindmap'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/study/osce:
+    get:
+      tags: [study]
+      operationId: getOsceStudy
+      summary: List OSCE study items (stub)
+      responses:
+        '200':
+          description: Empty array (stub endpoint)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/study/provas:
+    get:
+      tags: [study]
+      operationId: getExams
+      summary: List exams
+      responses:
+        '200':
+          description: List of exams
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Exam'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [study]
+      operationId: createExam
+      summary: Create an exam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                subjectId:
+                  type: string
+                  nullable: true
+                date:
+                  type: string
+                  format: date
+                notes:
+                  type: string
+                  nullable: true
+              required: [title, date]
+      responses:
+        '201':
+          description: Exam created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Exam'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/study/overview:
+    get:
+      tags: [study]
+      operationId: getStudyOverview
+      summary: Aggregated study snapshot (hero stats + subject chips)
+      description: |
+        Returns counters and last-activity timestamps for the four study
+        areas (flashcards, qbank, simulados, transcricoes) plus the user's
+        canonical academic_subjects for chip rendering. Used as the single
+        source for hero stats across StudySuite screens.
+      responses:
+        '200':
+          description: Study overview snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyOverviewResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/study/sessions:
+    get:
+      tags: [study]
+      operationId: getStudySessions
+      summary: List study sessions
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Study sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StudySession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/study/trabalhos:
+    get:
+      tags: [study]
+      operationId: getTrabalhos
+      summary: List assignments (trabalhos) with full details
+      description: Returns pending, completed, and overdue assignments from Canvas portal sync.
+      responses:
+        '200':
+          description: Assignments grouped by status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrabalhosResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/study/transcricao:
+    get:
+      tags: [study]
+      operationId: getTranscriptions
+      summary: List transcriptions
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Transcriptions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Transcription'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [study]
+      operationId: createTranscription
+      summary: Upload audio for transcription (proxies to /api/ai/transcribe)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required: [file]
+      responses:
+        '200':
+          description: SSE stream with transcription progress
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/study/clinical-cases:
+    get:
+      tags: [study]
+      operationId: getClinicalCases
+      summary: List clinical cases
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Clinical cases
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/study/voice/sessions:
+    get:
+      tags: [study]
+      operationId: getVoiceSessions
+      summary: List voice practice sessions
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Voice sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/VoiceSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ════════════════════════════════════════
+  # QBANK
+  # ════════════════════════════════════════
+  /api/qbank/filters:
+    get:
+      tags: [qbank]
+      operationId: getQBankFilters
+      summary: Get available filter options for QBank
+      responses:
+        '200':
+          description: Filter options
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QBankFilters'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/qbank/lists:
+    get:
+      tags: [qbank]
+      operationId: getQBankLists
+      summary: Get user question lists
+      responses:
+        '200':
+          description: Lists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lists:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/QBankList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [qbank]
+      operationId: createQBankList
+      summary: Create a question list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+              required: [title]
+      responses:
+        '201':
+          description: List created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QBankList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/qbank/lists/{id}/questions:
+    post:
+      tags: [qbank]
+      operationId: addQuestionsToList
+      summary: Add questions to a list
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                questionIds:
+                  type: array
+                  items:
+                    type: integer
+              required: [questionIds]
+      responses:
+        '200':
+          description: Questions added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  added:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/qbank/progress:
+    get:
+      tags: [qbank]
+      operationId: getQBankProgress
+      summary: Get QBank answer progress
+      responses:
+        '200':
+          description: Progress stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QBankProgress'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/qbank/questions:
+    get:
+      tags: [qbank]
+      operationId: getQBankQuestions
+      summary: Search and filter questions
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: institutionIds
+          in: query
+          schema:
+            type: array
+            items:
+              type: integer
+          style: form
+          explode: true
+        - name: years
+          in: query
+          schema:
+            type: array
+            items:
+              type: integer
+          style: form
+          explode: true
+        - name: difficulties
+          in: query
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+        - name: topicIds
+          in: query
+          schema:
+            type: array
+            items:
+              type: integer
+          style: form
+          explode: true
+        - name: onlyResidence
+          in: query
+          schema:
+            type: boolean
+        - name: stage
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: onlyWithImages
+          in: query
+          schema:
+            type: boolean
+        - name: includeCancelled
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Paginated questions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  questions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/QBankQuestion'
+                  pagination:
+                    type: object
+                    properties:
+                      page:
+                        type: integer
+                      limit:
+                        type: integer
+                      total:
+                        type: integer
+                      totalPages:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/qbank/questions/{id}:
+    get:
+      tags: [qbank]
+      operationId: getQBankQuestion
+      summary: Get a single question with full details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Full question
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QBankQuestion'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/qbank/questions/{id}/answer:
+    post:
+      tags: [qbank]
+      operationId: answerQBankQuestion
+      summary: Submit an answer to a question
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                alternativeId:
+                  type: integer
+                responseTimeMs:
+                  type: integer
+                  nullable: true
+                sessionId:
+                  type: string
+                  nullable: true
+              required: [alternativeId]
+      responses:
+        '200':
+          description: Answer result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  isCorrect:
+                    type: boolean
+                  answerId:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/PlanLimit'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/qbank/questions/{id}/stats:
+    get:
+      tags: [qbank]
+      operationId: getQuestionStats
+      summary: Get answer statistics for a question
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Per-alternative statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statistics:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        alternativeId:
+                          type: integer
+                        answersCount:
+                          type: integer
+                        percentage:
+                          type: number
+                        description:
+                          type: string
+                        sortOrder:
+                          type: integer
+                        isCorrect:
+                          type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/qbank/sessions:
+    get:
+      tags: [qbank]
+      operationId: getQBankSessions
+      summary: List recent QBank sessions (last 20)
+      responses:
+        '200':
+          description: Sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/QBankSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [qbank]
+      operationId: createQBankSession
+      summary: Create a new QBank practice session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                questionCount:
+                  type: integer
+                  nullable: true
+                institutionIds:
+                  type: array
+                  items:
+                    type: integer
+                  nullable: true
+                years:
+                  type: array
+                  items:
+                    type: integer
+                  nullable: true
+                difficulties:
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+                topicIds:
+                  type: array
+                  items:
+                    type: integer
+                  nullable: true
+                onlyResidence:
+                  type: boolean
+                  nullable: true
+                stage:
+                  type: string
+                  nullable: true
+                onlyUnanswered:
+                  type: boolean
+                  nullable: true
+                title:
+                  type: string
+                  nullable: true
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QBankSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/qbank/sessions/{id}:
+    get:
+      tags: [qbank]
+      operationId: getQBankSession
+      summary: Get a QBank session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QBankSession'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/qbank/sessions/{id}/finish:
+    post:
+      tags: [qbank]
+      operationId: finishQBankSession
+      summary: Finish a QBank session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  correctCount:
+                    type: integer
+                  totalQuestions:
+                    type: integer
+                  score:
+                    type: number
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ════════════════════════════════════════
+  # SIMULADOS
+  # ════════════════════════════════════════
+  /api/simulados:
+    get:
+      tags: [simulados]
+      operationId: getSimulados
+      summary: List simulado attempts with stats
+      responses:
+        '200':
+          description: Attempts and aggregate stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  attempts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SimuladoAttempt'
+                  stats:
+                    type: object
+                    properties:
+                      totalAttempts:
+                        type: integer
+                      completedAttempts:
+                        type: integer
+                      totalQuestions:
+                        type: integer
+                      totalCorrect:
+                        type: integer
+                      avgScore:
+                        type: number
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [simulados]
+      operationId: createSimulado
+      summary: Create a new simulado
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                subjectId:
+                  type: string
+                  nullable: true
+                timed:
+                  type: boolean
+                  nullable: true
+                timeLimitMinutes:
+                  type: integer
+                  nullable: true
+                questions:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SimuladoQuestion'
+              required: [title, questions]
+      responses:
+        '201':
+          description: Simulado created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimuladoAttempt'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/PlanLimit'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/simulados/{id}:
+    get:
+      tags: [simulados]
+      operationId: getSimulado
+      summary: Get a simulado attempt with questions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Simulado with questions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SimuladoAttempt'
+                  - type: object
+                    properties:
+                      questions:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SimuladoQuestion'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/simulados/{id}/answer:
+    post:
+      tags: [simulados]
+      operationId: answerSimulado
+      summary: Answer a simulado question
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                questionId:
+                  type: string
+                chosenIdx:
+                  type: integer
+              required: [questionId, chosenIdx]
+      responses:
+        '200':
+          description: Answer result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  isCorrect:
+                    type: boolean
+                  correctIdx:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/simulados/{id}/finish:
+    post:
+      tags: [simulados]
+      operationId: finishSimulado
+      summary: Finish a simulado attempt
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Final results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  correctQ:
+                    type: integer
+                  totalQ:
+                    type: integer
+                  score:
+                    type: number
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/simulados/{id}/result:
+    get:
+      tags: [simulados]
+      operationId: getSimuladoResult
+      summary: Get detailed simulado results
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detailed results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  title:
+                    type: string
+                  totalQ:
+                    type: integer
+                  correctQ:
+                    type: integer
+                  wrongQ:
+                    type: integer
+                  blankQ:
+                    type: integer
+                  score:
+                    type: number
+                  timeSpent:
+                    type: integer
+                    nullable: true
+                  avgScore:
+                    type: number
+                    nullable: true
+                  subjectResults:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/simulados/{id}/review:
+    get:
+      tags: [simulados]
+      operationId: reviewSimulado
+      summary: Get all questions for review after finishing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: All questions with answers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SimuladoQuestion'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/simulados/diagnostics:
+    get:
+      tags: [simulados]
+      operationId: getSimuladoDiagnostics
+      summary: Get diagnostic analysis across simulados
+      responses:
+        '200':
+          description: Diagnostics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  diagnostics:
+                    type: array
+                    items:
+                      type: object
+                  summary:
+                    type: object
+                    properties:
+                      totalAttempts:
+                        type: integer
+                      avgScore:
+                        type: number
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ════════════════════════════════════════
+  # AI
+  # ════════════════════════════════════════
+  /api/ai/coach:
+    post:
+      tags: [ai]
+      operationId: aiCoachChat
+      summary: Chat with AI coach (SSE stream, server-side history, MCP, portal grades injection, name dedup)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                messages:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ChatMessage'
+                conversationId:
+                  type: string
+                  nullable: true
+                attachmentIds:
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+              required: [messages]
+      responses:
+        '200':
+          description: SSE stream with text_delta, tool_start, tool_result, message_stop, and error events
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          $ref: '#/components/responses/PlanLimit'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/ai/coach/conversations:
+    get:
+      tags: [ai]
+      operationId: getCoachConversations
+      summary: List coach conversations
+      responses:
+        '200':
+          description: Conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Conversation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/ai/coach/conversations/{id}:
+    get:
+      tags: [ai]
+      operationId: getCoachConversation
+      summary: Get a conversation with messages
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Conversation with messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversation:
+                    $ref: '#/components/schemas/Conversation'
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ConversationMessage'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/ai/coach/feedback:
+    post:
+      tags: [ai]
+      operationId: submitCoachFeedback
+      summary: Submit feedback (thumbs up/down) on a coach message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                conversationId:
+                  type: string
+                messageId:
+                  type: string
+                feedback:
+                  type: string
+                  enum: [up, down]
+              required: [conversationId, messageId, feedback]
+      responses:
+        '200':
+          description: Feedback recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/ai/osce:
+    post:
+      tags: [ai]
+      operationId: startOsceAttempt
+      summary: Start an OSCE clinical simulation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                specialty:
+                  type: string
+              required: [specialty]
+      responses:
+        '200':
+          description: OSCE attempt started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OsceAttemptStart'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/ai/osce/{id}/respond:
+    post:
+      tags: [ai]
+      operationId: respondToOsceStep
+      summary: Submit response for current OSCE step
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                response:
+                  type: string
+              required: [response]
+      responses:
+        '200':
+          description: Step result (may include final results if complete)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OsceStepResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/ai/transcribe:
+    post:
+      tags: [ai]
+      operationId: transcribeAudio
+      summary: Transcribe audio file (SSE stream, max 25MB)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Audio file (max 25MB)
+              required: [file]
+      responses:
+        '200':
+          description: SSE stream with transcription progress
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/ai/transcribe-quick:
+    post:
+      tags: [ai]
+      operationId: transcribeQuick
+      summary: Quick transcription (no auth, synchronous)
+      security: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required: [file]
+      responses:
+        '200':
+          description: Transcription result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  text:
+                    type: string
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ════════════════════════════════════════
+  # VITA CHAT
+  # ════════════════════════════════════════
+  /api/vita/chat:
+    post:
+      tags: [vita]
+      operationId: vitaChat
+      summary: Chat with Vita AI assistant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+              required: [message]
+      responses:
+        '200':
+          description: Chat response with usage metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  response:
+                    type: string
+                  model:
+                    type: string
+                  tokens:
+                    type: object
+                    properties:
+                      input:
+                        type: integer
+                      output:
+                        type: integer
+                  costUsd:
+                    type: number
+                  latencyMs:
+                    type: number
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/vita/memory:
+    get:
+      tags: [vita]
+      operationId: getVitaMemory
+      summary: Get Vita's memory about the student
+      responses:
+        '200':
+          description: Student memory
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  insights:
+                    type: array
+                    items:
+                      type: string
+                  weakAreas:
+                    type: array
+                    items:
+                      type: string
+                  totalInteractions:
+                    type: integer
+                  lastInteractionAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+                  lastTopics:
+                    type: array
+                    items:
+                      type: string
+                  conversationSummary:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/vita/student-context:
+    get:
+      tags: [vita]
+      operationId: getStudentContext
+      summary: Get comprehensive student context for AI
+      description: >-
+        Returns unified student profile including qbank accuracy by subject
+        from user_subjects table. Used by Vita AI agent for context.
+      responses:
+        '200':
+          description: Full student context
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  identity:
+                    type: object
+                  academic:
+                    type: object
+                  performance:
+                    type: object
+                  gamification:
+                    type: object
+                  behavior:
+                    type: object
+                  connectors:
+                    type: object
+                  _meta:
+                    type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ════════════════════════════════════════
+  # STUDIO
+  # ════════════════════════════════════════
+  /api/studio/generate:
+    post:
+      tags: [studio]
+      operationId: studioGenerate
+      summary: Generate study output from sources
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sourceIds:
+                  type: array
+                  items:
+                    type: string
+                type:
+                  type: string
+                  enum: [summary, flashcards, mindmap, quiz]
+              required: [sourceIds, type]
+      responses:
+        '201':
+          description: Output generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudioOutput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/studio/outputs:
+    get:
+      tags: [studio]
+      operationId: getStudioOutputs
+      summary: List all studio outputs
+      responses:
+        '200':
+          description: Outputs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  outputs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StudioOutput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/studio/outputs/{id}:
+    get:
+      tags: [studio]
+      operationId: getStudioOutput
+      summary: Get a single studio output
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Output
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudioOutput'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    delete:
+      tags: [studio]
+      operationId: deleteStudioOutput
+      summary: Delete a studio output
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/studio/outputs/add-to-deck:
+    post:
+      tags: [studio]
+      operationId: addOutputToDeck
+      summary: Add generated flashcards to a deck
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                flashcardIds:
+                  type: array
+                  items:
+                    type: string
+                deckId:
+                  type: string
+                  nullable: true
+                flashcards:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      front:
+                        type: string
+                      back:
+                        type: string
+      responses:
+        '200':
+          description: Cards added to deck
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deckId:
+                    type: string
+                  addedCount:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/studio/sources:
+    get:
+      tags: [studio]
+      operationId: getStudioSources
+      summary: List uploaded sources
+      responses:
+        '200':
+          description: Sources
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/StudioSource'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/studio/sources/{id}:
+    get:
+      tags: [studio]
+      operationId: getStudioSource
+      summary: Get a single source
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Source
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudioSource'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/studio/upload:
+    post:
+      tags: [studio]
+      operationId: uploadStudioSource
+      summary: Upload a source file (PDF, images, audio - max 20MB)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required: [file]
+      responses:
+        '200':
+          description: Upload successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sourceId:
+                    type: string
+                  fileName:
+                    type: string
+                  mimeType:
+                    type: string
+                  sizeBytes:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/studio/upload/{filename}:
+    get:
+      tags: [studio]
+      operationId: getStudioUploadedFile
+      summary: Download an uploaded file
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Binary file content
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ════════════════════════════════════════
+  # USER & PROFILE
+  # ════════════════════════════════════════
+  /api/profile:
+    get:
+      tags: [user]
+      operationId: getProfile
+      summary: Get full user profile with subjects and stats
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    patch:
+      tags: [user]
+      operationId: updateProfile
+      summary: Update profile fields
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                moment:
+                  type: string
+                year:
+                  type: integer
+                semester:
+                  type: integer
+                highSchoolYear:
+                  type: integer
+                examBoard:
+                  type: string
+                studyGoalId:
+                  type: string
+                university:
+                  type: string
+                universityState:
+                  type: string
+                universityId:
+                  type: string
+                universityLms:
+                  type: string
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/progress:
+    get:
+      tags: [user]
+      operationId: getProgress
+      summary: Get user progress (streak, hours, accuracy, heatmap)
+      responses:
+        '200':
+          description: Progress data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProgress'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/achievements:
+    get:
+      tags: [user]
+      operationId: getAchievements
+      summary: Get achievements, level, XP, and badges
+      responses:
+        '200':
+          description: Achievements
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Achievements'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [user]
+      operationId: performAchievementAction
+      summary: Perform achievement action (e.g., prestige)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum: [prestige]
+              required: [action]
+      responses:
+        '200':
+          description: Action result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  prestige:
+                    type: object
+                    properties:
+                      level:
+                        type: integer
+                      cycle:
+                        type: integer
+                      tier:
+                        type: string
+                      iconPath:
+                        type: string
+                      prestigeCount:
+                        type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/activity:
+    get:
+      tags: [user]
+      operationId: getActivity
+      summary: Get activity feed
+      responses:
+        '200':
+          description: Activity entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ActivityEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [user]
+      operationId: logActivity
+      summary: Log an activity event (awards XP and badges)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  nullable: true
+                event:
+                  type: string
+                  nullable: true
+                surface:
+                  type: string
+                  nullable: true
+                metadata:
+                  type: object
+                  nullable: true
+      responses:
+        '200':
+          description: XP and badge result
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+
+  /api/activity/stats:
+    get:
+      tags: [user]
+      operationId: getActivityStats
+      summary: Get gamification stats (level, XP, streak, badges)
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Gamification stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalXp:
+                    type: integer
+                  level:
+                    type: integer
+                  currentLevelXp:
+                    type: integer
+                  xpToNextLevel:
+                    type: integer
+                  streakDays:
+                    type: integer
+                  achievements:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        description:
+                          type: string
+                        icon:
+                          type: string
+                        category:
+                          type: string
+                        rarity:
+                          type: string
+                        unlocked:
+                          type: boolean
+                        unlockedAt:
+                          type: string
+                          nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/config/app:
+    get:
+      tags: [platform]
+      operationId: getAppConfig
+      summary: Get app-wide configuration (gamification, feature flags)
+      description: Public endpoint. Clients cache with 1h TTL.
+      security: []
+      responses:
+        '200':
+          description: App configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  gamification:
+                    type: object
+                    properties:
+                      levels:
+                        type: object
+                        properties:
+                          maxLevel:
+                            type: integer
+                          formula:
+                            type: string
+                      xpRewards:
+                        type: object
+                        additionalProperties:
+                          type: integer
+                      streakBonus:
+                        type: object
+                        properties:
+                          threshold:
+                            type: integer
+                          bonusXp:
+                            type: integer
+                      badges:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            name:
+                              type: string
+                            description:
+                              type: string
+                            icon:
+                              type: string
+                            category:
+                              type: string
+                            xpReward:
+                              type: integer
+                              nullable: true
+                      dailyGoal:
+                        type: integer
+        '500':
+          $ref: '#/components/responses/ServerError'
+  /api/user/ai-consent:
+    get:
+      tags: [user]
+      operationId: getAiConsent
+      summary: Check if user has granted AI consent
+      responses:
+        '200':
+          description: Consent status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hasConsent:
+                    type: boolean
+                  grantedAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [user]
+      operationId: grantAiConsent
+      summary: Grant AI consent
+      responses:
+        '200':
+          description: Consent granted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hasConsent:
+                    type: boolean
+                  grantedAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      tags: [user]
+      operationId: revokeAiConsent
+      summary: Revoke AI consent
+      responses:
+        '200':
+          description: Consent revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hasConsent:
+                    type: boolean
+                  grantedAt:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/user/delete-data:
+    delete:
+      tags: [user]
+      operationId: deleteUserData
+      summary: LGPD user data deletion (soft-delete, irreversible)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                confirmation:
+                  type: string
+                  enum: ['DELETE']
+              required: [confirmation]
+      responses:
+        '200':
+          description: Data scheduled for deletion
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+        '400':
+          description: Missing confirmation body
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ════════════════════════════════════════
+  # SOCIAL
+  # ════════════════════════════════════════
+  /api/leaderboard:
+    get:
+      tags: [social]
+      operationId: getLeaderboard
+      summary: Get XP leaderboard
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [weekly, monthly, all]
+      responses:
+        '200':
+          description: Leaderboard entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaderboardEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/osce/stats:
+    get:
+      tags: [social]
+      operationId: getOsceStats
+      summary: Get OSCE performance stats
+      responses:
+        '200':
+          description: OSCE stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalAttempts:
+                    type: integer
+                  completedAttempts:
+                    type: integer
+                  averageScore:
+                    type: number
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ════════════════════════════════════════
+  # CONTENT
+  # ════════════════════════════════════════
+  /api/documents:
+    get:
+      tags: [content]
+      operationId: getDocuments
+      summary: List documents
+      parameters:
+        - name: subjectId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Documents
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [content]
+      operationId: createDocument
+      summary: Create a document record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                fileName:
+                  type: string
+                fileUrl:
+                  type: string
+                subjectId:
+                  type: string
+                  nullable: true
+                totalPages:
+                  type: integer
+                  nullable: true
+              required: [title, fileName, fileUrl]
+      responses:
+        '201':
+          description: Document created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    patch:
+      tags: [content]
+      operationId: updateDocument
+      summary: Update a document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                title:
+                  type: string
+                currentPage:
+                  type: integer
+                readProgress:
+                  type: number
+                subjectId:
+                  type: string
+                isFavorite:
+                  type: boolean
+              required: [id]
+      responses:
+        '200':
+          description: Updated document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    delete:
+      tags: [content]
+      operationId: deleteDocument
+      summary: Delete a document
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/documents/upload:
+    post:
+      tags: [content]
+      operationId: uploadDocument
+      summary: Upload a PDF document (max 50MB)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF file (max 50MB)
+              required: [file]
+      responses:
+        '201':
+          description: Document created from upload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/documents/{id}/extractions:
+    get:
+      tags: [content]
+      operationId: getDocumentExtractions
+      summary: Get AI extractions for a document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Extractions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  documentId:
+                    type: string
+                  title:
+                    type: string
+                  subjectId:
+                    type: string
+                    nullable: true
+                  extractions:
+                    type: object
+                  extractionCount:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/documents/{id}/favorite:
+    post:
+      tags: [content]
+      operationId: toggleDocumentFavorite
+      summary: Toggle document favorite status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Updated document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Document'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/documents/{id}/file:
+    get:
+      tags: [content]
+      operationId: getDocumentFile
+      summary: Download document PDF file
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: PDF file
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/notes:
+    get:
+      tags: [content]
+      operationId: getNotes
+      summary: List notes
+      parameters:
+        - name: subjectId
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Notes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Note'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [content]
+      operationId: createNote
+      summary: Create a note
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                  nullable: true
+                subjectId:
+                  type: string
+                  nullable: true
+              required: [title]
+      responses:
+        '201':
+          description: Note created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    patch:
+      tags: [content]
+      operationId: updateNote
+      summary: Update a note
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                title:
+                  type: string
+                content:
+                  type: string
+                subjectId:
+                  type: string
+              required: [id]
+      responses:
+        '200':
+          description: Updated note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    delete:
+      tags: [content]
+      operationId: deleteNote
+      summary: Delete a note
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ════════════════════════════════════════
+  # ANNOTATIONS
+  # ════════════════════════════════════════
+  /api/annotations/{id}:
+    get:
+      tags: [annotations]
+      operationId: getAnnotations
+      summary: Get annotations for a document
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Document ID
+      responses:
+        '200':
+          description: Annotations keyed by page number
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  annotations:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        strokes:
+                          type: array
+                          items:
+                            type: object
+                        textBoxes:
+                          type: array
+                          items:
+                            type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [annotations]
+      operationId: saveAnnotations
+      summary: Save annotations for a document page
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Document ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pageNumber:
+                  type: integer
+                strokes:
+                  type: array
+                  items:
+                    type: object
+                textBoxes:
+                  type: array
+                  items:
+                    type: object
+              required: [pageNumber]
+      responses:
+        '200':
+          description: Annotations saved
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ════════════════════════════════════════
+  # NOTIFICATIONS
+  # ════════════════════════════════════════
+  /api/notifications:
+    get:
+      tags: [notifications]
+      operationId: getNotifications
+      summary: Get all notifications for current user
+      responses:
+        '200':
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [notifications]
+      operationId: markNotificationsRead
+      summary: Mark notifications as read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+                markAll:
+                  type: boolean
+      responses:
+        '200':
+          description: Marked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  updated:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/notifications/briefing:
+    get:
+      tags: [notifications]
+      operationId: getBriefings
+      summary: Get study briefings
+      responses:
+        '200':
+          description: Briefings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  briefings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Briefing'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [notifications]
+      operationId: generateBriefing
+      summary: Generate a study briefing for a subject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subjectId:
+                  type: string
+                moduleName:
+                  type: string
+                  nullable: true
+              required: [subjectId]
+      responses:
+        '200':
+          description: Generated briefing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  briefing:
+                    $ref: '#/components/schemas/Briefing'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/notifications/preferences:
+    get:
+      tags: [notifications]
+      operationId: getNotificationPreferences
+      summary: Get notification preferences
+      responses:
+        '200':
+          description: Preferences
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  types:
+                    type: array
+                    items:
+                      type: object
+                  timing:
+                    type: object
+                  whatsapp:
+                    type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    put:
+      tags: [notifications]
+      operationId: updateNotificationPreferences
+      summary: Update notification preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Per-type channel toggles, timing settings, whatsapp config
+      responses:
+        '200':
+          description: Updated preferences
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ════════════════════════════════════════
+  # PLATFORM
+  # ════════════════════════════════════════
+  /api/anatomy:
+    get:
+      tags: [platform]
+      operationId: getAnatomy
+      summary: Get anatomy data
+      parameters:
+        - name: system
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Anatomy data (structure varies)
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/health:
+    get:
+      tags: [platform]
+      operationId: healthCheck
+      summary: Health check
+      security: []
+      parameters:
+        - name: deep
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheck'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/errors:
+    post:
+      tags: [platform]
+      operationId: reportError
+      summary: Report a client-side error
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: string
+                app:
+                  type: string
+                stack:
+                  type: string
+                  nullable: true
+                url:
+                  type: string
+                userAgent:
+                  type: string
+                breadcrumbs:
+                  type: array
+                  items:
+                    type: object
+                timestamp:
+                  type: string
+              required: [message, app, url, userAgent, breadcrumbs, timestamp]
+      responses:
+        '200':
+          description: Error received
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  received:
+                    type: boolean
+                  severity:
+                    type: string
+                  summary:
+                    type: string
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/enrollments:
+    get:
+      tags: [platform]
+      operationId: getEnrollments
+      summary: Get user enrollments
+      responses:
+        '200':
+          description: Enrollments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enrollments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Enrollment'
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    put:
+      tags: [platform]
+      operationId: updateEnrollment
+      summary: Create or update an enrollment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  nullable: true
+                subjectName:
+                  type: string
+                grade1:
+                  type: string
+                  nullable: true
+                grade2:
+                  type: string
+                  nullable: true
+                grade3:
+                  type: string
+                  nullable: true
+                finalGrade:
+                  type: string
+                  nullable: true
+                status:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Updated enrollment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Enrollment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/grades:
+    get:
+      tags: [platform]
+      operationId: getGrades
+      summary: Get grades
+      parameters:
+        - name: subjectId
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Grades
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Grade'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    post:
+      tags: [platform]
+      operationId: createGrade
+      summary: Create a grade entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subjectId:
+                  type: string
+                label:
+                  type: string
+                value:
+                  type: number
+                maxValue:
+                  type: number
+                  nullable: true
+                notes:
+                  type: string
+                  nullable: true
+              required: [subjectId, label, value]
+      responses:
+        '201':
+          description: Grade created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Grade'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/materiais:
+    get:
+      tags: [platform]
+      operationId: getMateriais
+      summary: Get study materials
+      responses:
+        '200':
+          description: Materials
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Material'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/push/register:
+    post:
+      tags: [platform]
+      operationId: registerPushToken
+      summary: Register a push notification token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+                platform:
+                  type: string
+              required: [token, platform]
+      responses:
+        '200':
+          description: Registered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/push/unregister:
+    delete:
+      tags: [platform]
+      operationId: unregisterPushToken
+      summary: Unregister a push notification token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+              required: [token]
+      responses:
+        '200':
+          description: Unregistered
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ════════════════════════════════════════
+  # ONBOARDING
+  # ════════════════════════════════════════
+  /api/onboarding:
+    post:
+      tags: [onboarding]
+      operationId: submitOnboarding
+      summary: Submit onboarding data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                moment:
+                  type: string
+                year:
+                  type: integer
+                  nullable: true
+                semester:
+                  type: integer
+                  nullable: true
+                highSchoolYear:
+                  type: integer
+                  nullable: true
+                selectedSubjects:
+                  type: array
+                  items:
+                    type: string
+                  nullable: true
+                examBoard:
+                  type: string
+                  nullable: true
+                studyGoal:
+                  type: string
+                university:
+                  type: string
+                  nullable: true
+                universityLms:
+                  type: string
+                  nullable: true
+              required: [moment, studyGoal]
+      responses:
+        '201':
+          description: Profile created/updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ════════════════════════════════════════
+  # UNIVERSITIES
+  # ════════════════════════════════════════
+  /api/universities:
+    get:
+      tags: [universities]
+      operationId: searchUniversities
+      summary: Search universities with portal info (no auth required)
+      security: []
+      parameters:
+        - name: q
+          in: query
+          description: Search by name or shortName (case-insensitive)
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Universities
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  universities:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/University'
+                  total:
+                    type: integer
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/universities/request:
+    post:
+      tags: [universities]
+      operationId: requestUniversity
+      summary: Request a university to be added
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                city:
+                  type: string
+                  nullable: true
+                state:
+                  type: string
+                  nullable: true
+              required: [name]
+      responses:
+        '200':
+          description: Request submitted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/universities/{id}/disciplines:
+    get:
+      tags: [universities]
+      operationId: getUniversityDisciplines
+      summary: Get disciplines for a university (no auth required)
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Disciplines
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  disciplines:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Discipline'
+                  total:
+                    type: integer
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ════════════════════════════════════════
+  # BILLING
+  # ════════════════════════════════════════
+  /api/stripe/checkout:
+    post:
+      tags: [billing]
+      operationId: createCheckoutSession
+      summary: Create a Stripe checkout session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                plan:
+                  type: string
+              required: [plan]
+      responses:
+        '200':
+          description: Checkout URL
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    format: uri
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/stripe/webhook:
+    post:
+      tags: [billing]
+      operationId: stripeWebhook
+      summary: Stripe webhook handler
+      security:
+        - stripeWebhook: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Raw Stripe event payload
+      responses:
+        '200':
+          description: Webhook processed
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  # ════════════════════════════════════════
+  # EXTENSION
+  # ════════════════════════════════════════
+  /api/extension/token:
+    post:
+      tags: [extension]
+      operationId: createExtensionToken
+      summary: Exchange session token for extension token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sessionToken:
+                  type: string
+              required: [sessionToken]
+      responses:
+        '200':
+          description: Extension token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/dashboard:
+    get:
+      tags: [study]
+      operationId: getDashboard
+      summary: Server-driven dashboard with hero cards, subjects, agenda
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Dashboard data with pre-computed hero cards
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ════════════════════════════════════════
+  # SERVER-DRIVEN UI
+  # ════════════════════════════════════════
+  /api/screen/{screenId}:
+    get:
+      tags: [sdui]
+      operationId: getScreen
+      summary: Server-driven screen layout — returns sections[] for any screen
+      parameters:
+        - name: screenId
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [dashboard, estudos, flashcards, profile, progresso, insights, agenda, simulados, discipline-detail, qbank]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Screen layout with ordered sections
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScreenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Unknown screen ID
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/extension/summary:
+    get:
+      tags: [extension]
+      operationId: getExtensionSummary
+      summary: Get compact student summary for the extension popup
+      security:
+        - extensionToken: []
+      responses:
+        '200':
+          description: Student summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  avatar:
+                    type: string
+                    nullable: true
+                  university:
+                    type: string
+                    nullable: true
+                  level:
+                    type: integer
+                  totalXp:
+                    type: integer
+                  upcomingExams:
+                    type: array
+                    items:
+                      type: object
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/billing/status:
+    get:
+      tags: [billing]
+      operationId: getBillingStatus
+      summary: Get current user billing status and plan
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Billing status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plan:
+                    type: string
+                  isActive:
+                    type: boolean
+                  periodEnd:
+                    type: string
+                    nullable: true
+                  provider:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'

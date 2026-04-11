@@ -144,7 +144,7 @@ struct MindMapEditorView: View {
                     Text("Deletar")
                         .font(.system(size: 11))
                 }
-                .foregroundStyle(viewModel.selectedNodeId != nil ? Color.red : VitaColors.textTertiary)
+                .foregroundStyle(viewModel.selectedNodeId != nil ? VitaColors.dataRed : VitaColors.textTertiary)
             }
             .disabled(viewModel.selectedNodeId == nil)
 

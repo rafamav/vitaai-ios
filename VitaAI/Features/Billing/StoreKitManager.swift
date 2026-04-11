@@ -12,10 +12,12 @@ import Observation
 final class StoreKitManager {
 
     // MARK: - Product IDs
+    // Both tiers are monthly. Premium = R$24,90/mes, Pro = R$49,90/mes.
+    // 7-day free trial on both.
 
-    static let monthlyProductID = "com.bymav.vitaai.monthly"
-    static let annualProductID  = "com.bymav.vitaai.annual"
-    static let allProductIDs: Set<String> = [monthlyProductID, annualProductID]
+    static let premiumProductID = "com.bymav.vitaai.premium"
+    static let proProductID     = "com.bymav.vitaai.pro"
+    static let allProductIDs: Set<String> = [premiumProductID, proProductID]
 
     // MARK: - Observable State
 
@@ -28,8 +30,14 @@ final class StoreKitManager {
 
     // MARK: - Computed Helpers
 
-    var annualProduct: Product?  { products.first { $0.id == Self.annualProductID } }
-    var monthlyProduct: Product? { products.first { $0.id == Self.monthlyProductID } }
+    var premiumProduct: Product? { products.first { $0.id == Self.premiumProductID } }
+    var proProduct: Product?     { products.first { $0.id == Self.proProductID } }
+
+    /// True if user has the Pro tier specifically.
+    var isPro: Bool { activeProductID == Self.proProductID }
+
+    /// True if user has Premium tier specifically (not Pro).
+    var isPremium: Bool { activeProductID == Self.premiumProductID }
 
     // MARK: - Init
 
@@ -53,9 +61,10 @@ final class StoreKitManager {
 
         do {
             let fetched = try await Product.products(for: Self.allProductIDs)
-            // Annual first — highlighted plan in UI
+            print("[StoreKit] Loaded \(fetched.count) products: \(fetched.map { "\($0.id) = \($0.displayPrice)" })")
+            // Premium first (cheaper), Pro second
             products = fetched.sorted {
-                $0.id == Self.annualProductID && $1.id != Self.annualProductID
+                $0.id == Self.premiumProductID && $1.id != Self.premiumProductID
             }
             await refreshSubscriptionStatus()
         } catch {
@@ -74,6 +83,7 @@ final class StoreKitManager {
             switch result {
             case .success(let verification):
                 let transaction = try checkVerified(verification)
+                print("[StoreKit] Purchase SUCCESS: \(transaction.productID)")
                 await refreshSubscriptionStatus()
                 await transaction.finish()
             case .userCancelled:

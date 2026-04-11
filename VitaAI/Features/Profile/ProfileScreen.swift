@@ -191,9 +191,7 @@ struct ProfileScreen: View {
                 .frame(width: 62, height: 62)
 
             if let imageURL = authManager.userImage.flatMap(URL.init(string:)) {
-                AsyncImage(url: imageURL) { image in
-                    image.resizable().scaledToFill()
-                } placeholder: {
+                CachedAsyncImage(url: imageURL) {
                     avatarInitial
                 }
                 .frame(width: 62, height: 62)

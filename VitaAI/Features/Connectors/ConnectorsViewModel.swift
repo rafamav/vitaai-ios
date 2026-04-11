@@ -1,19 +1,23 @@
 import Foundation
+import UIKit
 import Observation
 
 // MARK: - ConnectorsViewModel
 // Unified state for all portal connections, used by ConnectionsScreen.
-// Replaces the ~30 @State vars scattered across ConnectionsScreen.
-// When KMP lands, this file gets deleted and replaced by shared Kotlin ViewModel.
 
 @MainActor
 @Observable
 final class ConnectorsViewModel {
-    // Per-connector state
+    // Per-connector state — academic
     var canvas = ConnectorState(id: "canvas", name: "Canvas LMS")
-    var webaluno = ConnectorState(id: "webaluno", name: "WebAluno")
+    var mannesoft = ConnectorState(id: "mannesoft", name: "Portal Academico")
+
+    // Per-connector state — productivity
     var calendar = ConnectorState(id: "google_calendar", name: "Google Calendar")
     var drive = ConnectorState(id: "google_drive", name: "Google Drive")
+    var spotify = ConnectorState(id: "spotify", name: "Spotify")
+    var appleHealth = ConnectorState(id: "apple_health", name: "Apple Health")
+    var whatsapp = ConnectorState(id: "whatsapp", name: "WhatsApp")
 
     // University data
     var universityPortals: [UniversityPortal] = []
@@ -30,20 +34,31 @@ final class ConnectorsViewModel {
         self.api = api
     }
 
+    // MARK: - All integration connectors
+
+    var allIntegrations: [ConnectorState] {
+        [calendar, drive, spotify, appleHealth, whatsapp]
+    }
+
     // MARK: - Computed
 
     var connectedCount: Int {
-        [canvas, webaluno, calendar, drive].filter { $0.status == .connected }.count
+        ([canvas, mannesoft] + allIntegrations).filter { $0.status == .connected }.count
     }
 
-    var totalPortals: Int { 4 }
+    var totalPortals: Int {
+        2 + allIntegrations.count
+    }
 
     func state(for portalId: String) -> ConnectorState {
         switch portalId {
         case "canvas": canvas
-        case "webaluno", "mannesoft": webaluno
+        case "webaluno", "mannesoft": mannesoft
         case "google_calendar": calendar
         case "google_drive": drive
+        case "spotify": spotify
+        case "apple_health": appleHealth
+        case "whatsapp": whatsapp
         default: ConnectorState(id: portalId, name: portalId)
         }
     }
@@ -53,9 +68,7 @@ final class ConnectorsViewModel {
     func loadAll() async {
         await loadUniversityPortals()
         await loadPortalConnections()
-        async let cal = loadCalendar()
-        async let drv = loadDrive()
-        _ = await (cal, drv)
+        await loadIntegrations()
     }
 
     // MARK: - University Portals
@@ -67,7 +80,6 @@ final class ConnectorsViewModel {
             let uniName = profile.university
             guard let uniId, !uniId.isEmpty else { return }
 
-            // Search universities, match by exact ID from profile
             let query = uniName ?? ""
             let response = try await api.getUniversities(query: query)
             if let uni = response.universities.first(where: { $0.id == uniId }) {
@@ -77,7 +89,6 @@ final class ConnectorsViewModel {
                     universityPortals = portals
                 }
             } else if let uniName, !uniName.isEmpty {
-                // Fallback: profile has name but university not found in search
                 universityName = uniName
             }
         } catch {
@@ -85,14 +96,14 @@ final class ConnectorsViewModel {
         }
     }
 
-    // MARK: - Portal Connections (Canvas + WebAluno via single endpoint)
+    // MARK: - Portal Connections (Canvas + Mannesoft via single endpoint)
 
     func loadPortalConnections() async {
         do {
             let data = try await api.getCanvasStatus()
             guard let connections = data.connections, !connections.isEmpty else {
                 canvas.status = .disconnected
-                webaluno.status = .disconnected
+                mannesoft.status = .disconnected
                 return
             }
 
@@ -108,15 +119,17 @@ final class ConnectorsViewModel {
                 case "canvas":
                     canvas.status = status
                     canvas.lastSync = syncTime.flatMap { formatRelativeTime($0) }
+                    canvas.instanceUrl = conn.instanceUrl
                     canvas.stats = [
                         (conn.counts?.subjects ?? 0, "disciplinas"),
-                        (conn.counts?.evaluations ?? 0, "avaliações"),
+                        (conn.counts?.evaluations ?? 0, "avaliacoes"),
                         (conn.counts?.documents ?? 0, "arquivos"),
                     ]
                 case "mannesoft":
-                    webaluno.status = status
-                    webaluno.lastSync = syncTime.flatMap { formatRelativeTime($0) }
-                    webaluno.stats = [
+                    mannesoft.status = status
+                    mannesoft.lastSync = syncTime.flatMap { formatRelativeTime($0) }
+                    mannesoft.instanceUrl = conn.instanceUrl
+                    mannesoft.stats = [
                         (conn.counts?.subjects ?? 0, "disciplinas"),
                         (conn.counts?.evaluations ?? 0, "notas"),
                         (conn.counts?.schedule ?? 0, "aulas"),
@@ -125,8 +138,59 @@ final class ConnectorsViewModel {
                     break
                 }
             }
+
+            if canvas.status == .expired, let url = canvas.instanceUrl, !url.isEmpty {
+                NSLog("[Connectors] Canvas expired — triggering silent reauth")
+                canvas.status = .loading
+                Task {
+                    let success = await CanvasSilentReauth.shared.forceReauth(instanceUrl: url, api: api)
+                    if success {
+                        await loadPortalConnections()
+                    } else {
+                        canvas.status = .expired
+                    }
+                }
+            }
         } catch {
             print("[Connectors] Portal status load failed: \(error)")
+        }
+    }
+
+    // MARK: - Load Integrations (unified endpoint)
+
+    private func loadIntegrations() async {
+        // Load Google Calendar & Drive via existing specific endpoints
+        async let cal = loadCalendar()
+        async let drv = loadDrive()
+        _ = await (cal, drv)
+
+        // Spotify, Apple Health, WhatsApp: load from unified /api/integrations
+        do {
+            let data = try await api.getIntegrations()
+            for item in data.productivity {
+                switch item.id {
+                case "spotify":
+                    spotify.status = connectionStatus(from: item.status)
+                    spotify.lastSync = item.lastSyncAt.flatMap { formatRelativeTime($0) }
+                case "apple_health":
+                    appleHealth.status = connectionStatus(from: item.status)
+                    appleHealth.lastSync = item.lastSyncAt.flatMap { formatRelativeTime($0) }
+                case "whatsapp":
+                    whatsapp.status = connectionStatus(from: item.status)
+                    whatsapp.lastSync = item.lastSyncAt.flatMap { formatRelativeTime($0) }
+                default: break
+                }
+            }
+        } catch {
+            print("[Connectors] Integrations load failed: \(error)")
+        }
+    }
+
+    private func connectionStatus(from status: String) -> ConnectionItemStatus {
+        switch status {
+        case "active", "connected": .connected
+        case "expired": .expired
+        default: .disconnected
         }
     }
 
@@ -175,37 +239,66 @@ final class ConnectorsViewModel {
                 try await api.disconnectCanvas()
                 canvas = ConnectorState(id: "canvas", name: "Canvas LMS")
             case "webaluno", "mannesoft":
-                try await api.disconnectWebaluno()
-                webaluno = ConnectorState(id: "webaluno", name: "WebAluno")
+                try await api.disconnectPortal()
+                mannesoft = ConnectorState(id: "mannesoft", name: "Portal Academico")
             case "google_calendar":
                 try await api.disconnectGoogleCalendar()
                 calendar = ConnectorState(id: "google_calendar", name: "Google Calendar")
             case "google_drive":
                 try await api.disconnectGoogleDrive()
                 drive = ConnectorState(id: "google_drive", name: "Google Drive")
+            case "spotify":
+                try await api.disconnectIntegration("spotify")
+                spotify = ConnectorState(id: "spotify", name: "Spotify")
+            case "apple_health":
+                appleHealth = ConnectorState(id: "apple_health", name: "Apple Health")
+            case "whatsapp":
+                try await api.disconnectIntegration("whatsapp")
+                whatsapp = ConnectorState(id: "whatsapp", name: "WhatsApp")
             default: break
             }
+            toastMessage = "Desconectado"
+            toastType = .success
         } catch {
             print("[Connectors] Disconnect \(connectorId) error: \(error)")
+            toastMessage = "Erro ao desconectar"
+            toastType = .error
         }
     }
 
-    // MARK: - Connect WebAluno with session
+    // MARK: - Connect
 
-    func connectWebaluno(cookie: String) async {
+    func connectIntegration(_ connectorId: String) async {
         do {
-            toastMessage = "Conectando WebAluno..."
+            let data = try await api.startIntegrationOAuth(connectorId)
+            if let authUrl = data.authUrl, let url = URL(string: authUrl) {
+                await MainActor.run {
+                    UIApplication.shared.open(url)
+                }
+            }
+        } catch {
+            toastMessage = "Erro ao conectar"
+            toastType = .error
+        }
+    }
+
+    // MARK: - Connect Mannesoft portal with session
+
+    func connectMannesoft(cookie: String) async {
+        do {
+            toastMessage = "Conectando portal..."
             toastType = .success
-            webaluno.status = .connected
+            mannesoft.status = .connected
+            let portalUrl = universityPortals.first(where: { $0.portalType == "webaluno" || $0.portalType == "mannesoft" })?.instanceUrl ?? ""
             let _ = try await api.startVitaCrawl(
                 cookies: "PHPSESSID=\(cookie)",
-                instanceUrl: "https://ac3949.mannesoftprime.com.br"
+                instanceUrl: portalUrl
             )
-            toastMessage = "WebAluno conectado! Extraindo dados..."
+            toastMessage = "Portal conectado! Extraindo dados..."
             toastType = .success
             await loadPortalConnections()
         } catch {
-            print("[Connectors] WebAluno connect error: \(error)")
+            print("[Connectors] Portal connect error: \(error)")
             toastMessage = "Erro ao conectar: \(error.localizedDescription)"
             toastType = .error
         }
@@ -214,9 +307,26 @@ final class ConnectorsViewModel {
     // MARK: - Sync
 
     func syncCanvas() async {
-        // Canvas re-sync requires fresh on-device cookies — use reconnect flow
-        toastMessage = "Para re-sincronizar, reconecte ao Canvas"
+        guard let instanceUrl = canvas.instanceUrl else {
+            toastMessage = "Para re-sincronizar, reconecte ao Canvas"
+            toastType = .success
+            return
+        }
+
+        canvas.status = .loading
+        toastMessage = "Reconectando ao Canvas..."
         toastType = .success
+
+        let success = await CanvasSilentReauth.shared.forceReauth(instanceUrl: instanceUrl, api: api)
+        if success {
+            toastMessage = "Canvas reconectado!"
+            toastType = .success
+            await loadPortalConnections()
+        } else {
+            toastMessage = "Sessao Google expirou — reconecte manualmente"
+            toastType = .error
+            canvas.status = .expired
+        }
     }
 
     func syncCalendar() async {
@@ -268,4 +378,5 @@ struct ConnectorState {
     var lastSync: String?
     var stats: [(value: Int, label: String)] = []
     var subtitle: String?
+    var instanceUrl: String?
 }

@@ -14,9 +14,11 @@ struct TrabalhoEditorView: View {
     let onDismiss: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.appContainer) private var container
     @State private var viewModel: TrabalhoEditorViewModel?
     @State private var selectedTab: Int = 0   // 0 = Escrever, 1 = Visualizar
     @State private var showDeleteConfirm: Bool = false
+    @State private var showSubmitConfirm: Bool = false
 
     // Editor colors — match Android EditorTopBarBg palette
     private let topBarBg      = Color(red: 0.118, green: 0.118, blue: 0.180)
@@ -33,7 +35,7 @@ struct TrabalhoEditorView: View {
         }
         .onAppear {
             if viewModel == nil {
-                let vm = TrabalhoEditorViewModel(context: modelContext)
+                let vm = TrabalhoEditorViewModel(context: modelContext, api: container.api)
                 viewModel = vm
                 Task { await vm.loadOrCreate(assignmentId: assignmentId, templateId: templateId) }
             }
@@ -101,6 +103,12 @@ struct TrabalhoEditorView: View {
                 deleteConfirmContent(vm: vm)
             }
         }
+        // Submit confirmation
+        .sheet(isPresented: $showSubmitConfirm) {
+            VitaBottomSheet(title: "Enviar para o Canvas?") {
+                submitConfirmContent(vm: vm)
+            }
+        }
         .onDisappear {
             viewModel?.forceSave()
         }
@@ -136,8 +144,47 @@ struct TrabalhoEditorView: View {
             // Save status
             saveStatusView(vm: vm)
 
+            // Submit button
+            if vm.canSubmit {
+                Button {
+                    showSubmitConfirm = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 12))
+                        Text("Enviar")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(VitaColors.surface)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(VitaColors.accent)
+                    .clipShape(Capsule())
+                }
+            } else if vm.submitSuccess {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 12))
+                    Text("Enviado")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundStyle(VitaColors.dataGreen)
+            }
+
             // Overflow menu
             Menu {
+                if vm.canSubmit {
+                    Button {
+                        showSubmitConfirm = true
+                    } label: {
+                        Label("Enviar para Canvas", systemImage: "paperplane")
+                    }
+                }
+                Button {
+                    vm.autoGenerate()
+                } label: {
+                    Label("Gerar com IA", systemImage: "wand.and.stars")
+                }
                 Button(role: .destructive) {
                     showDeleteConfirm = true
                 } label: {
@@ -403,12 +450,10 @@ struct TrabalhoEditorView: View {
             Button {
                 vm.toggleAiPanel()
             } label: {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 16))
-                    .foregroundStyle(VitaColors.accent)
+                Image("vita_btn")
+                    .resizable()
+                    .frame(width: 28, height: 28)
                     .frame(width: 36, height: 36)
-                    .background(VitaColors.accent.opacity(0.12))
-                    .clipShape(Circle())
             }
             // sensoryFeedback removed (iOS 17+)
         }
@@ -521,6 +566,92 @@ struct TrabalhoEditorView: View {
                         )
                 }
                 // sensoryFeedback removed (iOS 17+)
+            }
+            Spacer().frame(height: 4)
+        }
+    }
+
+    // MARK: - Submit Confirm
+
+    @ViewBuilder
+    private func submitConfirmContent(vm: TrabalhoEditorViewModel) -> some View {
+        VStack(spacing: 16) {
+            if vm.isSubmitting {
+                HStack(spacing: 10) {
+                    ProgressView().tint(VitaColors.accent)
+                    Text("Enviando para o Canvas...")
+                        .font(VitaTypography.bodyMedium)
+                        .foregroundStyle(VitaColors.textSecondary)
+                }
+                .padding(.vertical, 12)
+            } else if vm.submitSuccess {
+                VStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 36))
+                        .foregroundStyle(VitaColors.dataGreen)
+                    Text("Trabalho enviado com sucesso!")
+                        .font(VitaTypography.titleSmall)
+                        .foregroundStyle(VitaColors.textPrimary)
+                }
+                .padding(.vertical, 12)
+                Button {
+                    showSubmitConfirm = false
+                    onDismiss()
+                } label: {
+                    Text("Fechar")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(VitaColors.accent)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(VitaColors.accent.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            } else {
+                if let error = vm.submitError {
+                    Text(error)
+                        .font(VitaTypography.bodySmall)
+                        .foregroundStyle(VitaColors.dataRed)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                Text("Seu texto (\(vm.wordCount) palavras) será enviado como resposta no Canvas. Esta ação não pode ser desfeita.")
+                    .font(VitaTypography.bodyMedium)
+                    .foregroundStyle(VitaColors.textSecondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                HStack(spacing: 12) {
+                    Button {
+                        showSubmitConfirm = false
+                    } label: {
+                        Text("Cancelar")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(VitaColors.textPrimary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(VitaColors.glassBg)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(VitaColors.glassBorder, lineWidth: 0.5)
+                            )
+                    }
+
+                    Button {
+                        vm.submitToCanvas()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "paperplane.fill")
+                                .font(.system(size: 13))
+                            Text("Enviar")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(VitaColors.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                }
             }
             Spacer().frame(height: 4)
         }

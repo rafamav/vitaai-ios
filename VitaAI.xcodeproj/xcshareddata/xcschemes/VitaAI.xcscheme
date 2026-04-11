@@ -55,6 +55,7 @@
       </CommandLineArguments>
    </TestAction>
    <LaunchAction
+      storeKitConfigurationFileReference = "container:VitaAI/VitaAI.storekit"
       buildConfiguration = "Debug"
       selectedDebuggerIdentifier = "Xcode.DebuggerFoundation.Debugger.LLDB"
       selectedLauncherIdentifier = "Xcode.DebuggerFoundation.Launcher.LLDB"

@@ -12,35 +12,53 @@ struct FlashcardsListScreen: View {
     var onOpenDeck: (String) -> Void
 
     @Environment(\.appContainer) private var container
+    @Environment(\.appData) private var appData
     @State private var decks: [FlashcardDeckEntry] = []
-    @State private var recommended: [FlashcardRecommended] = []
+    @State private var currentDecks: [FlashcardDeckEntry] = []
+    @State private var historyDecks: [FlashcardDeckEntry] = []
     @State private var continueDeck: FlashcardDeckEntry?
     @State private var continueDueCount: Int = 0
     @State private var isLoading = true
     @State private var isEmpty = false
+    @State private var selectedSubjectId: String? = nil
+    @State private var isGenerating = false
+
+    /// Filtered deck list based on the selected subject chip.
+    /// When nil (= "Todas"), the original currentDecks list is returned.
+    private var visibleCurrentDecks: [FlashcardDeckEntry] {
+        guard let id = selectedSubjectId,
+              let subject = container.studyOverviewStore.snapshot?.subjects.first(where: { $0.id == id }) else {
+            return currentDecks
+        }
+        let target = subject.name.uppercased()
+        return currentDecks.filter { $0.title.uppercased() == target }
+    }
 
     var body: some View {
-        ZStack {
-            // Background — fullscreen image (mockup: flashcard-bg-new.png)
-            Image("flashcard-bg-new")
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .ignoresSafeArea()
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
 
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
+                // Unified study hero stat (replaces the standalone banner image)
+                StudyHeroStat(
+                    primary: "\(container.studyOverviewStore.snapshot?.flashcards.dueNow ?? 0)",
+                    primaryCaption: "cards pra revisar agora",
+                    stats: [
+                        .init(
+                            value: "\(container.studyOverviewStore.snapshot?.flashcards.totalCards ?? 0)",
+                            label: "no baralho"
+                        ),
+                        .init(
+                            value: "\(container.studyOverviewStore.snapshot?.flashcards.reviewedToday ?? 0)",
+                            label: "hoje"
+                        ),
+                    ],
+                    subtitle: "Flashcards"
+                )
+                .padding(.top, 14)
 
-                    // Hero image (mockup: flashcard-hero-clean.webp, full width, rounded 18)
-                    Image("flashcard-hero-clean")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .clipShape(RoundedRectangle(cornerRadius: 18))
-                        .shadow(color: .black.opacity(0.40), radius: 20, x: 0, y: 8)
-                        .padding(.top, 14)
-
-                    if isLoading {
+                if isLoading {
                         ProgressView()
-                            .tint(Color(red: 1, green: 0.784, blue: 0.471))
+                            .tint(VitaColors.accentHover)
                             .frame(maxWidth: .infinity)
                             .padding(.top, 40)
                     } else if isEmpty {
@@ -56,14 +74,16 @@ struct FlashcardsListScreen: View {
                             }
 
                             VStack(spacing: 10) {
-                                // Primary CTA — Gerar com IA
-                                Button(action: {
-                                    print("[FlashcardsList] Gerar com IA tapped")
-                                }) {
+                                // Primary CTA — Gerar com IA (calls autoSeed)
+                                Button(action: { Task { await generateWithAI() } }) {
                                     HStack(spacing: 8) {
-                                        Image(systemName: "sparkles")
-                                            .font(.system(size: 14, weight: .semibold))
-                                        Text("Gerar com IA")
+                                        if isGenerating {
+                                            ProgressView().tint(VitaColors.surface).scaleEffect(0.8)
+                                        } else {
+                                            Image(systemName: "sparkles")
+                                                .font(.system(size: 14, weight: .semibold))
+                                        }
+                                        Text(isGenerating ? "Gerando..." : "Gerar com IA")
                                             .font(.system(size: 14, weight: .semibold))
                                     }
                                     .foregroundStyle(VitaColors.surface)
@@ -81,10 +101,11 @@ struct FlashcardsListScreen: View {
                                 }
                                 .buttonStyle(.plain)
 
-                                // Secondary CTA — Criar manualmente
-                                Button(action: {
-                                    print("[FlashcardsList] Criar manualmente tapped")
-                                }) {
+                                // Secondary CTA — Criar manualmente (opens the first
+                                // deck's editor if one exists; otherwise creates a
+                                // blank-titled deck and opens it). Keeps the "everything
+                                // navigates" rule of the unified screens.
+                                Button(action: { Task { await createManualDeck() } }) {
                                     HStack(spacing: 8) {
                                         Image(systemName: "plus")
                                             .font(.system(size: 14, weight: .semibold))
@@ -108,22 +129,38 @@ struct FlashcardsListScreen: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 40)
                     } else {
-                        // Continuar section
-                        if let cont = continueDeck {
+                        // Subject chips — unified filter strip driven by the
+                        // study overview snapshot. Uses the real academic_subjects
+                        // IDs so taps can also drive deep-links later.
+                        if let subjects = container.studyOverviewStore.snapshot?.subjects, !subjects.isEmpty {
+                            StudySubjectChips(subjects: subjects, selectedId: $selectedSubjectId)
+                                .padding(.top, 18)
+                                .padding(.horizontal, -16) // chips manage their own insets
+                        }
+
+                        // Continuar section (current semester only) — hides when
+                        // a chip filter is active so the hero matches the section.
+                        if selectedSubjectId == nil, let cont = continueDeck {
                             sectionLabel("Continuar")
                             continueCard(cont)
                         }
 
-                        // Recomendados section
-                        if !recommended.isEmpty {
+                        // Recomendados section (current semester, top 8)
+                        if selectedSubjectId == nil, currentDecks.count > 1 {
                             sectionLabel("Recomendados")
                             recommendedScroll
                         }
 
-                        // Disciplinas / decks
-                        if !decks.isEmpty {
-                            sectionLabel("Disciplinas / decks")
+                        // Suas disciplinas (current semester or filtered subject)
+                        if !visibleCurrentDecks.isEmpty {
+                            sectionLabel(selectedSubjectId == nil ? "Suas disciplinas" : "Desta disciplina")
                             decksGrid
+                        }
+
+                        // Histórico (past semesters) — only shown in unfiltered view.
+                        if selectedSubjectId == nil, !historyDecks.isEmpty {
+                            sectionLabel("Histórico")
+                            historyGrid
                         }
                     }
 
@@ -131,9 +168,39 @@ struct FlashcardsListScreen: View {
                 }
                 .padding(.horizontal, 16)
             }
-        }
         .task {
+            await appData.loadIfNeeded()
+            await container.studyOverviewStore.loadIfNeeded()
             await loadData()
+        }
+    }
+
+    // MARK: - Actions
+
+    /// Run QBank-backed autoSeed then refresh both local state + overview store.
+    @MainActor
+    private func generateWithAI() async {
+        guard !isGenerating else { return }
+        isGenerating = true
+        defer { isGenerating = false }
+        do {
+            _ = try await container.api.generateFlashcardsAutoSeed()
+            await container.studyOverviewStore.refresh()
+            await loadData()
+        } catch {
+            print("[FlashcardsList] generateWithAI error: \(error)")
+        }
+    }
+
+    /// Manual creation — placeholder until a dedicated create-deck sheet exists.
+    /// Opens the first current-semester deck so the user isn't stranded; when
+    /// the blank-deck editor lands, replace this with a real navigation.
+    @MainActor
+    private func createManualDeck() async {
+        if let first = currentDecks.first {
+            onOpenDeck(first.id)
+        } else {
+            await generateWithAI()
         }
     }
 
@@ -142,24 +209,55 @@ struct FlashcardsListScreen: View {
     private func loadData() async {
         isLoading = true
         do {
-            // Use recommended endpoint — lightweight, no cards inline
-            let recs = try await container.api.getMockupFlashcardsRecommended()
-            if recs.isEmpty {
+            var fetched = try await container.api.getFlashcardDecks()
+
+            // Auto-seed if user has no decks yet (first open)
+            if fetched.isEmpty {
+                // Trigger autoSeed — generates decks from QBank for user's disciplines
+                _ = try? await container.api.generateFlashcardsAutoSeed()
+                fetched = try await container.api.getFlashcardDecks()
+            }
+
+            // Filter out empty decks
+            let withCards = fetched.filter { !$0.cards.isEmpty }
+
+            if withCards.isEmpty {
                 isEmpty = true
                 isLoading = false
                 return
             }
 
-            recommended = recs
+            decks = withCards
 
-            // First recommended with dueCount > 0 = continue deck
-            if let first = recs.first(where: { $0.dueCount > 0 }) {
-                continueDeck = FlashcardDeckEntry(id: first.deckId, title: first.title)
-                continueDueCount = first.dueCount
+            // Split into current semester vs history
+            let subjectNames = Set(appData.dashboardSubjects.compactMap { $0.name?.uppercased() })
+            if subjectNames.isEmpty {
+                // No subjects loaded — treat all as current
+                currentDecks = withCards
+                historyDecks = []
+            } else {
+                currentDecks = withCards.filter { deck in
+                    subjectNames.contains(deck.title.uppercased())
+                }
+                historyDecks = withCards.filter { deck in
+                    !subjectNames.contains(deck.title.uppercased())
+                }
             }
 
-            // All decks for the grid (use recommended as deck list)
-            decks = recs.map { FlashcardDeckEntry(id: $0.deckId, title: $0.title) }
+            // First CURRENT deck with due cards = continue deck
+            if let first = currentDecks.first(where: { deck in
+                deck.cards.contains { card in
+                    guard let next = card.nextReviewAt else { return true }
+                    // Cards with no nextReviewAt or past due
+                    return ISO8601DateFormatter().date(from: next).map { $0 <= Date() } ?? true
+                }
+            }) {
+                continueDeck = first
+                continueDueCount = first.cards.filter { card in
+                    guard let next = card.nextReviewAt else { return true }
+                    return ISO8601DateFormatter().date(from: next).map { $0 <= Date() } ?? true
+                }.count
+            }
         } catch {
             print("[FlashcardsList] error: \(error)")
             isEmpty = true
@@ -173,7 +271,7 @@ struct FlashcardsListScreen: View {
         Text(text)
             .font(.system(size: 14, weight: .medium))
             .italic()
-            .foregroundStyle(Color(red: 1, green: 0.941, blue: 0.843).opacity(0.50))
+            .foregroundStyle(VitaColors.textWarm.opacity(0.50))
             .padding(.top, 22)
             .padding(.bottom, 10)
     }
@@ -196,7 +294,7 @@ struct FlashcardsListScreen: View {
                         .foregroundStyle(Color.white.opacity(0.93))
                     Text("\(continueDueCount) pendentes")
                         .font(.system(size: 11))
-                        .foregroundStyle(Color(red: 1, green: 0.941, blue: 0.843).opacity(0.40))
+                        .foregroundStyle(VitaColors.textWarm.opacity(0.40))
                 }
 
                 Spacer()
@@ -208,8 +306,8 @@ struct FlashcardsListScreen: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color(red: 0.047, green: 0.035, blue: 0.027).opacity(0.85),
-                                Color(red: 0.055, green: 0.043, blue: 0.031).opacity(0.82)
+                                VitaColors.surfaceCard.opacity(0.85),
+                                VitaColors.surfaceElevated.opacity(0.82)
                             ],
                             startPoint: .top, endPoint: .bottom
                         )
@@ -218,7 +316,7 @@ struct FlashcardsListScreen: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(Color(red: 1, green: 0.784, blue: 0.471).opacity(0.14), lineWidth: 0.5)
+                    .stroke(VitaColors.accentHover.opacity(0.14), lineWidth: 0.5)
             )
             .shadow(color: .black.opacity(0.40), radius: 18, x: 0, y: 7)
         }
@@ -230,15 +328,18 @@ struct FlashcardsListScreen: View {
     private var recommendedScroll: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                ForEach(recommended.prefix(8)) { rec in
-                    Button(action: { onOpenDeck(rec.deckId) }) {
+                ForEach(currentDecks.prefix(8)) { deck in
+                    let dueCount = deck.cards.filter { card in
+                        guard let next = card.nextReviewAt else { return true }
+                        return ISO8601DateFormatter().date(from: next).map { $0 <= Date() } ?? true
+                    }.count
+                    Button(action: { onOpenDeck(deck.id) }) {
                         VStack(alignment: .leading, spacing: 0) {
-                            // Image placeholder (use discipline hero bg)
                             RoundedRectangle(cornerRadius: 0)
                                 .fill(Color(red: 0.1, green: 0.07, blue: 0.05))
                                 .frame(height: 72)
                                 .overlay(
-                                    Image(heroImageFor(rec.title))
+                                    Image(heroImageFor(deck.title))
                                         .resizable()
                                         .aspectRatio(contentMode: .fill)
                                         .frame(height: 72)
@@ -246,13 +347,13 @@ struct FlashcardsListScreen: View {
                                 )
 
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(rec.title)
+                                Text(deck.title)
                                     .font(.system(size: 11.5, weight: .semibold))
                                     .foregroundStyle(Color.white.opacity(0.90))
                                     .lineLimit(1)
-                                Text("\(rec.totalCards) cards\(rec.dueCount > 0 ? " · \(rec.dueCount) pendentes" : "")")
+                                Text("\(deck.cards.count) cards\(dueCount > 0 ? " · \(dueCount) pendentes" : "")")
                                     .font(.system(size: 10))
-                                    .foregroundStyle(Color(red: 1, green: 0.941, blue: 0.843).opacity(0.48))
+                                    .foregroundStyle(VitaColors.textWarm.opacity(0.48))
                                     .lineLimit(1)
                             }
                             .padding(.horizontal, 10)
@@ -264,8 +365,8 @@ struct FlashcardsListScreen: View {
                                 .fill(
                                     LinearGradient(
                                         colors: [
-                                            Color(red: 0.047, green: 0.035, blue: 0.027).opacity(0.85),
-                                            Color(red: 0.055, green: 0.043, blue: 0.031).opacity(0.80)
+                                            VitaColors.surfaceCard.opacity(0.85),
+                                            VitaColors.surfaceElevated.opacity(0.80)
                                         ],
                                         startPoint: .top, endPoint: .bottom
                                     )
@@ -274,7 +375,7 @@ struct FlashcardsListScreen: View {
                         .clipShape(RoundedRectangle(cornerRadius: 14))
                         .overlay(
                             RoundedRectangle(cornerRadius: 14)
-                                .stroke(Color(red: 1, green: 0.784, blue: 0.471).opacity(0.12), lineWidth: 1)
+                                .stroke(VitaColors.accentHover.opacity(0.12), lineWidth: 1)
                         )
                         .shadow(color: .black.opacity(0.35), radius: 14, x: 0, y: 5)
                     }
@@ -294,7 +395,7 @@ struct FlashcardsListScreen: View {
 
     private var decksGrid: some View {
         LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
-            ForEach(decks) { deck in
+            ForEach(visibleCurrentDecks) { deck in
                 Button(action: { onOpenDeck(deck.id) }) {
                     HStack(spacing: 10) {
                         Image(discIconFor(deck.title))
@@ -316,8 +417,8 @@ struct FlashcardsListScreen: View {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        Color(red: 0.047, green: 0.035, blue: 0.027).opacity(0.82),
-                                        Color(red: 0.055, green: 0.043, blue: 0.031).opacity(0.78)
+                                        VitaColors.surfaceCard.opacity(0.82),
+                                        VitaColors.surfaceElevated.opacity(0.78)
                                     ],
                                     startPoint: .top, endPoint: .bottom
                                 )
@@ -326,9 +427,55 @@ struct FlashcardsListScreen: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color(red: 1, green: 0.784, blue: 0.471).opacity(0.10), lineWidth: 1)
+                            .stroke(VitaColors.accentHover.opacity(0.10), lineWidth: 1)
                     )
                     .shadow(color: .black.opacity(0.30), radius: 11, x: 0, y: 4)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // MARK: - History Grid (past semesters, same style but dimmed)
+
+    private var historyGrid: some View {
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
+            ForEach(historyDecks) { deck in
+                Button(action: { onOpenDeck(deck.id) }) {
+                    HStack(spacing: 10) {
+                        Image(discIconFor(deck.title))
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 28, height: 28)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .opacity(0.6)
+
+                        Text(deck.title)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.50))
+                            .lineLimit(1)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        VitaColors.surfaceCard.opacity(0.60),
+                                        VitaColors.surfaceElevated.opacity(0.55)
+                                    ],
+                                    startPoint: .top, endPoint: .bottom
+                                )
+                            )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(VitaColors.accentHover.opacity(0.06), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.20), radius: 8, x: 0, y: 3)
                 }
                 .buttonStyle(.plain)
             }

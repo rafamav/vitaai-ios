@@ -15,7 +15,7 @@ struct TranscricaoDetailSheet: View {
 
     var body: some View {
         ZStack {
-            TealColors.screenBg.ignoresSafeArea()
+            Color.clear.ignoresSafeArea()
 
             VStack(spacing: 0) {
                 // Header

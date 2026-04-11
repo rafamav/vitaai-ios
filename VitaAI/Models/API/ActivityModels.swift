@@ -24,6 +24,27 @@ struct LogActivityResponse: Decodable {
     var streakDays: Int = 0
     var streakUpdated: Bool = false
     var totalStudyHours: Double = 0
+
+    private enum CodingKeys: String, CodingKey {
+        case xpAwarded, totalXp, level, currentLevelXp, xpToNextLevel
+        case newBadges, tier, cycle, iconPath, streakDays, streakUpdated, totalStudyHours
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        xpAwarded = (try? c.decode(Int.self, forKey: .xpAwarded)) ?? 0
+        totalXp = (try? c.decode(Int.self, forKey: .totalXp)) ?? 0
+        level = (try? c.decode(Int.self, forKey: .level)) ?? 0
+        currentLevelXp = (try? c.decode(Int.self, forKey: .currentLevelXp)) ?? 0
+        xpToNextLevel = (try? c.decode(Int.self, forKey: .xpToNextLevel)) ?? 0
+        newBadges = (try? c.decode([NewBadge].self, forKey: .newBadges)) ?? []
+        tier = (try? c.decode(String.self, forKey: .tier)) ?? ""
+        cycle = (try? c.decode(String.self, forKey: .cycle)) ?? ""
+        iconPath = (try? c.decode(String.self, forKey: .iconPath)) ?? ""
+        streakDays = (try? c.decode(Int.self, forKey: .streakDays)) ?? 0
+        streakUpdated = (try? c.decode(Bool.self, forKey: .streakUpdated)) ?? false
+        totalStudyHours = (try? c.decode(Double.self, forKey: .totalStudyHours)) ?? 0
+    }
 }
 
 struct NewBadge: Decodable {

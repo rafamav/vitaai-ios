@@ -75,6 +75,7 @@ final class DeepLinkHandler {
         case "agenda":     return .navigate(.agenda)
         case "insights":   return .navigate(.insights)
         case "profile":    return .navigate(.profile)
+        case "paywall":    return .navigate(.paywall)
         case "progresso":  return .navigate(.progresso)
         case "notebooks":  return .navigate(.notebookList)
 
@@ -96,6 +97,9 @@ final class DeepLinkHandler {
                 return .navigate(.notebookEditor(notebookId: notebookId))
             }
             return .navigate(.notebookList)
+
+        // Atlas 3D
+        case "atlas": return .navigate(.atlas3D)
 
         // Connections / Conectores
         case "connections": return .navigate(.connections)

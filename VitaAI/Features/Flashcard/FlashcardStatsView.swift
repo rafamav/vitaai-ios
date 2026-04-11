@@ -18,7 +18,7 @@ struct FlashcardStatsView: View {
 
     var body: some View {
         ZStack {
-            VitaColors.surface.ignoresSafeArea()
+            Color.clear.ignoresSafeArea()
 
             if let vm = viewModel {
                 VStack(spacing: 0) {

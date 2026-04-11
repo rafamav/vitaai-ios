@@ -1,0 +1,129 @@
+{
+  "identifier" : "BF2B2B3E-8C1A-4D5E-9F3A-7E4B6C8D9E0F",
+  "type" : "subscriptions",
+  "version" : 3,
+  "subscriptionGroups" : [
+    {
+      "id" : "21514515",
+      "localizations" : [
+        {
+          "description" : "VitaAI Premium - Acesso completo com IA avancada",
+          "displayName" : "VitaAI Premium",
+          "locale" : "pt_BR"
+        }
+      ],
+      "name" : "VitaAI Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "24.90",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6745230001",
+          "introductoryOffer" : {
+            "displayPrice" : "0",
+            "internalID" : "INT_OFFER_001",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1W"
+          },
+          "localizations" : [
+            {
+              "description" : "Vita Chat IA + OSCE + Atlas 3D + Upload PDFs",
+              "displayName" : "Premium",
+              "locale" : "pt_BR"
+            }
+          ],
+          "productID" : "com.bymav.vitaai.premium",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Premium Mensal",
+          "subscriptionGroupID" : "21514515",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "49.90",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "6745230002",
+          "introductoryOffer" : {
+            "displayPrice" : "0",
+            "internalID" : "INT_OFFER_002",
+            "numberOfPeriods" : 1,
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P1W"
+          },
+          "localizations" : [
+            {
+              "description" : "Tudo do Premium + Transcricao + Voz + VITA GAME",
+              "displayName" : "Pro",
+              "locale" : "pt_BR"
+            }
+          ],
+          "productID" : "com.bymav.vitaai.pro",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Pro Mensal",
+          "subscriptionGroupID" : "21514515",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6745230000",
+    "_developerTeamID" : "BYMAV_TEAM",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "pt_BR",
+    "_storefront" : "BRA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ],
+    "_timeRate" : 6
+  }
+}

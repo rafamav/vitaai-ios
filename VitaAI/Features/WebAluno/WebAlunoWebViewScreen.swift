@@ -5,8 +5,6 @@ import WebKit
 
 /// Landing page — loads first to establish Mannesoft domain cookies,
 /// then auto-triggers loginGoogle() to start OAuth flow.
-private let webalunoURL = "https://ac3949.mannesoftprime.com.br/webaluno/"
-
 // MARK: - WebAlunoWebViewScreen
 
 /// Presents the WebAluno portal in a WKWebView.
@@ -18,6 +16,15 @@ struct WebAlunoWebViewScreen: View {
     var onSessionCaptured: (String) -> Void
     /// User's institutional email from VitaAI login — used as login_hint for Google OAuth
     var userEmail: String?
+    /// Portal instance URL — comes from university portal config, no hardcoded fallback
+    var portalInstanceUrl: String = ""
+
+    /// Build the webaluno URL from the portal instance URL
+    private var webalunoWebURL: String {
+        guard !portalInstanceUrl.isEmpty else { return "" }
+        let base = portalInstanceUrl.hasSuffix("/") ? portalInstanceUrl : portalInstanceUrl + "/"
+        return base.contains("/webaluno") ? base : base + "webaluno/"
+    }
 
     @State private var isLoading: Bool = true
     @State private var loadProgress: Double = 0
@@ -41,7 +48,7 @@ struct WebAlunoWebViewScreen: View {
 
                 // WebView — loads portal, auto-triggers Google OAuth with login_hint
                 WebAlunoWebView(
-                    url: URL(string: webalunoURL)!,
+                    url: URL(string: webalunoWebURL)!,
                     userEmail: userEmail,
                     isLoading: $isLoading,
                     loadProgress: $loadProgress,
@@ -249,17 +256,23 @@ struct WebAlunoWebView: UIViewRepresentable {
                 oauthTriggered = true
                 let emailHint = parent.userEmail ?? ""
                 NSLog("[WebAluno] Landing page loaded, triggering Google OAuth (hint: %@)...", emailHint)
+                // Derive base domain from portal URL for OAuth redirect
+                let portalBase: String = {
+                    guard let scheme = parent.url.scheme, let host = parent.url.host else { return "" }
+                    return "\(scheme)://\(host)"
+                }()
                 let js = """
                     (function() {
                         var clientId = '841344683161-55h62tlo6h5f0ea7ilrsp3psr29ubo0i.apps.googleusercontent.com';
-                        var redirectUri = encodeURIComponent('https://ac3949.mannesoftprime.com.br/autenticacao/oauth_google.php?tipo=1&origem=webaluno');
+                        var portalBase = '\(portalBase)';
+                        var redirectUri = encodeURIComponent(portalBase + '/autenticacao/oauth_google.php?tipo=1&origem=webaluno');
                         var loginHint = '\(emailHint)';
                         var url = 'https://accounts.google.com/o/oauth2/v2/auth'
                             + '?client_id=' + clientId
                             + '&redirect_uri=' + redirectUri
                             + '&response_type=code'
                             + '&scope=email%20profile'
-                            + '&hd=rede.ulbra.br'
+                            + (loginHint && loginHint.indexOf('@') > 0 ? '&hd=' + loginHint.split('@')[1] : '')
                             + (loginHint ? '&login_hint=' + encodeURIComponent(loginHint) : '');
                         window.location.href = url;
                         return 'redirecting to Google with hint: ' + loginHint;

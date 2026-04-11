@@ -15,23 +15,23 @@ struct TranscricaoRecorderArea: View {
             VStack(alignment: .leading, spacing: 0) {
                 // Timer
                 Text(formatTranscricaoElapsed(elapsedSeconds))
-                    .font(.system(size: 26, weight: .bold, design: .default))
-                    .tracking(-1)
+                    .font(.system(size: 36, weight: .bold, design: .default))
+                    .tracking(-1.5)
                     .monospacedDigit()
                     .foregroundStyle(
                         isRecording
                             ? TealColors.accentLight.opacity(0.95)
-                            : Color.white.opacity(0.15)
+                            : Color.white.opacity(0.22)
                     )
-                    .shadow(color: isRecording ? TealColors.accent.opacity(0.3) : .clear, radius: 20)
+                    .shadow(color: isRecording ? TealColors.accent.opacity(0.4) : .clear, radius: 24)
 
                 // Status label
                 Text(isRecording ? "Gravando..." : "Pronto para gravar")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(
                         isRecording
                             ? TealColors.accentLight.opacity(0.70)
-                            : Color.white.opacity(0.18)
+                            : Color.white.opacity(0.25)
                     )
                     .padding(.top, 2)
 
@@ -236,26 +236,36 @@ struct TranscricaoRecordingsListSection: View {
                     .padding(.vertical, 20)
             } else if recordings.isEmpty {
                 // Empty state
-                VStack(spacing: 10) {
+                VStack(spacing: 14) {
                     ZStack {
                         Circle()
-                            .fill(TealColors.accent.opacity(0.06))
-                            .frame(width: 64, height: 64)
-                        Image(systemName: "mic.slash")
-                            .font(.system(size: 26))
-                            .foregroundStyle(TealColors.accent.opacity(0.45))
+                            .fill(
+                                RadialGradient(
+                                    colors: [VitaColors.accent.opacity(0.12), VitaColors.accent.opacity(0.03)],
+                                    center: .center,
+                                    startRadius: 0,
+                                    endRadius: 40
+                                )
+                            )
+                            .frame(width: 80, height: 80)
+                        Image(systemName: "waveform.and.mic")
+                            .font(.system(size: 30, weight: .light))
+                            .foregroundStyle(VitaColors.accent.opacity(0.55))
                     }
 
                     Text("Nenhuma gravação ainda")
-                        .font(VitaTypography.labelMedium)
-                        .foregroundStyle(VitaColors.textWarm.opacity(0.55))
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.white.opacity(0.65))
 
-                    Text("Grave sua primeira aula para transcrever")
-                        .font(VitaTypography.labelSmall)
-                        .foregroundStyle(VitaColors.textWarm.opacity(0.30))
+                    Text("Grave sua primeira aula para transcrever.\nA IA gera resumos e flashcards automaticamente.")
+                        .font(.system(size: 12))
+                        .foregroundStyle(VitaColors.textWarm.opacity(0.35))
+                        .multilineTextAlignment(.center)
+                        .lineSpacing(3)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 32)
+                .padding(.vertical, 40)
+                .padding(.horizontal, 32)
             } else {
                 List {
                     ForEach(recordings) { rec in

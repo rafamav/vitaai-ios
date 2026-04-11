@@ -18,12 +18,12 @@ final class InsightsViewModel {
     var subjects: [SubjectProgress] = []
     var upcomingExams: [ExamEntry] = []
 
-    // MARK: - Grades data (from /grades + /canvas/courses + /webaluno/grades)
+    // MARK: - Grades data (from /grades + /canvas/courses + /grades/current)
     var studyStats: StudyStats? = nil
     var courseGrades: [CourseGrade] = []
-    var webalunoGrades: [WebalunoGrade] = []
-    var webalunoSummary: WebalunoGradesSummary? = nil
-    var webalunoConnected: Bool = false
+    var portalGrades: [GradeSubject] = []
+    var portalSummary: GradesSummary? = nil
+    var portalConnected: Bool = false
 
     // MARK: - Chart data
     var retentionHistory: [RetentionPoint] = []
@@ -37,13 +37,13 @@ final class InsightsViewModel {
 
     // MARK: - Computed
 
-    /// Best available average: WebAluno average if present, else avgAccuracy from progress
+    /// Best available average: portal average if present, else avgAccuracy from progress
     var displayAverage: Double {
-        webalunoSummary?.averageGrade ?? avgAccuracy
+        portalSummary?.averageGrade ?? avgAccuracy
     }
 
     var isEmptyState: Bool {
-        !isLoading && error == nil && studyStats == nil && courseGrades.isEmpty && webalunoGrades.isEmpty
+        !isLoading && error == nil && studyStats == nil && courseGrades.isEmpty && portalGrades.isEmpty
     }
 
     var isErrorState: Bool {
@@ -65,10 +65,11 @@ final class InsightsViewModel {
             async let progressTask = api.getProgress()
             async let gradesTask: [GradeEntry] = api.getGrades(limit: 100)
             async let coursesTask = api.getCourses()
-            async let webalunoTask = tryFetchWebalunoGrades()
+            async let portalTask = tryFetchPortalGrades()
+            async let flashcardStatsTask = tryFetchFlashcardStats()
 
-            let (progress, grades, coursesResp, webalunoResp) = try await (
-                progressTask, gradesTask, coursesTask, webalunoTask
+            let (progress, grades, coursesResp, portalResp, fcStats) = try await (
+                progressTask, gradesTask, coursesTask, portalTask, flashcardStatsTask
             )
 
             // Update progress stats
@@ -111,16 +112,29 @@ final class InsightsViewModel {
                 )
             }
 
-            // WebAluno grades
-            webalunoGrades = webalunoResp?.grades ?? []
-            webalunoSummary = webalunoResp?.summary
-            webalunoConnected = webalunoResp != nil
+            // Portal grades
+            if let resp = portalResp {
+                portalGrades = resp.current + resp.completed
+                portalSummary = resp.summary
+                portalConnected = true
+            }
 
-            // Rebuild chart data from real API values
-            retentionHistory = buildRetentionCurve(accuracy: avgAccuracy)
-            studyHeatmap = buildHeatmap(streak: streakDays, totalHours: totalHours)
-            forecastData = buildForecast(due: flashcardsDue)
-            cardDistribution = buildDistribution(total: totalCards, due: flashcardsDue)
+            // Chart data from REAL API data
+            if let fc = fcStats {
+                // Card distribution from real FSRS states
+                cardDistribution = buildDistributionFromStats(fc)
+                // Forecast from real FSRS scheduler
+                forecastData = buildForecastFromStats(fc)
+                // Retention from real review history
+                retentionHistory = buildRetentionFromStats(fc)
+            } else {
+                // Fallback to progress data if flashcard stats unavailable
+                cardDistribution = buildDistribution(total: totalCards, learned: progress.learnedCards, due: flashcardsDue)
+                forecastData = []
+                retentionHistory = []
+            }
+            // Heatmap from real API data
+            studyHeatmap = buildHeatmapFromAPI(progress.heatmap)
 
         } catch {
             self.error = error.localizedDescription
@@ -129,81 +143,74 @@ final class InsightsViewModel {
         isLoading = false
     }
 
-    /// Fetches WebAluno grades, returning nil on error (WebAluno is optional / may not be connected).
-    private func tryFetchWebalunoGrades() async -> WebalunoGradesResponse? {
-        do { return try await api.getWebalunoGrades() } catch { return nil }
+    /// Fetches portal grades, returning nil on error (portal may not be connected).
+    private func tryFetchPortalGrades() async -> GradesCurrentResponse? {
+        do { return try await api.getGradesCurrent() } catch { return nil }
     }
 
-    // MARK: - Chart data builders
+    /// Fetches flashcard stats (FSRS data), returning nil on error.
+    private func tryFetchFlashcardStats() async -> FlashcardStatsResponse? {
+        do { return try await api.getFlashcardStats() } catch { return nil }
+    }
 
-    /// Ebbinghaus forgetting curve scaled to the user's average accuracy.
-    private func buildRetentionCurve(accuracy: Double) -> [RetentionPoint] {
-        let R0 = max(20.0, min(accuracy, 95.0))
-        // Stability S: higher accuracy → slower forgetting
-        let S = 28.0 * (R0 / 70.0)
-        return [0, 1, 7, 14, 30, 60, 90].map { day in
-            let retention = day == 0 ? 100.0 : max(5.0, 100.0 * exp(-Double(day) / S))
-            return RetentionPoint(day: day, retention: retention)
+    // MARK: - Chart data from REAL API data
+
+    /// Card state distribution from real FSRS states (new, young, mature).
+    private func buildDistributionFromStats(_ stats: FlashcardStatsResponse) -> [CardCategory] {
+        guard stats.totalCards > 0 else { return [] }
+        return [
+            CardCategory(name: "Novo",     count: stats.newCards,     color: VitaColors.dataBlue),
+            CardCategory(name: "Jovem",    count: stats.youngCards,   color: VitaColors.dataAmber),
+            CardCategory(name: "Maduro",   count: stats.matureCards,  color: VitaColors.dataGreen),
+        ]
+    }
+
+    /// 7-day forecast from real FSRS scheduler.
+    private func buildForecastFromStats(_ stats: FlashcardStatsResponse) -> [ForecastDay] {
+        let calendar = Calendar.current
+        let today = Date()
+        return stats.forecastNext7Days.enumerated().compactMap { offset, cards in
+            guard let date = calendar.date(byAdding: .day, value: offset, to: today) else { return nil }
+            return ForecastDay(date: date, cardsCount: cards)
         }
     }
 
-    /// Deterministic heatmap for the last 91 days (13 weeks) based on streak + total hours.
-    private func buildHeatmap(streak: Int, totalHours: Double) -> [StudyDay] {
+    /// Retention curve from real daily retention data.
+    private func buildRetentionFromStats(_ stats: FlashcardStatsResponse) -> [RetentionPoint] {
+        guard !stats.dailyRetention.isEmpty else { return [] }
+        return stats.dailyRetention.enumerated().map { idx, entry in
+            RetentionPoint(day: idx, retention: entry.retention * 100)
+        }
+    }
+
+    /// Heatmap from real API data (array of minutes per day, last 91 days).
+    private func buildHeatmapFromAPI(_ heatmap: [Int]) -> [StudyDay] {
+        guard !heatmap.isEmpty else { return [] }
         var calendar = Calendar(identifier: .gregorian)
         calendar.firstWeekday = 1
         let today = Date()
         let fmt = ISO8601DateFormatter()
         fmt.formatOptions = [.withFullDate]
 
-        let dailyMinutes = streak > 0 ? Int(totalHours * 60.0 / Double(streak)) : 60
-
-        var result: [StudyDay] = []
-        for offset in stride(from: -90, through: 0, by: 1) {
-            guard let date = calendar.date(byAdding: .day, value: offset, to: today) else { continue }
-            let daysAgo = -offset
-            let dateId = fmt.string(from: date)
-
-            let minutes: Int
-            if daysAgo < streak {
-                // Within streak: regular study, slight alternation for realism
-                minutes = max(15, dailyMinutes + (daysAgo % 2 == 0 ? 15 : -10))
-            } else if daysAgo < streak * 3 {
-                // Pre-streak zone: occasional sessions
-                minutes = (daysAgo - streak) % 3 == 0 ? Int(Double(dailyMinutes) * 0.6) : 0
-            } else {
-                // Older: sparse
-                minutes = daysAgo % 7 == 0 ? Int(Double(dailyMinutes) * 0.4) : 0
-            }
-            result.append(StudyDay(id: dateId, date: date, minutesStudied: max(0, minutes)))
-        }
-        return result
-    }
-
-    /// Distributes `due` cards across the next 7 days with front-loaded weighting.
-    private func buildForecast(due: Int) -> [ForecastDay] {
-        let weights: [Double] = [0.30, 0.20, 0.15, 0.12, 0.10, 0.08, 0.05]
-        let total = Double(due)
-        let calendar = Calendar.current
-        let today = Date()
-        return (0..<7).compactMap { offset in
-            guard let date = calendar.date(byAdding: .day, value: offset, to: today) else { return nil }
-            let cards = max(0, Int((total * weights[offset]).rounded()))
-            return ForecastDay(date: date, cardsCount: cards)
+        // API returns array indexed from oldest to newest (91 days)
+        let count = heatmap.count
+        return heatmap.enumerated().compactMap { idx, minutes in
+            let daysAgo = count - 1 - idx
+            guard let date = calendar.date(byAdding: .day, value: -daysAgo, to: today) else { return nil }
+            return StudyDay(id: fmt.string(from: date), date: date, minutesStudied: minutes)
         }
     }
 
-    /// Estimates card state distribution from totalCards + due count.
-    private func buildDistribution(total: Int, due: Int) -> [CardCategory] {
+    /// Fallback card distribution from progress totals when flashcard stats unavailable.
+    private func buildDistribution(total: Int, learned: Int, due: Int) -> [CardCategory] {
         guard total > 0 else { return [] }
-        let mastered = Int(Double(total) * 0.50)
-        let review   = min(due, total - mastered)
-        let learning = min(Int(Double(total) * 0.20), max(0, total - mastered - review))
-        let new      = max(0, total - mastered - review - learning)
+        let newCards = max(0, total - learned)
+        let reviewCards = min(due, learned)
+        let masteredCards = max(0, learned - reviewCards)
         return [
-            CardCategory(name: "Novo",       count: new,      color: VitaColors.dataBlue),
-            CardCategory(name: "Aprendendo", count: learning,  color: VitaColors.dataAmber),
-            CardCategory(name: "Revisão",    count: review,    color: VitaColors.accent),
-            CardCategory(name: "Dominado",   count: mastered,  color: VitaColors.dataGreen),
+            CardCategory(name: "Novo",     count: newCards,      color: VitaColors.dataBlue),
+            CardCategory(name: "Revisão",  count: reviewCards,   color: VitaColors.accent),
+            CardCategory(name: "Dominado", count: masteredCards,  color: VitaColors.dataGreen),
         ]
     }
 
@@ -216,24 +223,14 @@ final class InsightsViewModel {
     }
 
     func subjectName(for id: String) -> String {
-        let names: [String: String] = [
-            "cm-cardio": "Cardiologia",
-            "cm-pneumo": "Pneumologia",
-            "cm-gastro": "Gastroenterologia",
-            "cm-nefro": "Nefrologia",
-            "cm-endocrino": "Endocrinologia",
-            "cm-reumato": "Reumatologia",
-            "cm-hemato": "Hematologia",
-            "cm-infecto": "Infectologia",
-            "cm-neuro": "Neurologia",
-            "cir-geral": "Cirurgia Geral",
-            "cir-trauma": "Cirurgia do Trauma",
-            "ped-geral": "Pediatria",
-            "go-obstetricia": "Obstetrícia",
-            "go-ginecologia": "Ginecologia",
-            "prev-epidemio": "Epidemiologia",
-            "prev-bioestat": "Bioestatística",
-        ]
-        return names[id] ?? id
+        // Use subject name from API data if available
+        if let match = subjects.first(where: { $0.subjectId == id }), !match.name.isEmpty {
+            return match.name
+        }
+        // Fallback: format the ID as a readable name
+        return id
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .capitalized
     }
 }

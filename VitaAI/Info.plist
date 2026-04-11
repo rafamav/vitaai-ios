@@ -38,6 +38,10 @@
 	<string>VitaAI precisa do microfone para gravar suas aulas e gerar transcricoes automaticas.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>VitaAI usa reconhecimento de fala para transcrever suas aulas em tempo real.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UISupportedInterfaceOrientations</key>

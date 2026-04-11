@@ -20,12 +20,12 @@ struct SimuladoReviewScreen: View {
                 reviewContent(vm: vm)
             } else {
                 ZStack {
-                    simuladoBg.ignoresSafeArea()
+                    Color.clear.ignoresSafeArea()
                     ProgressView().tint(simuladoAccent)
                 }
             }
         }
-        .background(simuladoBg.ignoresSafeArea())
+        .background(Color.clear.ignoresSafeArea())
         .navigationBarHidden(true)
         .onAppear {
             if vm == nil { vm = SimuladoViewModel(api: container.api, gamificationEvents: container.gamificationEvents) }

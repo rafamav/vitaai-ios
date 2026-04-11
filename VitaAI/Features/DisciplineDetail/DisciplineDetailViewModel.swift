@@ -81,14 +81,25 @@ final class DisciplineDetailViewModel {
             flashcardDecks = decks
             totalCards     = decks.reduce(0) { $0 + $1.cards.count }
 
-            // Vita score
-            let examFactor: Double = {
+            // VitaScore v1: difficulty * 0.45 + gradeRisk * 0.35 + urgency * 0.20
+            // Measures risk (0 = safe, 100 = danger)
+            // difficulty is set on academic_subjects and comes via /api/dashboard
+            // DisciplineDetail doesn't have it locally, so use neutral fallback
+            let diffScore: Double = 50
+
+            let urgencyScore: Double = {
                 guard let days = nearestExamDays else { return 30 }
-                return min(Double(max(days, 1)), 60)
+                if days <= 0 { return 100 }
+                if days >= 30 { return 0 }
+                return Double(Int((1.0 - Double(days) / 30.0) * 100))
             }()
-            let examScore = max(0, min(100, (1.0 - examFactor / 60.0) * 100))
-            let accScore  = max(0, min(100, 100 - accuracy))
-            vitaScore = Int(50 * 0.50 + examScore * 0.25 + accScore * 0.25)
+
+            // gradeRisk from exam scores — same as backend
+            let gradeRisk: Double = 60 // default when no exams graded yet
+            // Note: actual gradeRisk computed from exam scores is done server-side
+            // in /api/dashboard. This is a local fallback for DisciplineDetail.
+
+            vitaScore = max(0, min(100, Int(diffScore * 0.45 + gradeRisk * 0.35 + urgencyScore * 0.20)))
 
         } catch {
             self.error = error.localizedDescription

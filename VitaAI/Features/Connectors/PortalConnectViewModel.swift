@@ -32,9 +32,12 @@ final class PortalConnectViewModel {
     private let api: VitaAPI
     private var syncTask: Task<Void, Never>?
 
-    init(portalType: String, api: VitaAPI) {
+    init(portalType: String, api: VitaAPI, defaultInstanceUrl: String = "") {
         self.portalType = portalType
         self.api = api
+        if !defaultInstanceUrl.isEmpty {
+            self.instanceUrl = defaultInstanceUrl
+        }
     }
 
     // MARK: - Display Config
@@ -59,7 +62,6 @@ final class PortalConnectViewModel {
                 if let conn = status.canvasConnection, conn.status == "active" {
                     isConnected = true
                     if let url = conn.instanceUrl, !url.isEmpty { instanceUrl = url }
-                    else { instanceUrl = "https://ulbra.instructure.com" }
                     lastSync = conn.lastSyncAt.flatMap { formatRelativeTime($0) }
                     stats = [
                         (conn.counts?.subjects ?? 0, "disciplinas"),
@@ -68,7 +70,6 @@ final class PortalConnectViewModel {
                     ]
                 } else {
                     isConnected = false
-                    instanceUrl = "https://ulbra.instructure.com"
                 }
 
             case "webaluno", "mannesoft":
@@ -112,15 +113,15 @@ final class PortalConnectViewModel {
         isLoading = false
     }
 
-    // MARK: - Connect WebAluno (server-side crawl)
+    // MARK: - Connect Mannesoft portal (server-side crawl)
 
-    func connectWebaluno(cookie: String) {
+    func connectMannesoft(cookie: String) {
         Task {
             isConnecting = true
             error = nil
             successMessage = nil
             do {
-                let url = instanceUrl.isEmpty ? "https://ac3949.mannesoftprime.com.br" : instanceUrl
+                let url = instanceUrl
                 let crawlResult = try await api.startVitaCrawl(cookies: cookie, instanceUrl: url)
                 isConnecting = false
                 isConnected = true
@@ -217,9 +218,9 @@ final class PortalConnectViewModel {
                     error = "Para re-sincronizar, reconecte ao Canvas"
                     return
                 case "webaluno", "mannesoft":
-                    // WebAluno syncs automatically via server cron every 10 min
+                    // Mannesoft syncs automatically via server cron every 10 min
                     isSyncing = false
-                    successMessage = "WebAluno sincroniza automaticamente a cada 10 minutos"
+                    successMessage = "Portal sincroniza automaticamente a cada 10 minutos"
                     return
                 case "google_calendar":
                     let result = try await api.syncGoogleCalendar()
@@ -252,7 +253,7 @@ final class PortalConnectViewModel {
                 case "canvas":
                     try await api.disconnectCanvas()
                 case "webaluno", "mannesoft":
-                    try await api.disconnectWebaluno()
+                    try await api.disconnectPortal()
                 case "google_calendar":
                     try await api.disconnectGoogleCalendar()
                 case "google_drive":
@@ -318,7 +319,7 @@ enum PortalConnectConfig {
     static func displayName(for type: String) -> String {
         switch type {
         case "canvas": "Canvas LMS"
-        case "webaluno", "mannesoft": "WebAluno"
+        case "webaluno", "mannesoft": "Portal Acadêmico"
         case "google_calendar": "Google Calendar"
         case "google_drive": "Google Drive"
         case "moodle": "Moodle"

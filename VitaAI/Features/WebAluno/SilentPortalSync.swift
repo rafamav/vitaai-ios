@@ -10,7 +10,7 @@ final class SilentPortalSync {
     static let shared = SilentPortalSync()
 
     private let minSyncInterval: TimeInterval = 3600 // 1 hour between syncs
-    private let sessionCheckURL = "https://ac3949.mannesoftprime.com.br/webaluno/"
+    private var sessionCheckURL: String = ""
     private var webView: WKWebView?
     private var isRunning = false
 
@@ -18,18 +18,24 @@ final class SilentPortalSync {
 
     /// Call on app foreground / dashboard appear.
     /// Does nothing if last sync was recent or no active connection exists.
+    /// Also triggers Canvas silent reauth if needed.
     func syncIfNeeded(api: VitaAPI) {
         guard !isRunning else { return }
+
+        // Also check Canvas reauth (runs independently)
+        CanvasSilentReauth.shared.reauthIfNeeded(api: api)
 
         Task {
             // Check if we have an active portal connection
             do {
-                let status = try await api.getWebalunoStatus()
+                let status = try await api.getPortalStatus()
                 guard status.connected else { return }
 
+                // Get the portal connection for mannesoft/webaluno
+                let conn = status.connections?.first(where: { $0.portalType == "mannesoft" || $0.portalType == "webaluno" })
+
                 // Check if enough time has passed since last sync
-                if let conn = status.connections?.first,
-                   let lastSync = conn.lastSyncAt,
+                if let lastSync = conn?.lastSyncAt,
                    let syncDate = parseISO(lastSync) {
                     let elapsed = Date().timeIntervalSince(syncDate)
                     if elapsed < minSyncInterval {
@@ -38,7 +44,15 @@ final class SilentPortalSync {
                     }
                 }
 
-                NSLog("[SilentSync] Starting silent sync...")
+                // Get instance URL from the connection (not hardcoded)
+                guard let portalUrl = conn?.instanceUrl, !portalUrl.isEmpty else {
+                    NSLog("[SilentSync] No portal instance URL found, skipping")
+                    return
+                }
+                let baseUrl = portalUrl.hasSuffix("/") ? portalUrl : portalUrl + "/"
+                sessionCheckURL = baseUrl + (baseUrl.contains("/webaluno") ? "" : "webaluno/")
+
+                NSLog("[SilentSync] Starting silent sync for %@", sessionCheckURL)
                 await performSilentSync(api: api)
             } catch {
                 NSLog("[SilentSync] Status check failed: %@", String(describing: error))
@@ -170,10 +184,12 @@ final class SilentPortalSync {
         guard !apiPages.isEmpty else { return }
 
         do {
+            // Extract base domain from sessionCheckURL for instanceUrl
+            let baseInstance = sessionCheckURL.components(separatedBy: "/webaluno").first ?? sessionCheckURL
             let result = try await api.extractPortalPages(
                 pages: apiPages,
-                instanceUrl: "https://ac3949.mannesoftprime.com.br",
-                university: "ULBRA",
+                instanceUrl: baseInstance,
+                university: "",
                 sessionCookie: sessionCookie
             )
             NSLog("[SilentSync] Extract done: grades=%d, schedule=%d", result.grades ?? 0, result.schedule ?? 0)

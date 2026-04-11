@@ -1,30 +1,6 @@
 import Foundation
 import SwiftUI
 
-// MARK: - Local Assignment Model
-
-struct LocalAssignment: Identifiable {
-    var id: String
-    var title: String
-    var courseName: String
-    var dueAt: Date?
-    var pointsPossible: Double?
-    var isSubmitted: Bool
-
-    var daysUntilDue: Int? {
-        guard let due = dueAt else { return nil }
-        return Calendar.current.dateComponents([.day], from: Date(), to: due).day
-    }
-
-    var urgencyColor: Color {
-        guard let days = daysUntilDue else { return .gray }
-        if days <= 1 { return Color.red }
-        if days <= 3 { return Color.orange }
-        if days <= 7 { return Color.yellow }
-        return Color.green
-    }
-}
-
 // MARK: - TrabalhoViewModel
 
 @MainActor
@@ -32,35 +8,13 @@ struct LocalAssignment: Identifiable {
 final class TrabalhoViewModel {
     private let api: VitaAPI
 
-    var assignments: [LocalAssignment] = []
+    var pending: [TrabalhoItem] = []
+    var completed: [TrabalhoItem] = []
+    var overdue: [TrabalhoItem] = []
     var grades: [GradeEntry] = []
+    var total: Int = 0
     var selectedSegment: Int = 0
     var isLoading: Bool = true
-
-    // Derived
-    var pendingCount: Int {
-        assignments.filter { !$0.isSubmitted }.count
-    }
-
-    var sortedAssignments: [LocalAssignment] {
-        assignments.sorted {
-            switch ($0.dueAt, $1.dueAt) {
-            case let (lhs?, rhs?): return lhs < rhs
-            case (nil, _?): return false
-            case (_?, nil): return true
-            case (nil, nil): return false
-            }
-        }
-    }
-
-    var sortedGrades: [GradeEntry] {
-        grades.sorted {
-            // Sort by date descending; items without dates go last
-            let lhs = $0.date ?? ""
-            let rhs = $1.date ?? ""
-            return lhs > rhs
-        }
-    }
 
     init(api: VitaAPI) {
         self.api = api
@@ -71,80 +25,83 @@ final class TrabalhoViewModel {
     func load() async {
         isLoading = true
 
-        async let assignmentsTask: Void = fetchAssignments()
+        async let trabalhosTask: Void = fetchTrabalhos()
         async let gradesTask: Void = fetchGrades()
-        _ = await (assignmentsTask, gradesTask)
+        _ = await (trabalhosTask, gradesTask)
 
         isLoading = false
     }
 
-    private func fetchAssignments() async {
+    private func fetchTrabalhos() async {
         do {
-            let response = try await api.getAssignments()
-            if !response.assignments.isEmpty {
-                let now = Date()
-                let iso = ISO8601DateFormatter()
-                assignments = response.assignments.map { a in
-                    let dueDate: Date? = a.dueAt.flatMap { iso.date(from: $0) }
-                    // An assignment is "submitted" if its due date is in the past
-                    let submitted = dueDate.map { $0 < now } ?? false
-                    return LocalAssignment(
-                        id: a.id,
-                        title: a.name,
-                        courseName: a.courseName,
-                        dueAt: dueDate,
-                        pointsPossible: a.pointsPossible,
-                        isSubmitted: submitted
-                    )
-                }
-            }
+            let response = try await api.getTrabalhos()
+            pending = response.pending
+            completed = response.completed
+            overdue = response.overdue
+            total = response.total
         } catch {
-            print("[TrabalhoViewModel] assignments fallback: \(error)")
+            print("[TrabalhoViewModel] trabalhos error: \(error)")
         }
     }
 
     private func fetchGrades() async {
-        // Prefer WebAluno grades (richer subject data) if available,
-        // then fall back to generic /grades endpoint.
         do {
-            let webaluno = try await api.getWebalunoGrades()
-            if !webaluno.grades.isEmpty {
-                // Map WebalunoGrade → GradeEntry for unified display
-                grades = webaluno.grades.compactMap { wg -> GradeEntry? in
-                    // Use finalGrade if present, otherwise average of available grades
+            let portalResp = try await api.getGradesCurrent()
+            let allSubjects = portalResp.current + portalResp.completed
+            if !allSubjects.isEmpty {
+                grades = allSubjects.compactMap { gs -> GradeEntry? in
                     let value: Double
-                    if let final_ = wg.finalGrade {
+                    if let final_ = gs.finalGrade {
                         value = final_
                     } else {
-                        let available = [wg.grade1, wg.grade2, wg.grade3].compactMap { $0 }
+                        let available = [gs.grade1, gs.grade2, gs.grade3].compactMap { $0 }
                         guard !available.isEmpty else { return nil }
                         value = available.reduce(0, +) / Double(available.count)
                     }
                     return GradeEntry(
-                        id: wg.id.isEmpty ? UUID().uuidString : wg.id,
+                        id: UUID().uuidString,
                         userId: "",
-                        subjectId: wg.subjectCode ?? wg.subjectName,
-                        label: wg.subjectName,
+                        subjectId: gs.subjectName,
+                        label: gs.subjectName,
                         value: value,
                         maxValue: 10.0,
-                        notes: wg.status,
-                        date: wg.semester
+                        notes: gs.status,
+                        date: nil
                     )
                 }
                 return
             }
         } catch {
-            print("[TrabalhoViewModel] webaluno grades fallback: \(error)")
+            print("[TrabalhoViewModel] portal grades fallback: \(error)")
         }
 
         do {
             let entries = try await api.getGrades(limit: 30)
-            if !entries.isEmpty {
-                grades = entries
-            }
+            if !entries.isEmpty { grades = entries }
         } catch {
             print("[TrabalhoViewModel] grades fallback: \(error)")
         }
     }
 
+    // MARK: - Dismiss (archive)
+
+    func dismiss(_ item: TrabalhoItem) {
+        withAnimation {
+            pending.removeAll { $0.id == item.id }
+            overdue.removeAll { $0.id == item.id }
+            completed.removeAll { $0.id == item.id }
+        }
+        // Fire-and-forget backend call
+        Task {
+            try? await api.dismissTrabalho(id: item.id)
+        }
+    }
+
+    var sortedGrades: [GradeEntry] {
+        grades.sorted {
+            let lhs = $0.date ?? ""
+            let rhs = $1.date ?? ""
+            return lhs > rhs
+        }
+    }
 }

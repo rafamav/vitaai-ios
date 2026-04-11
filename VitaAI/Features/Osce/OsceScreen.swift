@@ -21,7 +21,9 @@ struct OsceScreen: View {
         }
         .onAppear {
             if viewModel == nil {
-                viewModel = OsceViewModel(api: container.api, sseClient: container.osceSseClient, gamificationEvents: container.gamificationEvents)
+                let vm = OsceViewModel(api: container.api, sseClient: container.osceSseClient, gamificationEvents: container.gamificationEvents)
+                viewModel = vm
+                vm.loadSpecialties()
             }
         }
     }
@@ -148,7 +150,7 @@ private struct OsceSpecialtyView: View {
 
                 // Specialty grid
                 LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(OsceViewModel.specialties, id: \.self) { specialty in
+                    ForEach(viewModel.specialties, id: \.self) { specialty in
                         SpecialtyCard(
                             specialty: specialty,
                             isLoading: viewModel.isLoading,

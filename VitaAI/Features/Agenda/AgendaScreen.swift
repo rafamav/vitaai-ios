@@ -3,8 +3,11 @@ import SwiftUI
 // MARK: - AgendaScreen
 
 struct AgendaScreen: View {
-    @Environment(\.appContainer) private var container
+    @Environment(\.appData) private var appData
+    @Environment(\.scenePhase) private var scenePhase
     @State private var viewModel: AgendaViewModel?
+    @State private var gradesTab = 0 // 0 = Notas, 1 = Frequência
+    @State private var gradesFilter = 0 // 0 = Cursando, 1 = Aprovadas
 
     var body: some View {
         Group {
@@ -17,8 +20,15 @@ struct AgendaScreen: View {
         }
         .onAppear {
             if viewModel == nil {
-                viewModel = AgendaViewModel(api: container.api)
-                Task { await viewModel?.load() }
+                viewModel = AgendaViewModel(appData: appData)
+                Task { await appData.loadIfNeeded() }
+            } else {
+                Task { await appData.silentRefresh() }
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                Task { await appData.silentRefresh() }
             }
         }
     }
@@ -38,15 +48,16 @@ struct AgendaScreen: View {
             } else {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 16) {
-                        weekDaySelector(vm: vm)
-                        dayHeader(vm: vm)
-                        timelineSection(vm: vm)
-                        aiPlanButton(vm: vm)
+                        MonthlyCalendarView(
+                            schedule: vm.classSchedule,
+                            evaluations: vm.academicEvaluations
+                        )
+                        .padding(.horizontal, 16)
                         Spacer().frame(height: 100)
                     }
                     .padding(.top, 8)
                 }
-                .refreshable { await vm.load() }
+                .refreshable { await appData.forceRefresh() }
             }
         }
         .sheet(isPresented: Binding(
@@ -253,7 +264,7 @@ struct AgendaScreen: View {
                         .frame(width: 34, height: 34)
                     Image(systemName: item.completed ? "checkmark.circle.fill" : iconFor(item.title))
                         .font(.system(size: 14))
-                        .foregroundStyle(item.completed ? Color.green : VitaColors.textSecondary)
+                        .foregroundStyle(item.completed ? VitaColors.dataGreen : VitaColors.textSecondary)
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -284,7 +295,7 @@ struct AgendaScreen: View {
                 // Completion toggle hint
                 Image(systemName: item.completed ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 18))
-                    .foregroundStyle(item.completed ? Color.green.opacity(0.8) : VitaColors.textTertiary)
+                    .foregroundStyle(item.completed ? VitaColors.dataGreen.opacity(0.8) : VitaColors.textTertiary)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
@@ -301,36 +312,39 @@ struct AgendaScreen: View {
     // MARK: - Class row
 
     @ViewBuilder
-    private func classRow(cls: ClassScheduleItem) -> some View {
-        HStack(spacing: 0) {
+    private func classRow(cls: AgendaClassBlock) -> some View {
+        let startTime = String(cls.startTime.prefix(5))
+        let endTime = String(cls.endTime.prefix(5))
+
+        return HStack(spacing: 0) {
             // Left accent border
             Rectangle()
-                .fill(Color.blue.opacity(0.7))
+                .fill(VitaColors.accent.opacity(0.7))
                 .frame(width: 3)
 
             HStack(spacing: 12) {
-                Text(cls.startTime)
+                Text(startTime)
                     .font(.system(size: 11, weight: .semibold))
                     .monospacedDigit()
-                    .foregroundStyle(Color.blue.opacity(0.8))
+                    .foregroundStyle(VitaColors.accent.opacity(0.8))
                     .frame(width: 36, alignment: .leading)
 
                 ZStack {
                     RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.blue.opacity(0.08))
+                        .fill(VitaColors.accent.opacity(0.08))
                         .frame(width: 34, height: 34)
                     Image(systemName: "graduationcap.fill")
                         .font(.system(size: 12))
-                        .foregroundStyle(Color.blue.opacity(0.8))
+                        .foregroundStyle(VitaColors.accent.opacity(0.8))
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(cls.subjectName ?? "")
+                    Text(cls.subjectName)
                         .font(VitaTypography.labelMedium)
                         .foregroundStyle(VitaColors.textPrimary)
                         .lineLimit(1)
 
-                    let detail = ["\(cls.startTime) - \(cls.endTime)", cls.room]
+                    let detail = ["\(startTime) - \(endTime)", cls.room]
                         .compactMap { $0 }
                         .joined(separator: " · ")
                     Text(detail)
@@ -348,7 +362,7 @@ struct AgendaScreen: View {
         .clipShape(RoundedRectangle(cornerRadius: 18))
         .overlay(
             RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.blue.opacity(0.12), lineWidth: 1)
+                .stroke(VitaColors.accent.opacity(0.12), lineWidth: 1)
         )
         .padding(.horizontal, 16)
     }
@@ -359,7 +373,7 @@ struct AgendaScreen: View {
     private func eventRow(event: StudyEventEntry) -> some View {
         let startTime = extractTime(from: event.startAt)
         let isExam = event.eventType.uppercased() == "EXAM"
-        let accentColor = isExam ? Color.orange : VitaColors.accent
+        let accentColor = isExam ? VitaColors.dataAmber : VitaColors.accent
 
         HStack(spacing: 0) {
             Rectangle()
@@ -408,6 +422,300 @@ struct AgendaScreen: View {
                 .stroke(accentColor.opacity(0.12), lineWidth: 1)
         )
         .padding(.horizontal, 16)
+    }
+
+    // MARK: - Grades card
+
+    @ViewBuilder
+    private func gradesCard(vm: AgendaViewModel) -> some View {
+        if let grades = vm.gradesResponse, (!grades.current.isEmpty || !grades.completed.isEmpty) {
+            let cr = computeCR(grades.completed)
+            let subjects = gradesFilter == 0 ? grades.current : grades.completed
+
+            VitaGlassCard {
+                VStack(spacing: 14) {
+                    // CR badge + title
+                    HStack(alignment: .center) {
+                        Text("Matérias")
+                            .font(VitaTypography.titleSmall)
+                            .foregroundStyle(VitaColors.textPrimary)
+
+                        if let cr {
+                            Text("CR \(String(format: "%.2f", cr))")
+                                .font(.system(size: 11, weight: .bold))
+                                .monospacedDigit()
+                                .foregroundStyle(crColor(cr))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(crColor(cr).opacity(0.10))
+                                .clipShape(Capsule())
+                                .overlay(
+                                    Capsule().stroke(crColor(cr).opacity(0.20), lineWidth: 1)
+                                )
+                        }
+
+                        Spacer()
+                    }
+
+                    // Filter pills: Cursando | Aprovadas
+                    HStack(spacing: 6) {
+                        filterPill("Cursando", count: grades.current.count, index: 0)
+                        filterPill("Aprovadas", count: grades.completed.count, index: 1)
+                        Spacer()
+
+                        // Column toggle
+                        HStack(spacing: 0) {
+                            gradesTabButton("Notas", index: 0)
+                            gradesTabButton("Freq", index: 1)
+                        }
+                        .background(VitaColors.surfaceElevated)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(VitaColors.glassBorder, lineWidth: 1)
+                        )
+                    }
+
+                    if subjects.isEmpty {
+                        Text(gradesFilter == 0 ? "Sem matérias cursando" : "Sem matérias aprovadas")
+                            .font(VitaTypography.bodySmall)
+                            .foregroundStyle(VitaColors.textTertiary)
+                            .padding(.vertical, 8)
+                    } else {
+                        // Table header
+                        if gradesTab == 0 {
+                            if gradesFilter == 0 {
+                                gradeTableHeader(columns: [("Disciplina", .leading, 1.0), ("G1", .center, 0.2), ("G2", .center, 0.2), ("Final", .center, 0.25)])
+                            } else {
+                                gradeTableHeader(columns: [("Disciplina", .leading, 1.0), ("Final", .center, 0.25)])
+                            }
+                        } else {
+                            gradeTableHeader(columns: [("Disciplina", .leading, 1.0), ("Freq", .center, 0.22), ("Faltas", .center, 0.22), ("CH", .center, 0.2)])
+                        }
+
+                        // Table rows
+                        ForEach(subjects) { subject in
+                            if gradesTab == 0 {
+                                if gradesFilter == 0 {
+                                    gradeNotasRow(subject)
+                                } else {
+                                    gradeApprovedRow(subject)
+                                }
+                            } else {
+                                gradeFreqRow(subject)
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+            }
+            .padding(.horizontal, 16)
+        }
+    }
+
+    @ViewBuilder
+    private func filterPill(_ title: String, count: Int, index: Int) -> some View {
+        let isActive = gradesFilter == index
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) { gradesFilter = index }
+        } label: {
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(VitaTypography.labelSmall)
+                Text("\(count)")
+                    .font(.system(size: 10, weight: .bold))
+                    .monospacedDigit()
+            }
+            .foregroundStyle(isActive ? VitaColors.surface : VitaColors.textSecondary)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(isActive ? VitaColors.accent : VitaColors.surfaceElevated)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule().stroke(isActive ? VitaColors.accent.opacity(0.5) : VitaColors.glassBorder, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func gradeApprovedRow(_ s: GradeSubject) -> some View {
+        HStack(spacing: 4) {
+            Text(shortName(s.subjectName))
+                .font(VitaTypography.bodySmall)
+                .foregroundStyle(VitaColors.textPrimary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            gradeCell(s.finalGrade)
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 3)
+    }
+
+    private func computeCR(_ completed: [GradeSubject]) -> Double? {
+        let grades = completed.compactMap(\.finalGrade)
+        guard !grades.isEmpty else { return nil }
+        // Weighted by workload if available, else simple average
+        let withWorkload = completed.filter { $0.finalGrade != nil && $0.workload != nil && $0.workload! > 0 }
+        if withWorkload.count > grades.count / 2 {
+            // Enough workload data for weighted average
+            let totalWeight = withWorkload.reduce(0) { $0 + ($1.workload ?? 0) }
+            let weightedSum = withWorkload.reduce(0.0) { $0 + ($1.finalGrade ?? 0) * Double($1.workload ?? 0) }
+            return totalWeight > 0 ? weightedSum / Double(totalWeight) : nil
+        }
+        return grades.reduce(0, +) / Double(grades.count)
+    }
+
+    private func approvedAverage(_ completed: [GradeSubject]) -> Double? {
+        let grades = completed.compactMap(\.finalGrade)
+        guard !grades.isEmpty else { return nil }
+        return grades.reduce(0, +) / Double(grades.count)
+    }
+
+    private func crColor(_ cr: Double) -> Color {
+        if cr >= 8.0 { return VitaColors.dataGreen }
+        if cr >= 6.0 { return VitaColors.accent }
+        return VitaColors.dataRed
+    }
+
+    @ViewBuilder
+    private func gradesTabButton(_ title: String, index: Int) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                gradesTab = index
+            }
+        } label: {
+            Text(title)
+                .font(VitaTypography.labelSmall)
+                .foregroundStyle(gradesTab == index ? VitaColors.surface : VitaColors.textSecondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(gradesTab == index ? VitaColors.accent : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func summaryRow(items: [(String, String)]) -> some View {
+        HStack(spacing: 0) {
+            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                VStack(spacing: 2) {
+                    Text(item.0)
+                        .font(.system(size: 16, weight: .semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(VitaColors.accent)
+                    Text(item.1)
+                        .font(VitaTypography.labelSmall)
+                        .foregroundStyle(VitaColors.textSecondary)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func gradeTableHeader(columns: [(String, HorizontalAlignment, CGFloat)]) -> some View {
+        HStack(spacing: 4) {
+            ForEach(Array(columns.enumerated()), id: \.offset) { _, col in
+                Text(col.0)
+                    .font(.system(size: 11, weight: .semibold))
+                    .textCase(.uppercase)
+                    .foregroundStyle(VitaColors.textSecondary)
+                    .frame(maxWidth: col.2 == 1.0 ? .infinity : nil, alignment: col.1 == .leading ? .leading : .center)
+                    .frame(width: col.2 < 1.0 ? 48 : nil)
+            }
+        }
+        .padding(.horizontal, 4)
+
+        Rectangle()
+            .fill(VitaColors.accent.opacity(0.15))
+            .frame(height: 0.5)
+    }
+
+    @ViewBuilder
+    private func gradeNotasRow(_ s: GradeSubject) -> some View {
+        HStack(spacing: 4) {
+            Text(shortName(s.subjectName))
+                .font(VitaTypography.bodySmall)
+                .foregroundStyle(VitaColors.textPrimary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            gradeCell(s.grade1)
+            gradeCell(s.grade2)
+            gradeCell(s.finalGrade)
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 3)
+    }
+
+    @ViewBuilder
+    private func gradeFreqRow(_ s: GradeSubject) -> some View {
+        HStack(spacing: 4) {
+            Text(shortName(s.subjectName))
+                .font(VitaTypography.bodySmall)
+                .foregroundStyle(VitaColors.textPrimary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(s.attendance.map { "\($0)%" } ?? "—")
+                .font(.system(size: 12, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(attendanceColor(s.attendance))
+                .frame(width: 48, alignment: .center)
+
+            Text(s.absences.map { "\($0)" } ?? "—")
+                .font(.system(size: 12, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(VitaColors.textSecondary)
+                .frame(width: 48, alignment: .center)
+
+            Text(s.workload.map { "\($0)" } ?? "—")
+                .font(.system(size: 12, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(VitaColors.textSecondary)
+                .frame(width: 48, alignment: .center)
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 3)
+    }
+
+    @ViewBuilder
+    private func gradeCell(_ val: Double?) -> some View {
+        Text(val.map { String(format: "%.1f", $0) } ?? "—")
+            .font(.system(size: 12, weight: .medium))
+            .monospacedDigit()
+            .foregroundStyle(val != nil ? VitaColors.textPrimary : VitaColors.textSecondary)
+            .frame(width: 48, alignment: .center)
+    }
+
+    private func shortName(_ name: String) -> String {
+        // Abbreviate long subject names
+        let subs: [(String, String)] = [
+            ("MEDICINA DE FAMÍLIA E COMUNIDADE", "MFC"),
+            ("FARMACOLOGIA MÉDICA", "Farmacologia"),
+            ("PATOLOGIA MÉDICA", "Patologia"),
+            ("MEDICINA LEGAL, DEONTOLOGIA E ÉTICA MÉDICA", "Med Legal"),
+            ("PRÁTICAS INTERPROFISSIONAIS DE EDUCAÇÃO EM SAÚDE", "PIES"),
+            ("SOCIEDADE E CONTEMPORANEIDADE", "Soc. Contemp."),
+        ]
+        for (full, short) in subs {
+            if name.uppercased().hasPrefix(full) { return short }
+        }
+        // Fallback: title case first 20 chars
+        if name.count > 22 {
+            return String(name.prefix(20)) + "…"
+        }
+        return name.capitalized(with: Locale(identifier: "pt_BR"))
+    }
+
+    private func attendanceColor(_ val: Int?) -> Color {
+        guard let v = val else { return VitaColors.textTertiary }
+        if v >= 90 { return VitaColors.dataGreen }
+        if v >= 75 { return VitaColors.accent }
+        return VitaColors.dataRed
     }
 
     // MARK: - AI Plan button
@@ -648,7 +956,7 @@ struct AgendaScreen: View {
 
     private func buildTimeline(
         studyItems: [LocalStudyItem],
-        classes: [ClassScheduleItem],
+        classes: [AgendaClassBlock],
         events: [StudyEventEntry]
     ) -> [TimelineRow] {
         var rows: [TimelineRow] = []
@@ -657,7 +965,7 @@ struct AgendaScreen: View {
             rows.append(TimelineRow(sortKey: item.time, kind: .study(item)))
         }
         for cls in classes {
-            rows.append(TimelineRow(sortKey: cls.startTime, kind: .classBlock(cls)))
+            rows.append(TimelineRow(sortKey: String(cls.startTime.prefix(5)), kind: .classBlock(cls)))
         }
         for event in events {
             let time = extractTime(from: event.startAt)
@@ -678,6 +986,6 @@ private struct TimelineRow: Identifiable {
 
 private enum TimelineRowKind {
     case study(LocalStudyItem)
-    case classBlock(ClassScheduleItem)
+    case classBlock(AgendaClassBlock)
     case event(StudyEventEntry)
 }

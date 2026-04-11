@@ -31,6 +31,42 @@ class VitaAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenter
         return true
     }
 
+    /// Silent (content-available) push handler — app is woken in the background
+    /// with a ~30s window to run work. The cron sends `type=canvas_reauth` payloads
+    /// when Canvas is within 2h of its 24h session expiry.
+    ///
+    /// Must call `completionHandler` exactly once, within the window, or iOS will
+    /// throttle future background pushes for this app.
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        let type = userInfo["type"] as? String ?? ""
+        NSLog("[PushBG] Silent push received: type=%@", type)
+
+        guard type == "canvas_reauth",
+              let instanceUrl = userInfo["instanceUrl"] as? String,
+              !instanceUrl.isEmpty else {
+            completionHandler(.noData)
+            return
+        }
+
+        Task { @MainActor in
+            // Background wakes don't go through AppContainer's @StateObject init,
+            // so build a minimal VitaAPI against the keychain-backed TokenStore.
+            // TokenStore reads the same `vita_session_token` used by the running app,
+            // so /portal/ingest authenticates correctly.
+            let api = VitaAPI(client: HTTPClient(tokenStore: TokenStore()))
+            let success = await CanvasSilentReauth.shared.forceReauth(
+                instanceUrl: instanceUrl,
+                api: api
+            )
+            NSLog("[PushBG] Canvas reauth result: %@", success ? "success" : "failed")
+            completionHandler(success ? .newData : .failed)
+        }
+    }
+
     // Show push banners while app is in foreground
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
@@ -65,6 +101,7 @@ struct VitaAIApp: App {
         WindowGroup {
             AppRouter(authManager: container.authManager)
                 .environment(\.appContainer, container)
+                .environment(\.appData, container.dataManager)
                 .environment(\.subscriptionStatus, container.subscriptionStatus)
                 // SwiftData (iOS 17+) - notes/mindmaps local persistence
                 .modifier(ModelContainerModifier(container: container))

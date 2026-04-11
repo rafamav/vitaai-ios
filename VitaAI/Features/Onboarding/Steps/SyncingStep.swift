@@ -20,11 +20,11 @@ struct SyncingStep: View {
                     if isDone {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 20))
-                            .foregroundStyle(Color.green)
+                            .foregroundStyle(VitaColors.dataGreen)
                     } else if hasError {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 20))
-                            .foregroundStyle(Color.orange)
+                            .foregroundStyle(VitaColors.dataAmber)
                     } else {
                         ProgressView()
                             .tint(VitaColors.accent)
@@ -34,7 +34,7 @@ struct SyncingStep: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(label)
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(isDone ? Color.green.opacity(0.9) : hasError ? Color.orange.opacity(0.9) : VitaColors.accent.opacity(0.9))
+                            .foregroundStyle(isDone ? VitaColors.dataGreen.opacity(0.9) : hasError ? VitaColors.dataAmber.opacity(0.9) : VitaColors.accent.opacity(0.9))
 
                         if viewModel.syncGrades > 0 || viewModel.syncSchedule > 0 || viewModel.syncCourses > 0 {
                             HStack(spacing: 6) {
@@ -80,7 +80,7 @@ struct SyncingStep: View {
                         RoundedRectangle(cornerRadius: 3)
                             .fill(
                                 isDone
-                                    ? LinearGradient(colors: [Color.green.opacity(0.5), Color.green.opacity(0.8)], startPoint: .leading, endPoint: .trailing)
+                                    ? LinearGradient(colors: [VitaColors.dataGreen.opacity(0.5), VitaColors.dataGreen.opacity(0.8)], startPoint: .leading, endPoint: .trailing)
                                     : LinearGradient(colors: [VitaColors.accent.opacity(0.4), VitaColors.accent.opacity(0.7)], startPoint: .leading, endPoint: .trailing)
                             )
                             .frame(width: geo.size.width * min(percent / 100, 1.0), height: 5)
@@ -92,10 +92,10 @@ struct SyncingStep: View {
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(isDone ? Color.green.opacity(0.03) : VitaColors.accent.opacity(0.03))
+                    .fill(isDone ? VitaColors.dataGreen.opacity(0.03) : VitaColors.accent.opacity(0.03))
                     .overlay(
                         RoundedRectangle(cornerRadius: 16)
-                            .stroke(isDone ? Color.green.opacity(0.12) : VitaColors.accent.opacity(0.12), lineWidth: 1)
+                            .stroke(isDone ? VitaColors.dataGreen.opacity(0.12) : VitaColors.accent.opacity(0.12), lineWidth: 1)
                     )
             )
 
@@ -107,11 +107,11 @@ struct SyncingStep: View {
                             if item.status == "done" {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 11))
-                                    .foregroundStyle(Color.green.opacity(0.7))
+                                    .foregroundStyle(VitaColors.dataGreen.opacity(0.7))
                             } else if item.status == "error" {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.system(size: 11))
-                                    .foregroundStyle(Color.red.opacity(0.5))
+                                    .foregroundStyle(VitaColors.dataRed.opacity(0.5))
                             } else {
                                 ProgressView()
                                     .tint(VitaColors.accent.opacity(0.5))
@@ -232,7 +232,7 @@ struct SyncingStep: View {
 
             // WebAluno
             do {
-                let status = try await api.getWebalunoStatus()
+                let status = try await api.getPortalStatus()
                 let g = status.counts?.grades ?? 0
                 let s = status.counts?.schedule ?? 0
                 await MainActor.run {

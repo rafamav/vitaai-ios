@@ -30,7 +30,7 @@ struct InlinePortalWebView: View {
                 HStack(spacing: 12) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 22))
-                        .foregroundStyle(Color.green)
+                        .foregroundStyle(VitaColors.dataGreen)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("\(University.displayName(for: portalType)) conectado!")
                             .font(.system(size: 14, weight: .semibold))
@@ -49,8 +49,8 @@ struct InlinePortalWebView: View {
                 .padding(16)
                 .background(
                     RoundedRectangle(cornerRadius: 16)
-                        .fill(Color.green.opacity(0.06))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.green.opacity(0.15), lineWidth: 1))
+                        .fill(VitaColors.dataGreen.opacity(0.06))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(VitaColors.dataGreen.opacity(0.15), lineWidth: 1))
                 )
             } else {
                 // WebView header
@@ -94,7 +94,7 @@ struct InlinePortalWebView: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(isConnected ? Color.green.opacity(0.15) : Color.white.opacity(0.08), lineWidth: 1)
+                .stroke(isConnected ? VitaColors.dataGreen.opacity(0.15) : Color.white.opacity(0.08), lineWidth: 1)
         )
         .transition(.opacity.combined(with: .scale(scale: 0.95)))
     }
@@ -323,11 +323,11 @@ struct OnboardingConnectSheet: View {
 
             ZStack {
                 Circle()
-                    .fill(Color.green.opacity(0.1))
+                    .fill(VitaColors.dataGreen.opacity(0.1))
                     .frame(width: 72, height: 72)
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 36))
-                    .foregroundStyle(Color.green)
+                    .foregroundStyle(VitaColors.dataGreen)
             }
 
             Text(String(localized: "connect_portal_connected").replacingOccurrences(of: "%@", with: portalName))
@@ -675,11 +675,11 @@ struct OnboardingPortalFlow: View {
 
             ZStack {
                 Circle()
-                    .fill(Color.green.opacity(0.1))
+                    .fill(VitaColors.dataGreen.opacity(0.1))
                     .frame(width: 80, height: 80)
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 40))
-                    .foregroundStyle(Color.green)
+                    .foregroundStyle(VitaColors.dataGreen)
             }
 
             Text("\(portalName) conectado!")

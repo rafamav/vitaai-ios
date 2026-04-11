@@ -10,7 +10,7 @@ struct SimuladoConfigScreen: View {
 
     var body: some View {
         ZStack {
-            simuladoBlueAtmosphere.ignoresSafeArea()
+            Color.clear.ignoresSafeArea()
             if let vm {
                 configContent(vm: vm)
             } else {

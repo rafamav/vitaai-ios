@@ -25,7 +25,7 @@ struct UpcomingExamsRow: View {
                                 Text("em \(exam.daysUntil) dias")
                                     .font(VitaTypography.labelSmall)
                             }
-                            .foregroundStyle(exam.daysUntil <= 3 ? Color.orange : VitaColors.accent)
+                            .foregroundStyle(exam.daysUntil <= 3 ? VitaColors.dataAmber : VitaColors.accent)
                         }
                         .padding(14)
                     }

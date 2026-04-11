@@ -83,12 +83,20 @@ final class TrabalhoEditorViewModel {
     private(set) var aiSuggestion: String = ""
     private(set) var isAiLoading: Bool = false
 
+    // Submit
+    private(set) var isSubmitting: Bool = false
+    private(set) var submitSuccess: Bool = false
+    private(set) var submitError: String? = nil
+    var canSubmit: Bool { !content.isEmpty && !isSubmitting && !submitSuccess }
+
     // MARK: Private
     private let context: ModelContext
+    private let api: VitaAPI?
     private var autoSaveTask: Task<Void, Never>? = nil
 
-    init(context: ModelContext) {
+    init(context: ModelContext, api: VitaAPI? = nil) {
         self.context = context
+        self.api = api
     }
 
     // MARK: - Load / Create
@@ -155,24 +163,85 @@ final class TrabalhoEditorViewModel {
     }
 
     func requestAiSuggestion(prompt: String) {
-        guard !isAiLoading else { return }
+        guard !isAiLoading, let api else { return }
         aiSuggestion = ""
         isAiLoading = true
+        let assignmentId = id
+        let existing = content.isEmpty ? nil : content
         Task {
-            // Placeholder — real integration via VitaChatClient
-            try? await Task.sleep(for: .seconds(1))
-            aiSuggestion = "Sugestão da IA baseada no seu texto..."
+            do {
+                let resp = try await api.generateTrabalho(
+                    id: assignmentId,
+                    prompt: prompt.isEmpty ? nil : prompt,
+                    existingContent: existing
+                )
+                aiSuggestion = resp.content
+            } catch {
+                NSLog("[TrabalhoEditor] AI generate error: %@", "\(error)")
+                aiSuggestion = "Erro ao gerar: \(error.localizedDescription)"
+            }
+            isAiLoading = false
+        }
+    }
+
+    /// Auto-generate full assignment text (no user prompt)
+    func autoGenerate() {
+        guard !isAiLoading, let api else { return }
+        aiSuggestion = ""
+        isAiLoading = true
+        showAiPanel = true
+        let assignmentId = id
+        Task {
+            do {
+                let resp = try await api.generateTrabalho(
+                    id: assignmentId,
+                    prompt: nil,
+                    existingContent: nil
+                )
+                aiSuggestion = resp.content
+            } catch {
+                NSLog("[TrabalhoEditor] AI auto-generate error: %@", "\(error)")
+                aiSuggestion = "Erro ao gerar: \(error.localizedDescription)"
+            }
             isAiLoading = false
         }
     }
 
     func applyAiSuggestion() {
         guard !aiSuggestion.isEmpty else { return }
-        let newContent = content + "\n\n" + aiSuggestion
-        content = newContent
+        if content.isEmpty {
+            content = aiSuggestion
+        } else {
+            content = content + "\n\n" + aiSuggestion
+        }
         aiSuggestion = ""
         showAiPanel = false
         scheduleAutoSave()
+    }
+
+    // MARK: - Submit to Canvas
+
+    func submitToCanvas() {
+        guard canSubmit, let api else { return }
+        isSubmitting = true
+        submitError = nil
+        let assignmentId = id
+        let body = content
+        Task {
+            do {
+                let resp = try await api.submitTrabalho(id: assignmentId, content: body)
+                if resp.success {
+                    submitSuccess = true
+                    NSLog("[TrabalhoEditor] Submitted to Canvas: %@", resp.submittedAt ?? "ok")
+                } else {
+                    submitError = "Falha ao enviar"
+                }
+            } catch {
+                NSLog("[TrabalhoEditor] Submit error: %@", "\(error)")
+                submitError = error.localizedDescription
+            }
+            isSubmitting = false
+        }
     }
 
     // MARK: - Save / Delete

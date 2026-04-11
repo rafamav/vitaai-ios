@@ -662,7 +662,10 @@ private struct ChatInput: View {
                 .lineLimit(1...4)
                 .focused(isInputFocused)
                 .submitLabel(.send)
-                .onSubmit { Task { await viewModel.send() } }
+                .onSubmit {
+                    isInputFocused.wrappedValue = false
+                    Task { await viewModel.send() }
+                }
 
                 // Mic button
                 VitaMicButton(isListening: $isListening) { transcribed in
@@ -675,6 +678,7 @@ private struct ChatInput: View {
 
                 // Send button
                 Button {
+                    isInputFocused.wrappedValue = false
                     Task { await viewModel.send() }
                 } label: {
                     Image(systemName: viewModel.isStreaming ? "stop.fill" : "arrow.up")

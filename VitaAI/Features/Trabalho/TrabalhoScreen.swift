@@ -31,7 +31,7 @@ struct TrabalhoScreen: View {
             if #available(iOS 17, *) {
                 TrabalhoEditorView(
                     assignmentId: editorAssignmentId,
-                    templateId: editorAssignmentId == nil ? nil : nil,
+                    templateId: nil,
                     onDismiss: {
                         showEditor = false
                         editorAssignmentId = nil
@@ -94,7 +94,6 @@ struct TrabalhoScreen: View {
                 }
                 .padding(.trailing, 20)
                 .padding(.bottom, 24)
-                // sensoryFeedback removed (iOS 17+)
                 .transition(.scale.combined(with: .opacity))
                 .animation(.spring(duration: 0.3), value: vm.selectedSegment)
             }
@@ -133,35 +132,90 @@ struct TrabalhoScreen: View {
 
     @ViewBuilder
     private func assignmentsContent(vm: TrabalhoViewModel) -> some View {
-        VStack(spacing: 8) {
-            // Summary header
-            if vm.pendingCount > 0 {
-                HStack {
-                    SectionHeader(
-                        title: "Tarefas",
-                        subtitle: "\(vm.pendingCount) pendente\(vm.pendingCount == 1 ? "" : "s")"
+        let allEmpty = vm.pending.isEmpty && vm.overdue.isEmpty && vm.completed.isEmpty
+
+        if vm.isLoading {
+            ProgressView()
+                .tint(VitaColors.accent)
+                .padding(.top, 40)
+        } else if allEmpty {
+            TrabalhoEmptyState(
+                icon: "checkmark.circle",
+                message: "Nenhuma tarefa encontrada.\nConecte seu portal para sincronizar."
+            )
+        } else {
+            VStack(spacing: 16) {
+                // Overdue section
+                if !vm.overdue.isEmpty {
+                    trabalhoSection(
+                        vm: vm,
+                        title: "Atrasados",
+                        subtitle: "\(vm.overdue.count)",
+                        icon: "exclamationmark.triangle.fill",
+                        iconColor: VitaColors.dataRed,
+                        items: vm.overdue
                     )
                 }
-            } else {
-                SectionHeader(title: "Tarefas")
+
+                // Pending section
+                if !vm.pending.isEmpty {
+                    trabalhoSection(
+                        vm: vm,
+                        title: "Pendentes",
+                        subtitle: "\(vm.pending.count)",
+                        icon: "clock.fill",
+                        iconColor: VitaColors.accent,
+                        items: vm.pending
+                    )
+                }
+
+                // Completed section
+                if !vm.completed.isEmpty {
+                    trabalhoSection(
+                        vm: vm,
+                        title: "Entregues",
+                        subtitle: "\(vm.completed.count)",
+                        icon: "checkmark.circle.fill",
+                        iconColor: VitaColors.dataGreen,
+                        items: vm.completed
+                    )
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func trabalhoSection(
+        vm: TrabalhoViewModel,
+        title: String,
+        subtitle: String,
+        icon: String,
+        iconColor: Color,
+        items: [TrabalhoItem]
+    ) -> some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 12))
+                    .foregroundStyle(iconColor)
+                Text(title)
+                    .font(VitaTypography.labelMedium)
+                    .foregroundStyle(VitaColors.textPrimary)
+                Text(subtitle)
+                    .font(VitaTypography.labelSmall)
+                    .foregroundStyle(VitaColors.textTertiary)
+                Spacer()
             }
 
-            if vm.assignments.isEmpty {
-                TrabalhoEmptyState(
-                    icon: "checkmark.circle",
-                    message: "Nenhuma tarefa pendente"
-                )
-            } else {
-                VStack(spacing: 8) {
-                    ForEach(vm.sortedAssignments) { assignment in
-                        Button {
-                            editorAssignmentId = assignment.id
-                            showEditor = true
-                        } label: {
-                            AssignmentRow(assignment: assignment)
-                        }
-                        .buttonStyle(.plain)
+            ForEach(items) { item in
+                SwipeToArchive(onArchive: { vm.dismiss(item) }) {
+                    Button {
+                        editorAssignmentId = item.id
+                        showEditor = true
+                    } label: {
+                        TrabalhoRow(item: item)
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -190,58 +244,74 @@ struct TrabalhoScreen: View {
     }
 }
 
-// MARK: - Assignment Row
+// MARK: - Trabalho Row
 
-private struct AssignmentRow: View {
-    let assignment: LocalAssignment
+private struct TrabalhoRow: View {
+    let item: TrabalhoItem
+
+    private var urgencyColor: Color {
+        guard let days = item.daysUntil else { return VitaColors.textTertiary }
+        if days < 0 { return VitaColors.dataRed }
+        if days <= 1 { return VitaColors.dataRed }
+        if days <= 3 { return VitaColors.dataAmber }
+        if days <= 7 { return VitaColors.accent }
+        return VitaColors.dataGreen
+    }
+
+    private var isCompleted: Bool { item.submitted }
 
     var body: some View {
         VitaGlassCard {
             HStack(spacing: 12) {
-                // Urgency indicator bar
+                // Urgency bar
                 RoundedRectangle(cornerRadius: 2)
-                    .fill(
-                        assignment.isSubmitted
-                            ? Color.gray.opacity(0.4)
-                            : assignment.urgencyColor
-                    )
-                    .frame(width: 3, height: 40)
+                    .fill(isCompleted ? VitaColors.textTertiary.opacity(0.4) : urgencyColor)
+                    .frame(width: 3, height: 44)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(assignment.title)
+                    Text(item.title)
                         .font(VitaTypography.labelMedium)
-                        .foregroundStyle(
-                            assignment.isSubmitted
-                                ? VitaColors.textTertiary
-                                : VitaColors.textPrimary
-                        )
-                        .strikethrough(assignment.isSubmitted)
+                        .foregroundStyle(isCompleted ? VitaColors.textTertiary : VitaColors.textPrimary)
+                        .strikethrough(isCompleted)
                         .lineLimit(2)
 
-                    Text(assignment.courseName)
+                    Text(item.subjectName)
                         .font(VitaTypography.labelSmall)
                         .foregroundStyle(VitaColors.textTertiary)
 
-                    if let due = assignment.dueAt {
-                        Text("Entrega: \(formattedDate(due))")
-                            .font(VitaTypography.labelSmall)
-                            .foregroundStyle(
-                                assignment.isSubmitted
-                                    ? VitaColors.textTertiary
-                                    : assignment.urgencyColor.opacity(0.8)
-                            )
+                    HStack(spacing: 8) {
+                        if let days = item.daysUntil {
+                            Text(daysLabel(days))
+                                .font(VitaTypography.labelSmall)
+                                .foregroundStyle(isCompleted ? VitaColors.textTertiary : urgencyColor.opacity(0.8))
+                        }
+
+                        // Submission type pill
+                        Text(item.submissionTypeLabel)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(VitaColors.textTertiary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(VitaColors.surfaceElevated)
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
                     }
                 }
 
                 Spacer()
 
-                VStack(alignment: .trailing, spacing: 3) {
-                    if assignment.isSubmitted {
+                VStack(alignment: .trailing, spacing: 4) {
+                    if isCompleted {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(Color.green)
+                            .foregroundStyle(VitaColors.dataGreen)
                             .font(.system(size: 16))
+                    } else if item.canGenerate {
+                        Image("vita_btn")
+                            .resizable()
+                            .frame(width: 22, height: 22)
+                            .opacity(0.9)
                     }
-                    if let pts = assignment.pointsPossible {
+
+                    if let pts = item.pointsPossible, pts > 0 {
                         Text("\(Int(pts))pts")
                             .font(VitaTypography.labelSmall)
                             .foregroundStyle(VitaColors.textTertiary)
@@ -250,8 +320,15 @@ private struct AssignmentRow: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .opacity(assignment.isSubmitted ? 0.7 : 1.0)
+            .opacity(isCompleted ? 0.7 : 1.0)
         }
+    }
+
+    private func daysLabel(_ days: Int) -> String {
+        if days < 0 { return "\(abs(days))d atrasado" }
+        if days == 0 { return "Hoje" }
+        if days == 1 { return "Amanha" }
+        return "Em \(days) dias"
     }
 }
 
@@ -276,7 +353,6 @@ private struct GradeRow: View {
         VitaGlassCard {
             VStack(spacing: 10) {
                 HStack(spacing: 12) {
-                    // Icon square
                     ZStack {
                         RoundedRectangle(cornerRadius: 8)
                             .fill(VitaColors.surfaceElevated)
@@ -313,19 +389,14 @@ private struct GradeRow: View {
                     }
                 }
 
-                // Grade bar
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 2)
                             .fill(VitaColors.surfaceElevated)
                             .frame(height: 3)
-
                         RoundedRectangle(cornerRadius: 2)
                             .fill(gradeColor.opacity(0.75))
-                            .frame(
-                                width: geo.size.width * fillFraction,
-                                height: 3
-                            )
+                            .frame(width: geo.size.width * fillFraction, height: 3)
                     }
                 }
                 .frame(height: 3)
@@ -359,11 +430,61 @@ private struct TrabalhoEmptyState: View {
     }
 }
 
-// MARK: - Helpers
+// MARK: - Swipe to Archive
 
-private func formattedDate(_ date: Date) -> String {
-    let df = DateFormatter()
-    df.locale = Locale(identifier: "pt_BR")
-    df.dateStyle = .short
-    return df.string(from: date)
+private struct SwipeToArchive<Content: View>: View {
+    let onArchive: () -> Void
+    @ViewBuilder let content: Content
+
+    @State private var offset: CGFloat = 0
+    @State private var showingAction = false
+    private let threshold: CGFloat = -80
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            // Background action
+            HStack {
+                Spacer()
+                VStack(spacing: 2) {
+                    Image(systemName: "archivebox.fill")
+                        .font(.system(size: 16))
+                    Text("Arquivar")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .foregroundStyle(.white)
+                .frame(width: 72)
+            }
+            .background(VitaColors.dataRed.opacity(0.8))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .opacity(offset < -20 ? 1 : 0)
+
+            // Content
+            content
+                .offset(x: offset)
+                .gesture(
+                    DragGesture(minimumDistance: 20)
+                        .onChanged { value in
+                            let translation = value.translation.width
+                            if translation < 0 {
+                                offset = translation * 0.7
+                            }
+                        }
+                        .onEnded { value in
+                            if offset < threshold {
+                                // Full swipe — archive
+                                withAnimation(.easeOut(duration: 0.25)) {
+                                    offset = -400
+                                }
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                                    onArchive()
+                                }
+                            } else {
+                                withAnimation(.spring(duration: 0.3)) {
+                                    offset = 0
+                                }
+                            }
+                        }
+                )
+        }
+    }
 }

@@ -4,17 +4,14 @@ import Observation
 @MainActor
 @Observable
 final class AgendaViewModel {
-    private let api: VitaAPI
+    let appData: AppDataManager
 
-    var studyEvents: [StudyEventEntry] = []
     var studyItems: [LocalStudyItem] = []
-    var classSchedule: [ClassScheduleItem] = []
     var selectedDayIndex: Int = {
         // Sunday=1...Saturday=7 in Calendar; map to 0-based index matching Portuguese days array
         let raw = Calendar.current.component(.weekday, from: Date())
         return raw - 1
     }()
-    var isLoading = true
     var showCreateModal = false
 
     // Create modal state
@@ -24,49 +21,15 @@ final class AgendaViewModel {
     var newDuration = 60
     var isSaving = false
 
-    init(api: VitaAPI) {
-        self.api = api
-    }
+    // Convenience accessors for shared data
+    var studyEvents: [StudyEventEntry] { appData.studyEvents }
+    var classSchedule: [AgendaClassBlock] { appData.classSchedule }
+    var academicEvaluations: [AgendaEvaluation] { appData.academicEvaluations }
+    var gradesResponse: GradesCurrentResponse? { appData.gradesResponse }
+    var isLoading: Bool { appData.isLoading }
 
-    func load() async {
-        isLoading = true
-
-        // Load real study events
-        do {
-            let calendar = Calendar.current
-            let today = Date()
-            let weekday = calendar.component(.weekday, from: today)
-            // Sunday = weekday 1, so offset to get Monday-anchored week start
-            let weekStart = calendar.date(byAdding: .day, value: -(weekday - 1), to: today) ?? today
-            let weekEnd = calendar.date(byAdding: .day, value: 6, to: weekStart) ?? today
-
-            let fmt = ISO8601DateFormatter()
-            let eventsResp = try await api.getStudyEvents(
-                from: fmt.string(from: weekStart),
-                to: fmt.string(from: weekEnd)
-            )
-            studyEvents = eventsResp.events
-        } catch {
-            studyEvents = []
-        }
-
-        // Load webaluno schedule
-        do {
-            let schedResp = try await api.getWebalunoSchedule()
-            classSchedule = schedResp.schedule.map {
-                ClassScheduleItem(
-                    dayOfWeek: $0.dayOfWeek,
-                    startTime: $0.startTime,
-                    endTime: $0.endTime,
-                    subjectName: $0.subjectName,
-                    room: $0.room
-                )
-            }
-        } catch {
-            classSchedule = []
-        }
-
-        isLoading = false
+    init(appData: AppDataManager) {
+        self.appData = appData
     }
 
     func toggleItem(_ item: LocalStudyItem) {
@@ -115,7 +78,7 @@ final class AgendaViewModel {
         }
     }
 
-    var selectedDayClasses: [ClassScheduleItem] {
+    var selectedDayClasses: [AgendaClassBlock] {
         classSchedule
             .filter { $0.dayOfWeek == selectedDayIndex }
             .sorted { $0.startTime < $1.startTime }
@@ -152,7 +115,7 @@ final class AgendaViewModel {
     private func minutesBetween(start: String, end: String) -> Int {
         let parts = { (s: String) -> (Int, Int)? in
             let comps = s.split(separator: ":").compactMap { Int($0) }
-            guard comps.count == 2 else { return nil }
+            guard comps.count >= 2 else { return nil }
             return (comps[0], comps[1])
         }
         guard let s = parts(start), let e = parts(end) else { return 0 }
@@ -189,11 +152,3 @@ struct LocalStudyItem: Identifiable {
     }
 }
 
-struct ClassScheduleItem: Identifiable {
-    var id: String { "\(dayOfWeek)-\(startTime)-\(subjectName)" }
-    var dayOfWeek: Int
-    var startTime: String
-    var endTime: String
-    var subjectName: String
-    var room: String?
-}

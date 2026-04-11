@@ -5,6 +5,7 @@ import SwiftUI
 @Observable
 final class DashboardViewModel {
     private let api: VitaAPI
+    private weak var dataManager: AppDataManager?
 
     // Data from unified /api/mockup/dashboard endpoint
     var greeting: String = ""
@@ -14,11 +15,15 @@ final class DashboardViewModel {
     var agenda: [DashboardAgendaItem] = []
     var flashcardsDueTotal: Int = 0
     var xpLevel: Int = 1
+    var streakDays: Int = 0
+    var totalStudyHours: Double = 0
+    var heroCards: [DashboardHeroCard] = []
     var isLoading = true
     var error: String?
 
-    init(api: VitaAPI) {
+    init(api: VitaAPI, dataManager: AppDataManager? = nil) {
         self.api = api
+        self.dataManager = dataManager
     }
 
     func loadDashboard() async {
@@ -28,9 +33,10 @@ final class DashboardViewModel {
         // Load dashboard (greeting, exams, subjects, agenda)
         do {
             let resp = try await api.getDashboard()
+            NSLog("[Dashboard] loaded hero=\(resp.hero?.count ?? 0) subjects=\(resp.subjects?.count ?? 0)")
             apply(dashboard: resp)
         } catch {
-            // Silently continue — progress may still work
+            NSLog("[Dashboard] getDashboard FAILED: \(error)")
         }
 
         // Load progress data (subjects, exams, flashcards)
@@ -53,29 +59,15 @@ final class DashboardViewModel {
         subtitle = dashboard.subtitle ?? ""
         if let fc = dashboard.flashcardsDueTotal, fc > 0 { flashcardsDueTotal = fc }
         if let xp = dashboard.xp, let lvl = xp.level { xpLevel = lvl }
-        if let subs = dashboard.subjects, !subs.isEmpty { subjects = subs }
-        if let ag = dashboard.agenda, !ag.isEmpty { agenda = ag }
-        // Map hero cards (new API) to upcoming exams
-        let examHeroes = (dashboard.hero ?? []).filter { $0.type == .exam }
-        if !examHeroes.isEmpty {
-            upcomingExams = examHeroes.map { card in
-                let daysText = card.pills.first(where: { $0.icon == "calendar" })?.text?
-                    .replacingOccurrences(of: "Em ", with: "")
-                    .replacingOccurrences(of: " dias", with: "")
-                    .trimmingCharacters(in: .whitespaces)
-                let days = daysText.flatMap { Int($0) } ?? 0
-                return UpcomingExam(
-                    id: card.id,
-                    subject: card.subtitle,
-                    type: card.title,
-                    date: Date().addingTimeInterval(TimeInterval(days * 86400)),
-                    daysUntil: days,
-                    conceptCards: 0,
-                    practiceCards: 0
-                )
-            }
+        if let subs = dashboard.subjects, !subs.isEmpty {
+            subjects = subs.sorted { ($0.vitaScore ?? 0) > ($1.vitaScore ?? 0) }
+            dataManager?.dashboardSubjects = subjects
         }
-        // Legacy exams fallback removed — Dashboard generated type has no exams field
+        if let ag = dashboard.agenda, !ag.isEmpty { agenda = ag }
+        // Store server-driven hero cards directly (sorted by urgency from backend)
+        if let hero = dashboard.hero, !hero.isEmpty {
+            heroCards = hero
+        }
     }
 
     private func apply(progress: ProgressResponse, preserveExistingSubjects: Bool) {
@@ -87,6 +79,8 @@ final class DashboardViewModel {
         if progress.flashcardsDue > 0 {
             flashcardsDueTotal = progress.flashcardsDue
         }
+        streakDays = progress.streakDays
+        totalStudyHours = progress.totalStudyHours
         if !progress.upcomingExams.isEmpty && upcomingExams.isEmpty {
             upcomingExams = progress.upcomingExams.map { exam in
                 UpcomingExam(

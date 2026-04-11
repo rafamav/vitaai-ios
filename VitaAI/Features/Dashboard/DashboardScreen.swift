@@ -6,6 +6,7 @@ import SwiftUI
 
 struct DashboardScreen: View {
     @Environment(\.appContainer) private var container
+    @Environment(\.appData) private var appData
     @State private var viewModel: DashboardViewModel?
     @State private var xpToastState = VitaXpToastState()
 
@@ -16,9 +17,12 @@ struct DashboardScreen: View {
     var onNavigateToTranscricao: (() -> Void)?
     var onNavigateToAtlas3D: (() -> Void)?
     var onNavigateToDisciplineDetail: ((String, String) -> Void)?
+    var onNavigateToTrabalhos: (() -> Void)?
     var onSubtitleLoaded: ((String) -> Void)?
 
     @State private var heroIndex: Int = 0
+    @State private var heroCardCount: Int = 1
+    @State private var heroTimer: Timer?
 
     var body: some View {
         Group {
@@ -51,9 +55,13 @@ struct DashboardScreen: View {
         }
         .onAppear {
             if viewModel == nil {
-                viewModel = DashboardViewModel(api: container.api)
+                viewModel = DashboardViewModel(api: container.api, dataManager: container.dataManager)
                 Task {
-                    await viewModel?.loadDashboard()
+                    // Load dashboard and appData in PARALLEL so disciplines
+                    // are available immediately, not after dashboard finishes
+                    async let dash: () = viewModel!.loadDashboard()
+                    async let data: () = appData.loadIfNeeded()
+                    _ = await (dash, data)
                     if let sub = viewModel?.subtitle, !sub.isEmpty {
                         onSubtitleLoaded?(sub)
                     }
@@ -70,7 +78,7 @@ struct DashboardScreen: View {
 
                 // ═══ HERO SECTION — skeleton → carousel (always, min 1 Revisão card) ═══
                 heroSection(viewModel: viewModel)
-                    .padding(.top, 12)
+                    .padding(.top, 2)
 
                 // ═══ "Ferramentas de Estudo" ═══
                 // Mockup: font-size 10px, font-weight 600, letter-spacing 0.8px, color rgba(255,241,215,0.55)
@@ -80,8 +88,8 @@ struct DashboardScreen: View {
                     .textCase(.uppercase)
                     .foregroundStyle(VitaColors.sectionLabel)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 6)
-                    .padding(.bottom, 6)
+                    .padding(.top, 12)
+                    .padding(.bottom, 12)
                     .padding(.horizontal, 16)
 
                 // ═══ TOOLS GRID 2x2 — IMAGES ONLY ═══
@@ -95,8 +103,8 @@ struct DashboardScreen: View {
                     .textCase(.uppercase)
                     .foregroundStyle(VitaColors.sectionLabel)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 14)
-                    .padding(.bottom, 6)
+                    .padding(.top, 12)
+                    .padding(.bottom, 12)
                     .padding(.horizontal, 16)
 
                 // ═══ DISCIPLINES — skeleton → scroll ═══
@@ -109,7 +117,7 @@ struct DashboardScreen: View {
                 // ═══ ATLAS 3D + AGENDA side by side ═══
                 atlasAgendaRow(viewModel: viewModel)
                     .padding(.horizontal, 16)
-                    .padding(.top, 18)
+                    .padding(.top, 12)
 
                 Spacer().frame(height: 120) // Tab bar clearance
             }
@@ -143,26 +151,50 @@ struct DashboardScreen: View {
         }
     }
 
-    // MARK: - Hero Carousel (exams + Revisão card)
+    // MARK: - Hero Carousel (server-driven cards)
+
+    @ViewBuilder
+    // Widget-like carousel: always show at least 3 cards, looping existing
+    // ones if the server returned fewer. Keeps the rotation feeling alive
+    // even on slow days (e.g., only 1 revision card).
+    private func paddedHeroCards(_ raw: [DashboardHeroCard]) -> [DashboardHeroCard] {
+        guard !raw.isEmpty else { return [] }
+        var out = raw
+        while out.count < 3 {
+            out.append(raw[out.count % raw.count])
+        }
+        return out
+    }
 
     @ViewBuilder
     private func heroCarousel(viewModel: DashboardViewModel) -> some View {
-        let exams = Array(viewModel.upcomingExams.prefix(3))
-        let totalCards = exams.count + 1
+        let cards = paddedHeroCards(viewModel.heroCards)
+        let cardCount = max(cards.count, 1)
 
         TabView(selection: $heroIndex) {
-            ForEach(Array(exams.enumerated()), id: \.element.id) { idx, exam in
-                heroCard(exam: exam, bgIndex: idx)
-                    .tag(idx)
+            if cards.isEmpty {
+                // Fallback: single revision card if server returned nothing
+                serverHeroCard(
+                    label: "HOJE",
+                    labelColor: VitaColors.accentHover,
+                    title: "Revisão",
+                    pills: [("rectangle.on.rectangle", "\(viewModel.flashcardsDueTotal) cards")],
+                    cta: "Revisar flashcards",
+                    bgImage: "flashcard-bg-new",
+                    action: { onNavigateToFlashcards?() }
+                ).tag(0)
+            } else {
+                ForEach(Array(cards.enumerated()), id: \.offset) { idx, card in
+                    heroCardView(card: card, bgIndex: idx)
+                        .tag(idx)
+                }
             }
-            revisaoCard(flashcardsDue: viewModel.flashcardsDueTotal, level: viewModel.xpLevel)
-                .tag(exams.count)
         }
         .tabViewStyle(.page(indexDisplayMode: .never))
         .frame(height: 165)
         .overlay(alignment: .top) {
             HStack(spacing: 5) {
-                ForEach(0..<totalCards, id: \.self) { i in
+                ForEach(0..<cardCount, id: \.self) { i in
                     RoundedRectangle(cornerRadius: 3)
                         .fill(Color.white.opacity(i == heroIndex ? 0.85 : 0.25))
                         .frame(width: i == heroIndex ? 18 : 6, height: 6)
@@ -172,16 +204,94 @@ struct DashboardScreen: View {
             .padding(.top, 10)
         }
         .padding(.horizontal, 16)
+        .onAppear {
+            heroCardCount = cardCount
+            heroTimer?.invalidate()
+            heroTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { _ in
+                Task { @MainActor in
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        heroIndex = (heroIndex + 1) % heroCardCount
+                    }
+                }
+            }
+        }
+        .onDisappear {
+            heroTimer?.invalidate()
+            heroTimer = nil
+        }
     }
 
-    // MARK: - Hero Exam Card (v2: exam.type as label, 3 pills, "Estudar agora")
+    // MARK: - Server-driven hero card dispatcher
 
     @ViewBuilder
-    private func heroCard(exam: UpcomingExam, bgIndex: Int) -> some View {
-        let bg = heroBgImages[bgIndex % heroBgImages.count]
+    private func heroCardView(card: DashboardHeroCard, bgIndex: Int) -> some View {
+        // Fully server-driven: label, tone, cta, background all come from backend.
+        // Client only maps semantic tone -> design system color.
+        let pills = card.pills.map { ($0.icon ?? "circle", $0.text ?? "") }
+
+        Button(action: { handleHeroAction(for: card) }) {
+            serverHeroCard(
+                label: card.label,
+                labelColor: toneColor(card.labelTone),
+                title: card.title.uppercased(),
+                subtitle: card.subtitle,
+                pills: pills,
+                cta: card.cta.text,
+                bgImage: card.backgroundImage.asset,
+                action: nil
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Maps backend semantic tone to design system color. Single source of truth for hero label color.
+    private func toneColor(_ tone: DashboardHeroCard.LabelTone) -> Color {
+        switch tone {
+        case .danger:  return Color(red: 0.937, green: 0.267, blue: 0.267) // red
+        case .warning: return Color(red: 0.980, green: 0.553, blue: 0.235) // orange
+        case .info:    return Color(red: 0.957, green: 0.773, blue: 0.275) // yellow
+        case .accent:  return VitaColors.accentHover
+        case .neutral: return VitaColors.textWarm
+        }
+    }
+
+    private func handleHeroAction(for card: DashboardHeroCard) {
+        guard let target = card.action.target else { return }
+        switch target {
+        case "flashcards":
+            onNavigateToFlashcards?()
+        case "trabalhos", "trabalho", "assignments":
+            onNavigateToTrabalhos?()
+        case "discipline", "disciplineDetail":
+            guard let id = card.action.id, !id.isEmpty else { return }
+            // For exam/assignment cards, subtitle holds the subject name (when it's an
+            // assignment) OR the exam title (when it's an exam with title = "Prova de X").
+            // Fall back to title if subtitle is unhelpful.
+            let candidate = card.type == .exam ? card.subtitle : card.title
+            let name = candidate.isEmpty ? card.title : candidate
+            onNavigateToDisciplineDetail?(id, name)
+        default:
+            break
+        }
+    }
+
+    // MARK: - Generic Server Hero Card
+
+    @ViewBuilder
+    private func serverHeroCard(
+        label: String,
+        labelColor: Color = VitaColors.accentHover,
+        title: String,
+        subtitle: String? = nil,
+        pills: [(String, String)],
+        cta: String,
+        bgImage: String,
+        action: (() -> Void)? = nil
+    ) -> some View {
+        let isAlert = labelColor != VitaColors.accentHover
 
         ZStack(alignment: .leading) {
-            Image(bg)
+            Image(bgImage)
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(height: 165)
@@ -189,9 +299,9 @@ struct DashboardScreen: View {
 
             LinearGradient(
                 stops: [
-                    .init(color: Color(red: 0.031, green: 0.024, blue: 0.016).opacity(0.85), location: 0),
-                    .init(color: Color(red: 0.031, green: 0.024, blue: 0.016).opacity(0.40), location: 0.45),
-                    .init(color: Color(red: 0.031, green: 0.024, blue: 0.016).opacity(0.10), location: 1),
+                    .init(color: Color(red: 0.031, green: 0.024, blue: 0.016).opacity(isAlert ? 0.92 : 0.85), location: 0),
+                    .init(color: Color(red: 0.031, green: 0.024, blue: 0.016).opacity(isAlert ? 0.55 : 0.40), location: 0.45),
+                    .init(color: Color(red: 0.031, green: 0.024, blue: 0.016).opacity(isAlert ? 0.20 : 0.10), location: 1),
                 ],
                 startPoint: .leading, endPoint: .trailing
             )
@@ -199,33 +309,38 @@ struct DashboardScreen: View {
             VStack(alignment: .leading, spacing: 8) {
                 Spacer()
 
-                // Label pill — exam.type (e.g. "P1", "P2")
-                Text(exam.type)
+                Text(label)
                     .font(.system(size: 9, weight: .bold))
                     .kerning(1.2)
-                    .textCase(.uppercase)
-                    .foregroundStyle(VitaColors.accentHover.opacity(0.70))
+                    .foregroundStyle(labelColor.opacity(isAlert ? 0.85 : 0.70))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(VitaColors.glassInnerLight.opacity(0.15))
-                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(VitaColors.accentHover.opacity(0.12), lineWidth: 1))
+                            .fill(labelColor.opacity(isAlert ? 0.10 : 0.06))
+                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(labelColor.opacity(isAlert ? 0.20 : 0.12), lineWidth: 1))
                     )
 
-                Text(shortSubjectName(exam.subject).uppercased())
+                Text(title)
                     .font(.system(size: 20, weight: .bold))
                     .tracking(-0.04 * 20)
+                    .lineLimit(2)
                     .foregroundStyle(Color(red: 1, green: 0.988, blue: 0.973).opacity(0.97))
 
-                // 3 pills: days, concepts, questions
-                HStack(spacing: 6) {
-                    heroPill(icon: "calendar", text: formatDays(exam.daysUntil))
-                    heroPill(icon: "book", text: "\(exam.conceptCards) conceitos")
-                    heroPill(icon: "questionmark.circle", text: "\(exam.practiceCards) questões")
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.55))
+                        .lineLimit(1)
                 }
 
-                Text("Estudar agora")
+                HStack(spacing: 6) {
+                    ForEach(Array(pills.prefix(3).enumerated()), id: \.offset) { _, pill in
+                        heroPill(icon: pill.0, text: pill.1)
+                    }
+                }
+
+                Text(cta)
                     .font(.system(size: 12, weight: .semibold))
                     .tracking(0.24)
                     .foregroundStyle(Color(red: 1, green: 0.902, blue: 0.706).opacity(0.80))
@@ -236,7 +351,6 @@ struct DashboardScreen: View {
                             .fill(Color.white.opacity(0.04))
                             .overlay(RoundedRectangle(cornerRadius: 10).stroke(VitaColors.accentHover.opacity(0.12), lineWidth: 1))
                     )
-                    .accessibilityIdentifier("hero_estudar_agora")
             }
             .padding(18)
         }
@@ -247,96 +361,13 @@ struct DashboardScreen: View {
                 .stroke(
                     AngularGradient(
                         gradient: Gradient(stops: [
-                            .init(color: VitaColors.accentHover.opacity(0.40), location: 0.0),
+                            .init(color: (isAlert ? labelColor : VitaColors.accentHover).opacity(0.40), location: 0.0),
                             .init(color: VitaColors.accentHover.opacity(0.12), location: 0.19),
                             .init(color: Color.white.opacity(0.04), location: 0.33),
                             .init(color: Color.white.opacity(0.025), location: 0.50),
                             .init(color: Color.white.opacity(0.04), location: 0.64),
                             .init(color: VitaColors.accentHover.opacity(0.12), location: 0.78),
-                            .init(color: VitaColors.accentHover.opacity(0.40), location: 1.0),
-                        ]),
-                        center: UnitPoint(x: 0.4, y: 0.8)
-                    ),
-                    lineWidth: 1
-                )
-        )
-        .shadow(color: .black.opacity(0.50), radius: 28, x: 0, y: 11)
-        .shadow(color: Color(red: 0.706, green: 0.549, blue: 0.235).opacity(0.08), radius: 22, x: 0, y: 5)
-    }
-
-    // MARK: - Hero Revisão Card (v2: always last slide)
-
-    @ViewBuilder
-    private func revisaoCard(flashcardsDue: Int, level: Int) -> some View {
-        ZStack(alignment: .leading) {
-            Image("flashcard-bg-new")
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(height: 165)
-                .clipped()
-
-            LinearGradient(
-                stops: [
-                    .init(color: Color(red: 0.031, green: 0.024, blue: 0.016).opacity(0.85), location: 0),
-                    .init(color: Color(red: 0.031, green: 0.024, blue: 0.016).opacity(0.40), location: 0.45),
-                    .init(color: Color(red: 0.031, green: 0.024, blue: 0.016).opacity(0.10), location: 1),
-                ],
-                startPoint: .leading, endPoint: .trailing
-            )
-
-            VStack(alignment: .leading, spacing: 8) {
-                Spacer()
-
-                Text("HOJE")
-                    .font(.system(size: 9, weight: .bold))
-                    .kerning(1.2)
-                    .foregroundStyle(VitaColors.accentHover.opacity(0.70))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(VitaColors.glassInnerLight.opacity(0.15))
-                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(VitaColors.accentHover.opacity(0.12), lineWidth: 1))
-                    )
-
-                Text("Revisão")
-                    .font(.system(size: 20, weight: .bold))
-                    .tracking(-0.04 * 20)
-                    .foregroundStyle(Color(red: 1, green: 0.988, blue: 0.973).opacity(0.97))
-
-                HStack(spacing: 6) {
-                    heroPill(icon: "rectangle.on.rectangle", text: "\(flashcardsDue) cards pendentes")
-                    heroPill(icon: "chart.bar", text: "Nível \(level)")
-                }
-
-                Text("Revisar flashcards")
-                    .font(.system(size: 12, weight: .semibold))
-                    .tracking(0.24)
-                    .foregroundStyle(Color(red: 1, green: 0.902, blue: 0.706).opacity(0.80))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.white.opacity(0.04))
-                            .overlay(RoundedRectangle(cornerRadius: 10).stroke(VitaColors.accentHover.opacity(0.12), lineWidth: 1))
-                    )
-            }
-            .padding(18)
-        }
-        .frame(height: 165)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(
-                    AngularGradient(
-                        gradient: Gradient(stops: [
-                            .init(color: VitaColors.accentHover.opacity(0.40), location: 0.0),
-                            .init(color: VitaColors.accentHover.opacity(0.12), location: 0.19),
-                            .init(color: Color.white.opacity(0.04), location: 0.33),
-                            .init(color: Color.white.opacity(0.025), location: 0.50),
-                            .init(color: Color.white.opacity(0.04), location: 0.64),
-                            .init(color: VitaColors.accentHover.opacity(0.12), location: 0.78),
-                            .init(color: VitaColors.accentHover.opacity(0.40), location: 1.0),
+                            .init(color: (isAlert ? labelColor : VitaColors.accentHover).opacity(0.40), location: 1.0),
                         ]),
                         center: UnitPoint(x: 0.4, y: 0.8)
                     ),
@@ -365,8 +396,6 @@ struct DashboardScreen: View {
                 .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.06), lineWidth: 1))
         )
     }
-
-    private let heroBgImages = ["hero-farmacologia", "hero-histologia", "hero-anatomia", "hero-patologia", "flashcard-bg-new"]
 
     private func shortSubjectName(_ subject: String) -> String {
         subject
@@ -479,36 +508,19 @@ struct DashboardScreen: View {
 
     @ViewBuilder
     private func disciplinesScroll() -> some View {
-        if let viewModel, !viewModel.subjects.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(viewModel.subjects) { subject in
-                        let img = disciplineImage(for: subject.name ?? "")
-                        Button {
-                            onNavigateToDisciplineDetail?(subject.id, subject.name ?? "")
-                        } label: {
-                            Image(img)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(width: 100, height: 67)
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                .shadow(color: .black.opacity(0.30), radius: 5, x: 0, y: 2)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 16)
-            }
-            .mask(
-                LinearGradient(
-                    stops: [
-                        .init(color: .black, location: 0),
-                        .init(color: .black, location: 0.75),
-                        .init(color: .clear, location: 1),
-                    ],
-                    startPoint: .leading, endPoint: .trailing
-                )
-            )
+        // appData.gradesResponse is the reliable source (from /api/grades/current)
+        // viewModel.subjects from /api/dashboard is unreliable fallback
+        let gradeSubjects = appData.gradesResponse?.current ?? []
+        let dashSubjects = viewModel?.subjects ?? []
+
+        if !gradeSubjects.isEmpty {
+            disciplineCards(names: gradeSubjects.map(\.subjectName), tierFor: { name in
+                dashSubjects.first(where: { $0.name == name })?.vitaTier
+            })
+        } else if !dashSubjects.isEmpty {
+            disciplineCards(names: dashSubjects.compactMap(\.name), tierFor: { name in
+                dashSubjects.first(where: { $0.name == name })?.vitaTier
+            })
         } else {
             HStack(spacing: 8) {
                 Image(systemName: "graduationcap")
@@ -522,6 +534,48 @@ struct DashboardScreen: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
         }
+    }
+
+    @ViewBuilder
+    private func disciplineCards(names: [String], tierFor: @escaping (String) -> String?) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(names, id: \.self) { name in
+                    let img = disciplineImage(for: name)
+                    let tier = tierFor(name)
+                    Button {
+                        onNavigateToDisciplineDetail?(name, name)
+                    } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Image(img)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: 100, height: 67)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .shadow(color: .black.opacity(0.30), radius: 5, x: 0, y: 2)
+
+                            Circle()
+                                .fill(tierDotColor(tier))
+                                .frame(width: 8, height: 8)
+                                .shadow(color: tierDotColor(tier).opacity(0.6), radius: 3)
+                                .padding(6)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+        .mask(
+            LinearGradient(
+                stops: [
+                    .init(color: .black, location: 0),
+                    .init(color: .black, location: 0.75),
+                    .init(color: .clear, location: 1),
+                ],
+                startPoint: .leading, endPoint: .trailing
+            )
+        )
     }
 
     // MARK: - Atlas 3D + Agenda Row
@@ -642,6 +696,16 @@ struct DashboardScreen: View {
                 .lineLimit(1)
         }
         .padding(.vertical, 4)
+    }
+
+    private func tierDotColor(_ tier: String?) -> Color {
+        switch tier {
+        case "bronze":  return VitaColors.dataRed       // danger
+        case "silver":  return VitaColors.dataAmber      // attention
+        case "gold":    return VitaColors.dataGreen      // on track
+        case "diamond": return Color(red: 0.68, green: 0.85, blue: 1.0) // safe
+        default:        return VitaColors.textTertiary
+        }
     }
 
     private func agendaDotColor(_ daysUntil: Int) -> Color {

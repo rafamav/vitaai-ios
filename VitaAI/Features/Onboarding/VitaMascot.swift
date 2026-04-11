@@ -25,9 +25,9 @@ struct VitaMascot: View {
     @State private var eyeAngle: Double = 0        // slight tilt to eyes
     @State private var loopTask: Task<Void, Never>? = nil
 
-    private let teal = Color(red: 0.15, green: 0.85, blue: 0.75)
-    private let tealBright = Color(red: 0.4, green: 1.0, blue: 0.9)
-    private let tealDim = Color(red: 0.08, green: 0.45, blue: 0.40)
+    private let teal = Color(red: 0.784, green: 0.627, blue: 0.314)
+    private let tealBright = Color(red: 1.0, green: 0.784, blue: 0.471)
+    private let tealDim = Color(red: 0.549, green: 0.392, blue: 0.196)
     // Snake is a distinct green — different from teal staff
     private let snakeGreen = Color(red: 0.2, green: 0.9, blue: 0.45)
     private let snakeGreenBright = Color(red: 0.4, green: 1.0, blue: 0.6)
@@ -511,7 +511,7 @@ struct VitaMascot: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(Int.random(in: 4000...8000)))
             guard !Task.isCancelled else { break }
-            if state != .sleeping { triggerBounce() }
+            triggerBounce()
         }
     }
 
@@ -520,11 +520,10 @@ struct VitaMascot: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(Int.random(in: 1500...3500)))
             guard !Task.isCancelled else { break }
-            if state != .sleeping {
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    eyeLookX = CGFloat.random(in: -size * 0.04...size * 0.04)
-                }
+            withAnimation(.easeInOut(duration: 0.5)) {
+                eyeLookX = CGFloat.random(in: -size * 0.04...size * 0.04)
             }
+
             try? await Task.sleep(for: .milliseconds(Int.random(in: 800...2000)))
             guard !Task.isCancelled else { break }
             withAnimation(.easeInOut(duration: 0.4)) { eyeLookX = 0 }
@@ -536,12 +535,10 @@ struct VitaMascot: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(Int.random(in: 2500...5000)))
             guard !Task.isCancelled else { break }
-            if state != .sleeping {
-                blinking = true
-                try? await Task.sleep(for: .milliseconds(100))
-                guard !Task.isCancelled else { break }
-                blinking = false
-            }
+            blinking = true
+            try? await Task.sleep(for: .milliseconds(100))
+            guard !Task.isCancelled else { break }
+            blinking = false
         }
     }
 }

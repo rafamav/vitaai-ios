@@ -33,7 +33,8 @@ final class OsceViewModel {
         "Conduta",
     ]
 
-    static let specialties = [
+    /// Default specialties — used as fallback until API provides them
+    private static let defaultSpecialties = [
         "Cardiologia",
         "Pediatria",
         "Ginecologia",
@@ -46,6 +47,7 @@ final class OsceViewModel {
 
     // MARK: - State
 
+    var specialties: [String] = defaultSpecialties
     var phase: OscePhase = .selectSpecialty
     var specialty: String = ""
     var attemptId: String? = nil
@@ -71,6 +73,22 @@ final class OsceViewModel {
         self.api = api
         self.sseClient = sseClient
         self.gamificationEvents = gamificationEvents
+    }
+
+    // MARK: - Load specialties from API
+
+    func loadSpecialties() {
+        Task {
+            do {
+                let list: [String] = try await api.getOsceSpecialties()
+                if !list.isEmpty {
+                    specialties = list
+                }
+            } catch {
+                // API may not have this endpoint yet — keep defaults
+                NSLog("[OSCE] Specialties fetch failed (using defaults): %@", String(describing: error))
+            }
+        }
     }
 
     // MARK: - Start case

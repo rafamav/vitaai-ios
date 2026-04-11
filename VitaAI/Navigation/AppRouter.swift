@@ -3,12 +3,53 @@ import SwiftUI
 // Clears ONLY the UINavigationController and its child view controllers' backgrounds.
 // Applied as a zero-size overlay inside NavigationStack content so the outer
 // VitaAmbientBackground (full screen) shows through seamlessly.
+/// Custom UIView that clears all superview backgrounds on every layout pass.
+private final class ClearBackgroundUIView: UIView {
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        clearChain()
+    }
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        clearChain()
+    }
+    private func clearChain() {
+        var view: UIView? = self
+        while let parent = view?.superview {
+            parent.backgroundColor = .clear
+            view = parent
+        }
+    }
+}
+
+/// Placed inside each pushed route to clear UIKit hosting backgrounds.
+private struct HostingClearerView: UIViewRepresentable {
+    func makeUIView(context: Context) -> ClearBackgroundUIView {
+        let v = ClearBackgroundUIView()
+        v.backgroundColor = .clear
+        v.isHidden = true
+        return v
+    }
+    func updateUIView(_ uiView: ClearBackgroundUIView, context: Context) {}
+}
+
 private struct NavControllerBackgroundClearer: UIViewRepresentable {
+    var pathCount: Int  // triggers updateUIView on every push/pop
+
     func makeUIView(context: Context) -> UIView {
         let view = UIView()
         view.backgroundColor = .clear
         view.isHidden = true
-        DispatchQueue.main.async {
+        clearNavBackgrounds(from: view)
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        clearNavBackgrounds(from: uiView)
+    }
+
+    private func clearNavBackgrounds(from view: UIView) {
+        func doClear() {
             var responder: UIResponder? = view
             while let next = responder?.next {
                 if let nc = next as? UINavigationController {
@@ -19,9 +60,10 @@ private struct NavControllerBackgroundClearer: UIViewRepresentable {
                 responder = next
             }
         }
-        return view
+        DispatchQueue.main.async { doClear() }
+        // Delayed pass catches VCs mid-push that weren't ready on first pass
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { doClear() }
     }
-    func updateUIView(_ uiView: UIView, context: Context) {}
 }
 
 struct AppRouter: View {
@@ -86,15 +128,22 @@ struct AppRouter: View {
                     profileChecked = true
                     return
                 }
-                // 404 / other = no profile = needs onboarding
-                needsOnboarding = true
-                isOnboardedStored = false
-                legacyOnboardingStored = false
+                if case .serverError(404) = error {
+                    // 404 = no profile exists = genuinely needs onboarding
+                    needsOnboarding = true
+                    isOnboardedStored = false
+                    legacyOnboardingStored = false
+                } else {
+                    // Other API errors (500, decode, etc) — DON'T assume onboarding.
+                    // Show main tab and let normal error handling deal with it.
+                    NSLog("[AppRouter] getProfile API error (not 404): \(error) — skipping onboarding check")
+                    needsOnboarding = false
+                }
             } catch {
-                // Network error / other — assume needs onboarding
-                needsOnboarding = true
-                isOnboardedStored = false
-                legacyOnboardingStored = false
+                // Network error / timeout — DON'T force onboarding.
+                // The user may be fully onboarded but temporarily offline.
+                NSLog("[AppRouter] getProfile network error: \(error) — skipping onboarding check")
+                needsOnboarding = false
             }
             profileChecked = true
         }
@@ -146,7 +195,9 @@ struct MainTabView: View {
                     onMenuTap: { showNotifPopout = false; showMenuPopout.toggle() }
                 )
                 .padding(.horizontal, 12)
-                .padding(.bottom, 8)
+                .padding(.bottom, 4)
+
+                VitaBreadcrumb()
 
                 ZStack {
                     NavigationStack(path: $router.path) {
@@ -154,7 +205,7 @@ struct MainTabView: View {
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .clipped()
                             .overlay(alignment: .topLeading) {
-                                NavControllerBackgroundClearer()
+                                NavControllerBackgroundClearer(pathCount: router.path.count)
                                     .frame(width: 0, height: 0)
                             }
                             .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -221,6 +272,7 @@ struct MainTabView: View {
                 .zIndex(200)
             }
         }
+        .environment(router)
         .background {
             VitaAmbientBackground { Color.clear }
                 .ignoresSafeArea()
@@ -246,6 +298,14 @@ struct MainTabView: View {
             .allowsHitTesting(false)
         }
         .task {
+            // Populate subtitle from profile API (reliable source)
+            if dashboardSubtitle.isEmpty {
+                if let profile = try? await container.api.getProfile(),
+                   let uni = profile.university, !uni.isEmpty {
+                    let sem = profile.semester.map { " · \($0)º Semestre" } ?? ""
+                    dashboardSubtitle = uni + sem
+                }
+            }
             await subStatus.refresh()
             // await PushManager.shared.requestPermission()
             Task {
@@ -280,6 +340,7 @@ struct MainTabView: View {
                 onNavigateToTranscricao: { router.navigate(to: .transcricao) },
                 onNavigateToAtlas3D: { router.navigate(to: .atlas3D) },
                 onNavigateToDisciplineDetail: { id, name in router.navigate(to: .disciplineDetail(disciplineId: id, disciplineName: name)) },
+                onNavigateToTrabalhos: { router.navigate(to: .trabalhos) },
                 onSubtitleLoaded: { subtitle in dashboardSubtitle = subtitle }
             )
         case .estudos:
@@ -297,7 +358,7 @@ struct MainTabView: View {
                 onNavigateToProvas: { router.navigate(to: .provas) }
             )
         case .faculdade:
-            AgendaScreen()
+            FaculdadeHomeScreen()
         case .progresso:
             ProgressoScreen()
         }
@@ -310,6 +371,12 @@ struct MainTabView: View {
         routeView(for: route)
             .navigationBarBackButtonHidden(true)
             .toolbar(.hidden, for: .navigationBar)
+            .overlay(alignment: .topLeading) {
+                // Clears UIKit hosting view backgrounds so the single
+                // shell VitaAmbientBackground shows through seamlessly
+                HostingClearerView()
+                    .frame(width: 0, height: 0)
+            }
     }
 
     @ViewBuilder
@@ -434,7 +501,13 @@ struct MainTabView: View {
         case .paywall:
             VitaPaywallScreen(onDismiss: { router.goBack() })
         case .atlas3D:
-            AtlasWebViewScreen(onBack: { router.goBack() })
+            AtlasWebViewScreen(
+                onBack: { router.goBack() },
+                onAskVita: { _ in
+                    router.goBack()
+                    withAnimation(.easeInOut(duration: 0.25)) { showChat = true }
+                }
+            )
         case .osce:
             OsceScreen(onBack: { router.goBack() })
         case .activityFeed:
@@ -503,6 +576,12 @@ struct MainTabView: View {
                 onNavigateToQBank: { router.navigate(to: .qbank) },
                 onNavigateToSimulado: { router.navigate(to: .simuladoHome) }
             )
+        case .faculdadeAgenda:
+            AgendaScreen()
+        case .faculdadeMaterias:
+            FaculdadeMateriasScreen(onBack: { router.goBack() })
+        case .faculdadeDocumentos:
+            FaculdadeDocumentosScreen(onBack: { router.goBack() })
         default:
             EmptyView()
         }

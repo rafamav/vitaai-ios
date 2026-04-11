@@ -58,7 +58,7 @@ struct CanvasStatusResponse: Codable {
 
 struct CanvasConnectRequest: Codable {
     var accessToken: String
-    var instanceUrl: String = "https://ulbra.instructure.com"
+    var instanceUrl: String = ""
 }
 
 struct CanvasConnectResponse: Codable {
