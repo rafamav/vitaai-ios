@@ -18,6 +18,9 @@ final class AuthManager: ObservableObject {
     @Published var userEmail: String?
     @Published var userImage: String?
 
+    /// Retained delegate for native Apple Sign In flow
+    private var appleSignInDelegate: AppleSignInDelegate?
+
     init(tokenStore: TokenStore) {
         self.tokenStore = tokenStore
         Task { await checkLoginStatus() }
@@ -49,7 +52,7 @@ final class AuthManager: ObservableObject {
         isLoading = true
         let urlString = "\(AppConfig.authBaseURL)/api/auth/mobile-start?provider=\(provider)"
         guard let authURL = URL(string: urlString) else {
-            error = "URL inválida"
+            error = "URL invalida"
             isLoading = false
             return
         }
@@ -83,13 +86,113 @@ final class AuthManager: ObservableObject {
     }
 
     func signInWithGoogle() { signIn(provider: "google") }
-    func signInWithApple() { signIn(provider: "apple") }
+
+    // MARK: - Native Apple Sign In
+
+    func signInWithApple() {
+        error = nil
+        isLoading = true
+
+        let provider = ASAuthorizationAppleIDProvider()
+        let request = provider.createRequest()
+        request.requestedScopes = [.fullName, .email]
+
+        let controller = ASAuthorizationController(authorizationRequests: [request])
+        let delegate = AppleSignInDelegate { [weak self] result in
+            Task { @MainActor in
+                guard let self else { return }
+                switch result {
+                case .success(let credential):
+                    await self.handleAppleCredential(credential)
+                case .failure(let err):
+                    self.isLoading = false
+                    if (err as NSError).code == ASAuthorizationError.canceled.rawValue {
+                        return
+                    }
+                    self.error = "Erro ao conectar com Apple: \(err.localizedDescription)"
+                }
+            }
+        }
+        self.appleSignInDelegate = delegate
+        controller.delegate = delegate
+        controller.presentationContextProvider = ASWebAuthContextProvider.shared
+        controller.performRequests()
+    }
+
+    private func handleAppleCredential(_ credential: ASAuthorizationAppleIDCredential) async {
+        guard let tokenData = credential.identityToken,
+              let identityToken = String(data: tokenData, encoding: .utf8) else {
+            error = "Token Apple nao recebido"
+            isLoading = false
+            return
+        }
+
+        let fullName: String? = {
+            guard let name = credential.fullName else { return nil }
+            let parts = [name.givenName, name.familyName].compactMap { $0 }
+            return parts.isEmpty ? nil : parts.joined(separator: " ")
+        }()
+
+        guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/mobile-apple") else {
+            error = "URL invalida"
+            isLoading = false
+            return
+        }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        var body: [String: String] = ["identityToken": identityToken]
+        if let fullName { body["fullName"] = fullName }
+        if let email = credential.email { body["email"] = email }
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        do {
+            let (data, response) = try await session.data(for: req)
+            guard let http = response as? HTTPURLResponse else {
+                error = "Resposta invalida"
+                isLoading = false
+                return
+            }
+
+            let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+
+            if (200...299).contains(http.statusCode), let token = json?["token"] as? String {
+                let name = json?["name"] as? String ?? fullName
+                let email = json?["email"] as? String ?? credential.email
+                let image = json?["image"] as? String
+
+                await tokenStore.saveSession(token: token, name: name, email: email, image: image)
+                userName = name
+                userEmail = email
+                userImage = image
+                isLoggedIn = true
+
+                if let email {
+                    SentryConfig.setUser(id: email, email: email)
+                    VitaPostHogConfig.identify(userId: email, properties: [
+                        "name": name ?? "",
+                        "platform": "ios",
+                    ])
+                }
+                VitaPostHogConfig.capture(event: "login", properties: ["method": "apple"])
+            } else {
+                error = json?["error"] as? String ?? "Erro no login com Apple"
+            }
+        } catch {
+            self.error = "Erro de conexao"
+        }
+        isLoading = false
+    }
+
+    // MARK: - Email Auth
 
     func signInWithEmail(email: String, password: String) async {
         error = nil
 
         guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/sign-in/email") else {
-            error = "URL inválida"; return
+            error = "URL invalida"; return
         }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -103,7 +206,7 @@ final class AuthManager: ObservableObject {
         error = nil
 
         guard let url = URL(string: "\(AppConfig.authBaseURL)/api/auth/sign-up/email") else {
-            error = "URL inválida"; return
+            error = "URL invalida"; return
         }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
@@ -129,17 +232,14 @@ final class AuthManager: ObservableObject {
         do {
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else {
-                error = "Resposta inválida"; return
+                error = "Resposta invalida"; return
             }
             let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
             if (200...299).contains(http.statusCode) {
-                // Better Auth sends the real session token in Set-Cookie header, not in JSON body
-                // Extract from Set-Cookie: better-auth.session_token=VALUE;...
                 var token: String?
                 if let setCookies = http.allHeaderFields["Set-Cookie"] as? String {
                     token = extractSessionToken(from: setCookies)
                 }
-                // Fallback: try JSON body token
                 if token == nil {
                     token = json?["token"] as? String
                 }
@@ -148,7 +248,7 @@ final class AuthManager: ObservableObject {
                 let name = user?["name"] as? String ?? json?["name"] as? String
                 let image = user?["image"] as? String
                 guard let token else {
-                    error = "Credenciais inválidas"; return
+                    error = "Credenciais invalidas"; return
                 }
                 await tokenStore.saveSession(token: token, name: name, email: email, image: image)
                 userName = name
@@ -165,12 +265,11 @@ final class AuthManager: ObservableObject {
                 error = json?["message"] as? String ?? "Email ou senha incorretos"
             }
         } catch {
-            self.error = "Erro de conexão"
+            self.error = "Erro de conexao"
         }
     }
 
     private func extractSessionToken(from setCookie: String) -> String? {
-        // Parse: better-auth.session_token=VALUE; Max-Age=...
         for part in setCookie.components(separatedBy: ",") {
             let trimmed = part.trimmingCharacters(in: .whitespaces)
             if trimmed.contains("better-auth.session_token=") {
@@ -185,9 +284,11 @@ final class AuthManager: ObservableObject {
         return nil
     }
 
+    // MARK: - OAuth Callback (Google)
+
     private func handleCallback(url: URL) async {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            error = "Callback inválido"
+            error = "Callback invalido"
             return
         }
 
@@ -196,7 +297,7 @@ final class AuthManager: ObservableObject {
         })
 
         guard let token = params["token"] else {
-            error = "Token não recebido"
+            error = "Token nao recebido"
             return
         }
 
@@ -220,16 +321,24 @@ final class AuthManager: ObservableObject {
             ])
         }
         VitaPostHogConfig.capture(event: "login", properties: ["method": "oauth"])
+        lastLoginAt = Date()
     }
 
+    /// Tracks when login last succeeded
+    private var lastLoginAt: Date?
+
     func logout() {
-        // Already @MainActor — no need for Task wrapper which causes race conditions
+        if let loginTime = lastLoginAt, Date().timeIntervalSince(loginTime) < 5 {
+            NSLog("[AuthManager] Ignoring 401 logout — login was %.1fs ago", Date().timeIntervalSince(loginTime))
+            return
+        }
         Task {
             await tokenStore.clearSession()
             userName = nil
             userEmail = nil
             userImage = nil
             isLoggedIn = false
+            lastLoginAt = nil
             SentryConfig.clearUser()
             VitaPostHogConfig.capture(event: "logout")
             VitaPostHogConfig.reset()
@@ -237,12 +346,42 @@ final class AuthManager: ObservableObject {
     }
 }
 
-// MARK: - ASWebAuthenticationSession context provider
+// MARK: - Apple Sign In Delegate
 
-final class ASWebAuthContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+private final class AppleSignInDelegate: NSObject, ASAuthorizationControllerDelegate {
+    let completion: (Result<ASAuthorizationAppleIDCredential, Error>) -> Void
+
+    init(completion: @escaping (Result<ASAuthorizationAppleIDCredential, Error>) -> Void) {
+        self.completion = completion
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithAuthorization authorization: ASAuthorization) {
+        if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
+            completion(.success(credential))
+        } else {
+            completion(.failure(NSError(domain: "AppleSignIn", code: -1, userInfo: [NSLocalizedDescriptionKey: "Credencial invalida"])))
+        }
+    }
+
+    func authorizationController(controller: ASAuthorizationController, didCompleteWithError error: Error) {
+        completion(.failure(error))
+    }
+}
+
+// MARK: - Presentation context provider
+
+final class ASWebAuthContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding, ASAuthorizationControllerPresentationContextProviding {
     static let shared = ASWebAuthContextProvider()
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = scene.windows.first else {
+            return ASPresentationAnchor()
+        }
+        return window
+    }
+
+    func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
         guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let window = scene.windows.first else {
             return ASPresentationAnchor()
