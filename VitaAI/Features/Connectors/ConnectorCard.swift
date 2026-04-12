@@ -10,6 +10,8 @@ struct ConnectorCard: View {
     let status: ConnectionItemStatus
     let color: Color
     var lastSync: String?
+    var lastPing: String?           // "sessao viva ha Xmin" — so quando divergir do lastSync
+    var isStale: Bool = false        // conectado mas dados > 12h → clock fica ambar
     var stats: [(value: Int, label: String)] = []
     var isPrimary: Bool = false
     var onConnect: (() -> Void)?
@@ -34,16 +36,21 @@ struct ConnectorCard: View {
             }
             .padding(14)
 
-            // Meta row (when connected)
-            if isConnected, hasMetaData {
+            // Meta row — mostra sempre que tiver dado, mesmo com token expirado,
+            // pra nao esconder a ancora temporal do usuario ("expirado ha 2 dias")
+            if hasMetaData {
                 metaRow
             }
         }
         .background(cardBg)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(borderColor, lineWidth: 1))
-        .onTapGesture {
-            if isConnected { onTapConnected?() }
+        .overlay {
+            if status == .connected {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture { onTapConnected?() }
+            }
         }
     }
 
@@ -146,20 +153,46 @@ struct ConnectorCard: View {
         lastSync != nil || stats.contains(where: { $0.value > 0 })
     }
 
+    // Cor do "dados ha X" — ambar quando stale (dados > 12h) ou expirado
+    private var syncTextColor: Color {
+        if status == .expired {
+            return VitaColors.dataAmber.opacity(0.75)
+        }
+        if isStale {
+            return VitaColors.dataAmber.opacity(0.70)
+        }
+        return Color(red: 1.0, green: 0.863, blue: 0.627).opacity(0.55)
+    }
+
+    private var syncIconColor: Color {
+        if status == .expired || isStale {
+            return VitaColors.dataAmber.opacity(0.50)
+        }
+        return goldSubtle.opacity(0.25)
+    }
+
+    private var syncPrefix: String {
+        // Prefixo muda conforme o estado: token vivo / velho / expirado
+        if status == .expired { return "Expirado · dados " }
+        if isStale           { return "Dados " }
+        return ""
+    }
+
     private var metaRow: some View {
-        VStack(spacing: 0) {
+        VStack(alignment: .leading, spacing: 4) {
             Rectangle()
                 .fill(goldSubtle.opacity(0.04))
                 .frame(height: 1)
 
+            // Linha 1: "dados ha X" + stats
             HStack(spacing: 6) {
                 if let sync = lastSync {
-                    Image(systemName: "clock")
+                    Image(systemName: isStale || status == .expired ? "exclamationmark.triangle.fill" : "clock")
                         .font(.system(size: 8))
-                        .foregroundColor(goldSubtle.opacity(0.25))
-                    Text(sync)
+                        .foregroundColor(syncIconColor)
+                    Text("\(syncPrefix)\(sync)")
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(Color(red: 1.0, green: 0.863, blue: 0.627).opacity(0.55))
+                        .foregroundColor(syncTextColor)
                 }
 
                 if lastSync != nil && stats.contains(where: { $0.value > 0 }) {
@@ -184,7 +217,25 @@ struct ConnectorCard: View {
                 Spacer()
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.top, 8)
+
+            // Linha 2: "token vivo ha X" — so quando ping divergir de sync
+            // (ex: Mannesoft com PHPSESSID keep-alive mas extracao parada)
+            if let ping = lastPing {
+                HStack(spacing: 4) {
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 7))
+                        .foregroundColor(Color(red: 0.510, green: 0.784, blue: 0.549).opacity(0.55))
+                    Text("Token vivo · verificado \(ping)")
+                        .font(.system(size: 9))
+                        .foregroundColor(Color(red: 0.510, green: 0.784, blue: 0.549).opacity(0.55))
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 8)
+            } else {
+                Spacer().frame(height: 8)
+            }
         }
     }
 }

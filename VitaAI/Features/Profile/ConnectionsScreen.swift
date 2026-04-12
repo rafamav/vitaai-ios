@@ -26,6 +26,29 @@ struct ConnectionsScreen: View {
     @State private var activeSheet: String?
     @State private var showAllPortals = false
 
+    // Direct WebView flows (no intermediate screen)
+    @State private var showWebalunoWebView = false
+    @State private var webalunoInstanceUrl: String = ""
+    @State private var showCanvasWebView = false
+    @State private var canvasInstanceUrl: String = ""
+
+    // WhatsApp linking flow
+    @State private var showWhatsAppSheet = false
+    @State private var waPhone: String = ""
+    @State private var waCode: String = ""
+    @State private var waStep: Int = 0
+    @State private var waError: String?
+    @State private var waSending = false
+
+    // Sync overlay state
+    @State private var syncing = false
+    @State private var syncConnectorName: String = ""
+    @State private var syncPhase: String = "login"
+    @State private var syncMessage: String?
+    @State private var canvasSyncPhase: CanvasSyncOrchestrator.Phase = .starting
+    @State private var canvasSyncProgress: Double = 0
+    @State private var isCanvasSync = false
+
     // Design tokens
     private let goldSubtle = VitaColors.accentLight
     private let borderColor = VitaColors.glassBorder
@@ -74,6 +97,53 @@ struct ConnectionsScreen: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .background(Color(red: 0.047, green: 0.035, blue: 0.027))
+        }
+        // WebAluno WebView (direct, no intermediate screen)
+        .fullScreenCover(isPresented: $showWebalunoWebView) {
+            WebAlunoWebViewScreen(
+                onBack: { showWebalunoWebView = false },
+                onSessionCaptured: { cookie in
+                    showWebalunoWebView = false
+                    connectWebaluno(cookie: cookie)
+                },
+                userEmail: container.authManager.userEmail,
+                portalInstanceUrl: webalunoInstanceUrl
+            )
+        }
+        // Canvas WebView (direct, no intermediate screen)
+        .fullScreenCover(isPresented: $showCanvasWebView) {
+            canvasWebViewFullScreen
+        }
+        // WhatsApp linking sheet
+        .sheet(isPresented: $showWhatsAppSheet) {
+            whatsAppLinkSheet
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .background(Color(red: 0.047, green: 0.035, blue: 0.027))
+        }
+        // Sync overlay (shared for both Canvas and WebAluno)
+        .overlay {
+            if syncing {
+                ZStack {
+                    VitaColors.surface.opacity(0.95)
+                        .ignoresSafeArea()
+                    if isCanvasSync {
+                        ConnectorSyncView(
+                            connectorName: "Canvas",
+                            steps: SyncStep.canvasSteps(phase: canvasSyncPhase),
+                            message: syncMessage,
+                            progress: canvasSyncProgress < 100 ? canvasSyncProgress : nil
+                        )
+                    } else {
+                        ConnectorSyncView(
+                            connectorName: syncConnectorName,
+                            steps: SyncStep.webalunoSteps(phase: syncPhase),
+                            message: syncMessage
+                        )
+                    }
+                }
+                .transition(.opacity)
+            }
         }
         .vitaToastHost(toastState)
         .onChange(of: vm?.toastMessage) { msg in
@@ -129,11 +199,22 @@ struct ConnectionsScreen: View {
                         connectorId: "apple_health",
                         state: vm.appleHealth, vm: vm
                     )
-                    integrationCard(
-                        letter: "W", name: "WhatsApp",
+                    ConnectorCard(
+                        letter: "W",
+                        name: "WhatsApp",
+                        status: vm.whatsapp.status,
                         color: Color(red: 0.15, green: 0.68, blue: 0.38),
-                        connectorId: "whatsapp",
-                        state: vm.whatsapp, vm: vm
+                        lastSync: vm.whatsapp.lastSync,
+                        stats: vm.whatsapp.stats,
+                        onConnect: {
+                            waStep = 0; waPhone = ""; waCode = ""; waError = nil
+                            showWhatsAppSheet = true
+                        },
+                        onDisconnect: { Task { await vm.disconnect("whatsapp") } },
+                        onTapConnected: {
+                            waStep = 0; waPhone = vm.whatsapp.subtitle ?? ""; waCode = ""; waError = nil
+                            showWhatsAppSheet = true
+                        }
                     )
                 }
                 .padding(.horizontal, 14)
@@ -159,7 +240,31 @@ struct ConnectionsScreen: View {
     @ViewBuilder
     private func institucionalSection(vm: ConnectorsViewModel) -> some View {
         let hasUniversity = !vm.universityName.isEmpty
-        let detectedPortals = vm.universityPortals
+        // Fallback: se o catalogo getUniversities() nao retornou portals (universidade fora do
+        // catalogo ou backend incompleto), constroi portais a partir do state real do VM.
+        // Isso garante que usuario com conexao ativa sempre ve o card, independente do catalogo.
+        let fallbackPortals: [UniversityPortal] = {
+            guard vm.universityPortals.isEmpty else { return [] }
+            var result: [UniversityPortal] = []
+            if vm.mannesoft.status != .disconnected {
+                result.append(UniversityPortal(
+                    id: "fallback-mannesoft",
+                    portalType: "mannesoft",
+                    portalName: "Portal Academico",
+                    instanceUrl: vm.mannesoft.instanceUrl
+                ))
+            }
+            if vm.canvas.status != .disconnected {
+                result.append(UniversityPortal(
+                    id: "fallback-canvas",
+                    portalType: "canvas",
+                    portalName: "Canvas",
+                    instanceUrl: vm.canvas.instanceUrl
+                ))
+            }
+            return result
+        }()
+        let detectedPortals = vm.universityPortals.isEmpty ? fallbackPortals : vm.universityPortals
         let detectedTypes = Set(detectedPortals.map(\.portalType))
         let otherPortals = allPortalTypes.filter { !detectedTypes.contains($0.type) }
 
@@ -195,9 +300,11 @@ struct ConnectionsScreen: View {
                         status: connState.status,
                         color: University.color(for: portal.portalType),
                         lastSync: connState.lastSync,
+                        lastPing: connState.lastPing,
+                        isStale: connState.isStale,
                         stats: connState.stats,
                         isPrimary: portal.isPrimary,
-                        onConnect: { onPortalConnect?(portal.portalType) },
+                        onConnect: { handleConnect(portalType: portal.portalType, instanceUrl: portal.instanceUrl) },
                         onDisconnect: { Task { await vm.disconnect(portal.portalType) } },
                         onTapConnected: { activeSheet = portal.portalType }
                     )
@@ -237,7 +344,7 @@ struct ConnectionsScreen: View {
                         name: portal.displayName,
                         status: connState.status,
                         color: portal.color,
-                        onConnect: { onPortalConnect?(portal.type) },
+                        onConnect: { handleConnect(portalType: portal.type, instanceUrl: nil) },
                         onDisconnect: { Task { await vm.disconnect(portal.type) } },
                         onTapConnected: { activeSheet = portal.type }
                     )
@@ -294,7 +401,7 @@ struct ConnectionsScreen: View {
             color: color,
             lastSync: state.lastSync,
             stats: state.stats,
-            onConnect: { onPortalConnect?(connectorId) },
+            onConnect: { handleConnect(portalType: connectorId, instanceUrl: nil) },
             onDisconnect: { Task { await vm.disconnect(connectorId) } },
             onTapConnected: { activeSheet = connectorId }
         )
@@ -302,8 +409,110 @@ struct ConnectionsScreen: View {
 
     // MARK: - Integration Card (OAuth connectors)
 
+    // MARK: - WhatsApp Link Sheet
+
     @ViewBuilder
-    private func integrationCard(
+    private var whatsAppLinkSheet: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                Spacer().frame(height: 10)
+                Image(systemName: waStep == 2 ? "checkmark.circle.fill" : "message.fill")
+                    .font(.system(size: 48))
+                    .foregroundStyle(waStep == 2 ? .green : Color(red: 0.15, green: 0.68, blue: 0.38))
+
+                if waStep == 0 {
+                    Text("Conectar WhatsApp").font(.title2.bold()).foregroundStyle(.white)
+                    Text("Receba notificacoes e converse com a VITA pelo WhatsApp")
+                        .font(.subheadline).foregroundStyle(.gray).multilineTextAlignment(.center).padding(.horizontal)
+                    TextField("51989484243", text: $waPhone)
+                        .keyboardType(.phonePad).textContentType(.telephoneNumber)
+                        .padding().background(Color.white.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal, 24).foregroundStyle(.white)
+                    if let err = waError { Text(err).font(.caption).foregroundStyle(.red) }
+                    Button {
+                        Task { await sendWACode() }
+                    } label: {
+                        HStack {
+                            if waSending { ProgressView().tint(.black) }
+                            Text("Enviar codigo").fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity).padding(.vertical, 14)
+                        .background(Color(red: 0.15, green: 0.68, blue: 0.38))
+                        .foregroundStyle(.white).clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .disabled(waPhone.count < 8 || waSending).padding(.horizontal, 24)
+
+                } else if waStep == 1 {
+                    Text("Digite o codigo").font(.title2.bold()).foregroundStyle(.white)
+                    Text("Enviamos um codigo de 6 digitos para seu WhatsApp")
+                        .font(.subheadline).foregroundStyle(.gray).multilineTextAlignment(.center).padding(.horizontal)
+                    TextField("000000", text: $waCode)
+                        .keyboardType(.numberPad).textContentType(.oneTimeCode)
+                        .multilineTextAlignment(.center)
+                        .font(.system(size: 32, weight: .bold, design: .monospaced))
+                        .padding().background(Color.white.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal, 60).foregroundStyle(.white)
+                    if let err = waError { Text(err).font(.caption).foregroundStyle(.red) }
+                    Button {
+                        Task { await verifyWACode() }
+                    } label: {
+                        HStack {
+                            if waSending { ProgressView().tint(.black) }
+                            Text("Verificar").fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity).padding(.vertical, 14)
+                        .background(Color(red: 0.15, green: 0.68, blue: 0.38))
+                        .foregroundStyle(.white).clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .disabled(waCode.count < 6 || waSending).padding(.horizontal, 24)
+                    Button("Reenviar codigo") { Task { await sendWACode() } }
+                        .font(.caption).foregroundStyle(goldSubtle)
+
+                } else {
+                    Text("WhatsApp conectado!").font(.title2.bold()).foregroundStyle(.white)
+                    Text("A VITA vai te mandar uma mensagem de boas-vindas")
+                        .font(.subheadline).foregroundStyle(.gray)
+                }
+                Spacer()
+            }
+            .padding(.top, 20)
+            .background(Color(red: 0.08, green: 0.08, blue: 0.10))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Fechar") { showWhatsAppSheet = false }.foregroundStyle(.gray)
+                }
+            }
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func sendWACode() async {
+        guard let vm else { return }
+        waSending = true; waError = nil
+        do {
+            try await vm.linkWhatsApp(phone: waPhone)
+            waStep = 1
+        } catch { waError = "Erro ao enviar codigo" }
+        waSending = false
+    }
+
+    private func verifyWACode() async {
+        guard let vm else { return }
+        waSending = true; waError = nil
+        do {
+            try await vm.verifyWhatsApp(code: waCode)
+            waStep = 2
+            try? await Task.sleep(for: .seconds(2))
+            showWhatsAppSheet = false
+        } catch { waError = "Codigo invalido ou expirado" }
+        waSending = false
+    }
+
+        private func integrationCard(
         letter: String, name: String, color: Color,
         connectorId: String, state: ConnectorState,
         vm: ConnectorsViewModel
@@ -321,6 +530,209 @@ struct ConnectionsScreen: View {
         )
     }
 
+    // MARK: - Handle Connect (direct flow, no intermediate screen)
+
+    private func handleConnect(portalType: String, instanceUrl: String?) {
+        switch portalType {
+        case "webaluno", "mannesoft":
+            webalunoInstanceUrl = instanceUrl ?? vm?.mannesoft.instanceUrl ?? ""
+            showWebalunoWebView = true
+        case "canvas":
+            canvasInstanceUrl = instanceUrl ?? vm?.canvas.instanceUrl ?? "https://ulbra.instructure.com"
+            showCanvasWebView = true
+        default:
+            // Unknown portal — fallback to connect screen
+            onPortalConnect?(portalType)
+        }
+    }
+
+    private func connectWebaluno(cookie: String) {
+        guard let vm else { return }
+        isCanvasSync = false
+        syncConnectorName = "Portal Acadêmico"
+        syncPhase = "login"
+        syncMessage = "Conectando ao portal..."
+        withAnimation { syncing = true }
+        Task {
+            do {
+                let portalUrl = vm.universityPortals.first(where: { $0.portalType == "webaluno" || $0.portalType == "mannesoft" })?.instanceUrl ?? webalunoInstanceUrl
+                syncPhase = "disciplines"
+                syncMessage = "Vita buscando disciplinas..."
+                let crawlResult = try await container.api.startVitaCrawl(
+                    cookies: "PHPSESSID=\(cookie)",
+                    instanceUrl: portalUrl
+                )
+                if let syncId = crawlResult.syncId, !syncId.isEmpty {
+                    for _ in 0..<60 {
+                        try await Task.sleep(for: .seconds(2))
+                        let progress = try await container.api.getSyncProgress(syncId: syncId)
+                        let label = (progress.label ?? "").isEmpty ? "Vita trabalhando..." : (progress.label ?? "")
+                        syncMessage = label
+                        if label.contains("disciplina") || label.contains("matéria") {
+                            syncPhase = "disciplines"
+                        } else if label.contains("nota") || label.contains("grade") {
+                            syncPhase = "grades"
+                        } else if label.contains("horário") || label.contains("schedule") || label.contains("aula") {
+                            syncPhase = "schedule"
+                        } else if label.contains("extrai") || label.contains("extract") || label.contains("process") {
+                            syncPhase = "extracting"
+                        }
+                        if progress.isDone {
+                            syncPhase = "done"
+                            syncMessage = "Extração completa!"
+                            withAnimation { syncing = false }
+                            toastState.show("Portal conectado!", type: .success)
+                            await vm.loadAll()
+                            return
+                        }
+                        if progress.isError {
+                            withAnimation { syncing = false }
+                            toastState.show(label, type: .error)
+                            return
+                        }
+                    }
+                    withAnimation { syncing = false }
+                    toastState.show("Vita continua em background...", type: .success)
+                    await vm.loadAll()
+                } else {
+                    syncPhase = "done"
+                    withAnimation { syncing = false }
+                    toastState.show("Portal conectado!", type: .success)
+                    await vm.loadAll()
+                }
+            } catch {
+                withAnimation { syncing = false }
+                toastState.show("Erro ao conectar portal", type: .error)
+            }
+        }
+    }
+
+    private func connectCanvas(cookies: String) {
+        guard let vm else { return }
+        isCanvasSync = true
+        canvasSyncPhase = .starting
+        canvasSyncProgress = 0
+        syncMessage = CanvasSyncOrchestrator.Phase.starting.rawValue
+        withAnimation { syncing = true }
+        Task {
+            let orchestrator = CanvasSyncOrchestrator(
+                cookies: cookies,
+                instanceUrl: canvasInstanceUrl,
+                vitaAPI: container.api,
+                onProgress: { [self] progress in
+                    Task { @MainActor in
+                        self.canvasSyncPhase = progress.phase
+                        self.canvasSyncProgress = progress.percent
+                        if let detail = progress.detail {
+                            self.syncMessage = "\(progress.phase.rawValue) \(detail)"
+                        } else {
+                            self.syncMessage = progress.phase.rawValue
+                        }
+                    }
+                }
+            )
+            do {
+                let result = try await orchestrator.run()
+                withAnimation { syncing = false }
+                let summary = [
+                    result.courses.map { "\($0) disciplinas" },
+                    result.assignments.map { "\($0) atividades" },
+                    result.pdfExtracted.map { "\($0) PDFs processados" },
+                ].compactMap { $0 }.joined(separator: ", ")
+                toastState.show(summary.isEmpty ? "Extração completa!" : "Pronto! \(summary)", type: .success)
+                await vm.loadAll()
+            } catch {
+                withAnimation { syncing = false }
+                toastState.show("Erro: \(error.localizedDescription)", type: .error)
+            }
+        }
+    }
+
+    // MARK: - Canvas WebView Full Screen
+
+    private var canvasWebViewFullScreen: some View {
+        VStack(spacing: 0) {
+            // Nav bar
+            HStack(spacing: 4) {
+                Button(action: { showCanvasWebView = false }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 17, weight: .semibold))
+                        Text("Voltar")
+                            .font(VitaTypography.bodyLarge)
+                    }
+                    .foregroundColor(VitaColors.accent)
+                    .frame(minWidth: 44, minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                Spacer()
+                Text("Canvas LMS")
+                    .font(VitaTypography.titleMedium)
+                    .fontWeight(.semibold)
+                    .foregroundColor(VitaColors.textPrimary)
+                Spacer()
+                Color.clear.frame(width: 70, height: 44)
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 8)
+
+            // Instructions
+            VitaGlassCard {
+                HStack(spacing: 12) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 20))
+                        .foregroundColor(VitaColors.accent)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Faça login no Canvas")
+                            .font(VitaTypography.titleSmall)
+                            .fontWeight(.semibold)
+                            .foregroundColor(VitaColors.textPrimary)
+                        Text("Vita importa disciplinas, notas e materiais")
+                            .font(VitaTypography.bodySmall)
+                            .foregroundColor(VitaColors.textSecondary)
+                    }
+                    Spacer()
+                }
+                .padding(16)
+            }
+            .padding(.horizontal, 20)
+
+            // URL bar + WebView
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 9))
+                        .foregroundColor(VitaColors.textTertiary)
+                    Text(canvasInstanceUrl.replacingOccurrences(of: "https://", with: ""))
+                        .font(.system(size: 10))
+                        .foregroundColor(VitaColors.textTertiary)
+                        .lineLimit(1)
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.white.opacity(0.03))
+
+                PortalWebView(
+                    portalType: "canvas",
+                    portalURL: canvasInstanceUrl.replacingOccurrences(of: "https://", with: ""),
+                    onSessionCaptured: { cookie in
+                        showCanvasWebView = false
+                        connectCanvas(cookies: cookie)
+                    }
+                )
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
+        }
+        .background(VitaColors.surface.ignoresSafeArea())
+    }
+
     // MARK: - Sheet Content
 
     @ViewBuilder
@@ -334,6 +746,10 @@ struct ConnectionsScreen: View {
                 icon: icon,
                 subtitle: state.subtitle,
                 lastSync: state.lastSync,
+                lastSyncAbsolute: state.lastSyncAbsolute,
+                lastPing: state.lastPing,
+                isStale: state.isStale,
+                isExpired: state.status == .expired,
                 stats: state.stats.map { ConnectorStat(value: $0.value, label: $0.label) },
                 syncNote: syncNote,
                 onSync: {
@@ -341,7 +757,9 @@ struct ConnectionsScreen: View {
                     Task {
                         switch connectorId {
                         case "canvas": await vm.syncCanvas()
-                        case "webaluno": onPortalConnect?("webaluno") // re-connect flow
+                        case "webaluno", "mannesoft":
+                            webalunoInstanceUrl = vm.mannesoft.instanceUrl ?? ""
+                            showWebalunoWebView = true
                         case "google_calendar": await vm.syncCalendar()
                         case "google_drive": await vm.syncDrive()
                         default: break
