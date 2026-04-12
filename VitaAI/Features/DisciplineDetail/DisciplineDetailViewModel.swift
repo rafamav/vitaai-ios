@@ -2,8 +2,8 @@ import Foundation
 import SwiftUI
 
 // MARK: - DisciplineDetailViewModel
-// Mirrors mockup: disciplina-detalhe-mobile-v1.html
-// Aggregates: exams, flashcard stats, topics, PDFs, videos, vita suggestion
+// Real API data: progress, exams, flashcard decks, trabalhos.
+// All API calls fire in parallel via async let.
 
 @MainActor
 @Observable
@@ -17,31 +17,10 @@ final class DisciplineDetailViewModel {
     private(set) var isLoading = true
     private(set) var error: String?
 
-    // Quick counts
-    private(set) var totalCards: Int = 0
-    private(set) var totalQuestions: Int = 0
-    private(set) var cardsDue: Int = 0
-    private(set) var accuracy: Double = 0
-
-    // Exams
+    private(set) var subjectProgress: SubjectProgress?
     private(set) var exams: [ExamEntry] = []
-    private(set) var nearestExamDays: Int? = nil
-    private(set) var examTopics: [String] = []
-
-    // Flashcard decks
     private(set) var flashcardDecks: [FlashcardDeckEntry] = []
-
-    // Topic rows (Conteúdo da prova)
-    private(set) var topicRows: [TopicRow] = []
-
-    // PDFs (Matériais)
-    private(set) var pdfs: [PDFEntry] = []
-
-    // Videos
-    private(set) var videos: [VideoEntry] = []
-
-    // Vita score (0-100)
-    private(set) var vitaScore: Int = 50
+    private(set) var trabalhos: TrabalhosResponse?
 
     // MARK: - Init
 
@@ -51,56 +30,149 @@ final class DisciplineDetailViewModel {
         self.disciplineName = disciplineName
     }
 
+    // MARK: - Computed: identity
+
+    var subjectColor: Color {
+        SubjectColors.colorFor(subject: disciplineName)
+    }
+
+    // MARK: - Computed: exams
+
+    var subjectExams: [ExamEntry] {
+        exams
+            .filter { matchesDiscipline($0.subjectName) }
+            .sorted { a, b in
+                // Sort by date ascending; treat empty date as far future
+                a.date < b.date
+            }
+    }
+
+    var nextExam: ExamEntry? {
+        subjectExams.first { $0.daysUntil >= 0 }
+    }
+
+    // MARK: - Computed: grades from scored exams
+
+    var gradeSlots: (p1: Double?, p2: Double?, p3: Double?, sf: Double?) {
+        let scored = subjectExams.filter { $0.result != nil }
+        func slot(_ label: String) -> Double? {
+            scored.first { $0.examType?.lowercased() == label || $0.title.lowercased().contains(label) }?.result
+        }
+        let p1 = slot("p1") ?? slot("prova 1") ?? slot("av1")
+        let p2 = slot("p2") ?? slot("prova 2") ?? slot("av2")
+        let p3 = slot("p3") ?? slot("prova 3") ?? slot("av3")
+        let sf = slot("sf") ?? slot("sub") ?? slot("substitutiva")
+        return (p1, p2, p3, sf)
+    }
+
+    var hasGradeRisk: Bool {
+        let g = gradeSlots
+        let vals = [g.p1, g.p2, g.p3].compactMap { $0 }
+        return vals.contains { $0 < 5.0 }
+    }
+
+    // MARK: - Computed: attendance / professor / semester
+
+    var attendance: Double? {
+        // SubjectProgress does not expose attendance — return nil until API provides it
+        nil
+    }
+
+    var professorName: String? {
+        // SubjectProgress has no professorName field; will be nil until API adds it
+        nil
+    }
+
+    var semester: String? {
+        nil
+    }
+
+    // MARK: - Computed: flashcards
+
+    var subjectDecks: [FlashcardDeckEntry] {
+        flashcardDecks.filter { deck in
+            // Match by subjectId, or fall back to title similarity
+            if let sid = deck.subjectId, sid == disciplineId { return true }
+            return matchesDiscipline(deck.title)
+        }
+    }
+
+    var flashcardsDue: Int {
+        subjectDecks.reduce(0) { total, deck in
+            let due = deck.cards.filter { card in
+                guard let next = card.nextReviewAt,
+                      let date = ISO8601DateFormatter().date(from: next) else {
+                    return card.reps == 0
+                }
+                return date <= Date()
+            }.count
+            return total + due
+        }
+    }
+
+    var flashcardsTotal: Int {
+        subjectDecks.reduce(0) { $0 + $1.cards.count }
+    }
+
+    // MARK: - Computed: trabalhos
+
+    var pendingAssignments: [TrabalhoItem] {
+        guard let t = trabalhos else { return [] }
+        return (t.pending + t.overdue).filter { matchesDiscipline($0.subjectName) }
+    }
+
+    // MARK: - Computed: VitaScore (0-100)
+    // 45% difficulty (1 - accuracy), 35% gradeRisk, 20% urgency (next exam proximity)
+
+    var vitaScore: Int {
+        let accuracy = subjectProgress?.accuracy ?? 0.5
+        let diffScore = (1.0 - accuracy) * 45.0
+
+        let grades = gradeSlots
+        let gradeVals = [grades.p1, grades.p2, grades.p3].compactMap { $0 }
+        let gradeRisk: Double
+        if gradeVals.isEmpty {
+            gradeRisk = 0
+        } else {
+            let below = gradeVals.filter { $0 < 5.0 }.count
+            gradeRisk = Double(below) / Double(gradeVals.count) * 35.0
+        }
+
+        let urgency: Double
+        if let days = nextExam?.daysUntil {
+            if days <= 3 { urgency = 20.0 }
+            else if days <= 7 { urgency = 14.0 }
+            else if days <= 14 { urgency = 7.0 }
+            else { urgency = 2.0 }
+        } else {
+            urgency = 0
+        }
+
+        return min(100, Int(diffScore + gradeRisk + urgency))
+    }
+
     // MARK: - Load
 
     func load() async {
         isLoading = true
         error = nil
 
+        async let progressTask = api.getProgress()
+        async let examsTask = api.getExams()
+        async let decksTask = api.getFlashcardDecks()
+        async let trabalhosTask = api.getTrabalhos()
+
         do {
-            async let progressTask = api.getProgress()
-            async let examsTask   = api.getExams(upcoming: true)
-            async let decksTask   = api.getFlashcardDecks(subjectId: disciplineId)
-
-            let (progressResp, examsResp, decks) = try await (progressTask, examsTask, decksTask)
-
-            // Subject progress
-            let subject = progressResp.subjects.first { sub in
-                sub.subjectId == disciplineId || matchesDiscipline(sub.subjectId, disciplineName)
-            }
-            if let subject {
-                accuracy  = subject.accuracy
-                cardsDue  = subject.cardsDue
-            }
-
-            // Exams
-            exams = examsResp.exams.filter { matchesDiscipline($0.subjectName ?? "", disciplineName) }
-            nearestExamDays = exams.first?.daysUntil
-
-            // Flashcards
+            let (progressResponse, examsResponse, decks, trabalhosResponse) = try await (
+                progressTask,
+                examsTask,
+                decksTask,
+                trabalhosTask
+            )
+            subjectProgress = progressResponse.subjects.first { matchesDiscipline($0.name) }
+            exams = examsResponse.exams
             flashcardDecks = decks
-            totalCards     = decks.reduce(0) { $0 + $1.cards.count }
-
-            // VitaScore v1: difficulty * 0.45 + gradeRisk * 0.35 + urgency * 0.20
-            // Measures risk (0 = safe, 100 = danger)
-            // difficulty is set on academic_subjects and comes via /api/dashboard
-            // DisciplineDetail doesn't have it locally, so use neutral fallback
-            let diffScore: Double = 50
-
-            let urgencyScore: Double = {
-                guard let days = nearestExamDays else { return 30 }
-                if days <= 0 { return 100 }
-                if days >= 30 { return 0 }
-                return Double(Int((1.0 - Double(days) / 30.0) * 100))
-            }()
-
-            // gradeRisk from exam scores — same as backend
-            let gradeRisk: Double = 60 // default when no exams graded yet
-            // Note: actual gradeRisk computed from exam scores is done server-side
-            // in /api/dashboard. This is a local fallback for DisciplineDetail.
-
-            vitaScore = max(0, min(100, Int(diffScore * 0.45 + gradeRisk * 0.35 + urgencyScore * 0.20)))
-
+            trabalhos = trabalhosResponse
         } catch {
             self.error = error.localizedDescription
         }
@@ -108,118 +180,12 @@ final class DisciplineDetailViewModel {
         isLoading = false
     }
 
-    // MARK: - Computed
+    // MARK: - Helper
 
-    /// Short display name (strip common latin suffixes)
-    var shortName: String {
-        disciplineName
-            .replacingOccurrences(of: "MEDICA",  with: "", options: .caseInsensitive)
-            .replacingOccurrences(of: "MEDICO",  with: "", options: .caseInsensitive)
-            .replacingOccurrences(of: " III", with: "")
-            .replacingOccurrences(of: " II",  with: "")
-            .replacingOccurrences(of: " I",   with: "")
-            .trimmingCharacters(in: .whitespaces)
+    private func matchesDiscipline(_ candidate: String?) -> Bool {
+        guard let candidate else { return false }
+        let a = disciplineName.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        let b = candidate.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+        return a == b || b.contains(a) || a.contains(b)
     }
-
-    /// Hero image asset name
-    var heroImageName: String {
-        let k = normalize(disciplineName)
-        let mapping: [(keyword: String, asset: String)] = [
-            ("farmacologia",  "disc-farmacologia"),
-            ("patologia",     "disc-patologia-geral"),
-            ("legal",         "disc-medicina-legal"),
-            ("ética",         "disc-etica-medica"),
-            ("familia",       "disc-mfc"),
-            ("comunidade",    "disc-mfc"),
-            ("histologia",    "disc-histologia"),
-            ("anatomia",      "disc-anatomia"),
-            ("cardiologia",   "disc-cardiologia"),
-            ("bioquimica",    "disc-bioquimica"),
-            ("embriologia",   "disc-embriologia"),
-            ("semiologia",    "disc-semiologia"),
-            ("microbiologia", "disc-microbiologia"),
-            ("fisiologia",    "disc-fisiologia-1"),
-        ]
-        for (keyword, asset) in mapping {
-            if k.contains(keyword) { return asset }
-        }
-        return "disc-interprofissional"
-    }
-
-    /// Hero subtitle (mockup: "Prof. Dr. Marcos Ribeiro · Peso 4 · 60h")
-    var heroSubtitle: String {
-        // Pull from exam notes or fallback to generic
-        if let exam = exams.first, let notes = exam.notes, !notes.isEmpty {
-            return notes
-        }
-        return ""
-    }
-
-    /// Period label (mockup: "3o Período")
-    var periodLabel: String {
-        // In a real app this comes from the curriculum endpoint
-        return "3o Período"
-    }
-
-    /// Vita suggestion text
-    var vitaSuggestion: String {
-        if let weakTopic = topicRows.first(where: { ($0.accuracy ?? 100) < 50 }) {
-            return "Foque em \(weakTopic.name) — seu acerto está em \(weakTopic.accuracy ?? 0)%. Recomendo 20 questões + revisar flashcards antes da próxima prova."
-        } else if cardsDue > 0 {
-            return "Você tem \(cardsDue) cards pendentes em \(shortName). Revise antes da prova!"
-        } else if let days = nearestExamDays {
-            return "Prova de \(shortName) em \(days) dias. Bora revisar!"
-        } else {
-            return "Continue praticando \(shortName) para manter o conhecimento fresco."
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func matchesDiscipline(_ a: String, _ b: String) -> Bool {
-        let normA = normalize(a)
-        let normB = normalize(b)
-        if normA == normB || normA.contains(normB) || normB.contains(normA) { return true }
-        let ignore = Set(["médica","médico","medicina","saúde","educação","geral","especial","básica","clínica","aplicada","práticas","comunidade"])
-        let wordsA = normA.split(separator: " ").map(String.init).filter { $0.count > 4 && !ignore.contains($0) }
-        let wordsB = normB.split(separator: " ").map(String.init).filter { $0.count > 4 && !ignore.contains($0) }
-        guard !wordsA.isEmpty, !wordsB.isEmpty else { return false }
-        return wordsA.contains { wa in wordsB.contains { wb in wa == wb } }
-    }
-
-    private func normalize(_ s: String) -> String {
-        s.lowercased()
-            .folding(options: .diacriticInsensitive, locale: .init(identifier: "pt_BR"))
-            .filter { $0.isLetter || $0.isNumber || $0 == " " }
-            .split(separator: " ")
-            .joined(separator: " ")
-    }
-
-}
-
-// MARK: - Domain Models
-
-struct TopicRow: Identifiable {
-    let id: String
-    let name: String
-    let subtitle: String
-    let accuracy: Int?
-    let statusIcon: String
-    let iconColor: Color
-    let badgeColor: Color
-}
-
-struct PDFEntry: Identifiable {
-    let id: String
-    let name: String
-    let meta: String
-}
-
-struct VideoEntry: Identifiable {
-    let id: String
-    let title: String
-    let channel: String
-    let duration: String
-    let thumbColors: [Color]
-    let playIconColor: Color
 }
