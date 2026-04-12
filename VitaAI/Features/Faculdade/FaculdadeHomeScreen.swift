@@ -301,7 +301,7 @@ struct FaculdadeHomeScreen: View {
 
     private func miniEvalLine(_ eval: AgendaEvaluation) -> some View {
         let subject = eval.subjectName ?? "—"
-        let color = colorFor(subject: subject)
+        let color = SubjectColors.colorFor(subject: subject)
         let prova = eval.type.uppercased().contains("EXAM") || eval.type.uppercased().contains("PROVA")
         return HStack(spacing: 8) {
             Group {
@@ -322,7 +322,7 @@ struct FaculdadeHomeScreen: View {
     }
 
     private func miniAulaLine(_ aula: AgendaClassBlock) -> some View {
-        let color = colorFor(subject: aula.subjectName)
+        let color = SubjectColors.colorFor(subject: aula.subjectName)
         return HStack(spacing: 8) {
             Text(String(aula.startTime.prefix(5)))
                 .font(.system(size: 10, weight: .semibold, design: .rounded))
@@ -413,7 +413,7 @@ struct FaculdadeHomeScreen: View {
 
     @ViewBuilder
     private func materiaRow(_ subject: GradeSubject) -> some View {
-        let color = colorFor(subject: subject.subjectName)
+        let color = SubjectColors.colorFor(subject: subject.subjectName)
         let grade = subject.grade1
         let freq = subject.attendance
         HStack(spacing: 0) {
@@ -529,22 +529,4 @@ struct FaculdadeHomeScreen: View {
         }
     }
 
-    // MARK: - Subject color (match MonthlyCalendarView palette)
-
-    private let subjectPalette: [Color] = [
-        VitaColors.accentHover,
-        VitaTokens.PrimitiveColors.cyan400,
-        VitaTokens.PrimitiveColors.indigo400,
-        VitaTokens.PrimitiveColors.green400,
-        VitaTokens.PrimitiveColors.orange400,
-        VitaTokens.PrimitiveColors.red400,
-        VitaTokens.PrimitiveColors.teal400,
-        VitaTokens.PrimitiveColors.amber400,
-    ]
-
-    private func colorFor(subject: String) -> Color {
-        var sum: UInt32 = 0
-        for byte in subject.utf8 { sum = (sum &* 31) &+ UInt32(byte) }
-        return subjectPalette[Int(sum) % subjectPalette.count]
-    }
 }
