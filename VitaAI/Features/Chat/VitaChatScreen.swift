@@ -206,7 +206,10 @@ private struct MessagesList: View {
                             isStreaming: viewModel.isStreaming && message.id == viewModel.messages.last?.id,
                             onRetry: message.isError ? {
                                 Task { await viewModel.retryLastMessage() }
-                            } : nil
+                            } : nil,
+                            onFeedback: { value in
+                                Task { await viewModel.sendFeedback(messageId: message.id, value: value) }
+                            }
                         )
                         .id(message.id)
                     }
@@ -237,6 +240,7 @@ private struct MessageRow: View {
     let message: ChatMessage
     let isStreaming: Bool
     var onRetry: (() -> Void)?
+    var onFeedback: ((Int) -> Void)?
     @State private var cursorVisible: Bool = true
 
     private var isUser: Bool { message.role == "user" }
@@ -268,7 +272,7 @@ private struct MessageRow: View {
                     }
                     // Action buttons (copy, share, time) — only when done streaming
                     if !isStreaming && !message.content.isEmpty && !message.isError {
-                        MessageActions(message: message)
+                        MessageActions(message: message, onFeedback: onFeedback)
                     }
                 }
                 Spacer(minLength: 52)
@@ -520,6 +524,7 @@ private struct HistoryRow: View {
 
 private struct MessageActions: View {
     let message: ChatMessage
+    var onFeedback: ((Int) -> Void)?
 
     var body: some View {
         HStack(spacing: 14) {
@@ -535,6 +540,32 @@ private struct MessageActions: View {
             }
 
             Spacer()
+
+            // Thumbs up
+            Button {
+                let newValue = message.feedback == 1 ? 0 : 1
+                if newValue != 0 { onFeedback?(newValue) }
+            } label: {
+                Image(systemName: message.feedback == 1 ? "hand.thumbsup.fill" : "hand.thumbsup")
+                    .font(.system(size: 11))
+                    .foregroundColor(message.feedback == 1 ? VitaColors.accent : VitaColors.textTertiary)
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Gostei")
+
+            // Thumbs down
+            Button {
+                let newValue = message.feedback == -1 ? 0 : -1
+                if newValue != 0 { onFeedback?(newValue) }
+            } label: {
+                Image(systemName: message.feedback == -1 ? "hand.thumbsdown.fill" : "hand.thumbsdown")
+                    .font(.system(size: 11))
+                    .foregroundColor(message.feedback == -1 ? VitaColors.accent : VitaColors.textTertiary)
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Nao gostei")
 
             // Copy
             Button {

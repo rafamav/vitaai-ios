@@ -29,7 +29,9 @@ struct ConversationMessage: Codable, Identifiable {
 }
 
 struct FeedbackRequest: Codable {
-    var feedback: Int = 0
+    var conversationId: String
+    var messageId: String
+    var feedback: String  // "up" or "down"
 }
 
 struct PushPreferencesRequest: Codable {

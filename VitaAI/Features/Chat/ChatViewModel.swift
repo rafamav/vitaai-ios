@@ -229,6 +229,24 @@ final class ChatViewModel {
         showHistory = false
     }
 
+    // MARK: - Feedback
+
+    func sendFeedback(messageId: String, value: Int) async {
+        guard let conversationId = currentConversationId else { return }
+        guard value == 1 || value == -1 else { return }
+        let feedbackStr = value == 1 ? "up" : "down"
+        if let idx = messages.firstIndex(where: { m in m.id == messageId }) {
+            messages[idx].feedback = value
+        }
+        do {
+            try await api.sendFeedback(conversationId: conversationId, messageId: messageId, feedback: feedbackStr)
+        } catch {
+            if let idx = messages.firstIndex(where: { m in m.id == messageId }) {
+                messages[idx].feedback = 0
+            }
+        }
+    }
+
     // MARK: - Helpers
 
     /// Strips "[MEMORIA: ...]" tags from the end of AI responses (system prompt artifact)

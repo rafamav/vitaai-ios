@@ -55,6 +55,11 @@ actor VitaAPI {
         try await client.get("notifications")
     }
 
+    func markNotificationsRead(ids: [String]? = nil, markAll: Bool = false) async throws {
+        struct Body: Encodable { let ids: [String]?; let markAll: Bool? }
+        let _: EmptyResponse = try await client.post("notifications", body: Body(ids: ids, markAll: markAll ? true : nil))
+    }
+
     // MARK: - Universities
 
     func getUniversities(query: String? = nil) async throws -> UniversitiesResponse {
@@ -77,11 +82,17 @@ actor VitaAPI {
         return try await client.get("study/flashcards", queryItems: items.isEmpty ? nil : items)
     }
 
-    func getFlashcardDecks(subjectId: String? = nil, dueOnly: Bool = false) async throws -> [FlashcardDeckEntry] {
+    func getFlashcardDecks(subjectId: String? = nil, dueOnly: Bool = false, tag: String? = nil, cardsLimit: Int? = nil) async throws -> [FlashcardDeckEntry] {
         var items: [URLQueryItem] = []
         if let subjectId { items.append(.init(name: "subjectId", value: subjectId)) }
         if dueOnly { items.append(.init(name: "due", value: "true")) }
+        if let tag { items.append(.init(name: "tag", value: tag)) }
+        if let cardsLimit { items.append(.init(name: "cardsLimit", value: String(cardsLimit))) }
         return try await client.get("study/flashcards", queryItems: items.isEmpty ? nil : items)
+    }
+
+    func getFlashcardTopics(deckId: String) async throws -> [FlashcardTopic] {
+        try await client.get("study/flashcards", queryItems: [.init(name: "topics", value: deckId)])
     }
 
     func getFlashcardStats() async throws -> FlashcardStatsResponse {
@@ -111,6 +122,20 @@ actor VitaAPI {
         )
     }
 
+    func suspendFlashcard(cardId: String) async throws {
+        let _: EmptyResponse = try await client.post(
+            "study/flashcards/\(cardId)/suspend",
+            body: EmptyBody()
+        )
+    }
+
+    func buryFlashcard(cardId: String) async throws {
+        let _: EmptyResponse = try await client.post(
+            "study/flashcards/\(cardId)/bury",
+            body: EmptyBody()
+        )
+    }
+
     // MARK: - Grades
 
     func getGrades(subjectId: String? = nil, limit: Int = 20) async throws -> [GradeEntry] {
@@ -129,8 +154,8 @@ actor VitaAPI {
         try await client.get("ai/coach/conversations/\(conversationId)")
     }
 
-    func sendFeedback(messageId: String, feedback: Int) async throws {
-        let _: EmptyResponse = try await client.post("ai/coach/messages/\(messageId)/feedback", body: FeedbackRequest(feedback: feedback))
+    func sendFeedback(conversationId: String, messageId: String, feedback: String) async throws {
+        let _: EmptyResponse = try await client.post("ai/coach/feedback", body: FeedbackRequest(conversationId: conversationId, messageId: messageId, feedback: feedback))
     }
 
     // MARK: - OSCE
@@ -153,6 +178,42 @@ actor VitaAPI {
 
     func getTranscricoes() async throws -> [TranscricaoEntry] {
         try await client.get("study/transcricao")
+    }
+
+    // MARK: - Studio (Transcription Detail + Outputs)
+
+    func getStudioSourceDetail(id: String) async throws -> StudioSourceDetail {
+        try await client.get("studio/sources/\(id)")
+    }
+
+    func getStudioOutputs(sourceId: String) async throws -> StudioOutputsResponse {
+        try await client.get("studio/outputs", queryItems: [
+            URLQueryItem(name: "sourceId", value: sourceId),
+        ])
+    }
+
+    private struct GenerateBody: Encodable {
+        let sourceIds: [String]
+        let type: String
+    }
+
+    func generateStudioOutput(sourceId: String, outputType: String) async throws -> StudioOutput {
+        // Backend expects sourceIds array and "type" field at POST /api/studio/generate
+        let backendType = Self.mapOutputType(outputType)
+        let result: StudioOutput = try await client.post("studio/generate", body: GenerateBody(
+            sourceIds: [sourceId],
+            type: backendType
+        ))
+        return result
+    }
+
+    /// Map iOS output type names to backend enum values
+    private static func mapOutputType(_ type: String) -> String {
+        switch type {
+        case "questions": return "quiz"
+        case "concepts": return "summary" // concepts extracted as summary variant
+        default: return type // summary, flashcards, mindmap pass through
+        }
     }
 
     // MARK: - MindMaps
