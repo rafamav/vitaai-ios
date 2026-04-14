@@ -41,6 +41,7 @@ targets:
         NSSpeechRecognitionUsageDescription: "VitaAI usa reconhecimento de fala para transcrever suas aulas em tempo real."
         UIBackgroundModes:
           - remote-notification
+          - audio
         UILaunchScreen: {}
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
@@ -48,9 +49,17 @@ targets:
           - CFBundleURLName: com.bymav.vitaai
             CFBundleURLSchemes:
               - vitaai
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+          UISceneConfigurations:
+            CPTemplateApplicationSceneSessionRoleApplication:
+              - UISceneClassName: CPTemplateApplicationScene
+                UISceneConfigurationName: CloudCar
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).CloudCarSceneDelegate
     dependencies:
       - package: Sentry
       - package: PostHog
+      - sdk: CarPlay.framework
     settings:
       base:
         PRODUCT_NAME: VitaAI

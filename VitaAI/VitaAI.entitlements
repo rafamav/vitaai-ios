@@ -8,5 +8,14 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<!--
+		CloudCar / CarPlay communication entitlement. Apple gates this behind
+		manual approval through https://developer.apple.com/contact/carplay/.
+		The key must remain present so debug builds can register a CarPlay
+		scene against the CarPlay Simulator; production CarPlay activation
+		will only work once Apple grants the entitlement on the App ID.
+	-->
+	<key>com.apple.developer.carplay-communication</key>
+	<true/>
 </dict>
 </plist>
