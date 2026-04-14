@@ -64,6 +64,9 @@ final class SilentPortalSync {
         isRunning = true
         defer { isRunning = false }
 
+        // Fetch stored session cookie from backend — works on ANY device
+        let backendCookie = await fetchBackendSessionCookie(api: api)
+
         // Create a hidden WKWebView with the SAME data store (shares cookies with login WebView)
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
@@ -75,7 +78,12 @@ final class SilentPortalSync {
         let wv = WKWebView(frame: CGRect(x: 0, y: 0, width: 1, height: 1), configuration: config)
         self.webView = wv
 
-        // Load the Mannesoft portal — cookies should auto-login
+        // Inject backend cookie BEFORE loading — ensures sync works on any device
+        if let cookieStr = backendCookie {
+            await injectCookies(cookieStr, into: wv, for: sessionCheckURL)
+        }
+
+        // Load the Mannesoft portal — injected + local cookies should auto-login
         let url = URL(string: sessionCheckURL)!
         wv.load(URLRequest(url: url))
 
@@ -102,8 +110,8 @@ final class SilentPortalSync {
 
         NSLog("[SilentSync] Session valid! Injecting bridge.js...")
 
-        // Capture PHPSESSID from WKWebView cookies for server-side sync
-        let sessionCookie = await extractPHPSESSID(from: wv)
+        // Capture all relevant cookies (PHPSESSID + Cloudflare) for server-side sync
+        let sessionCookie = await extractAllCookies(from: wv)
 
         // Wait 2s for page to render
         try? await Task.sleep(for: .seconds(2))
@@ -155,6 +163,50 @@ final class SilentPortalSync {
         return false
     }
 
+    /// Fetch the stored PHPSESSID from backend — works on any device
+    private func fetchBackendSessionCookie(api: VitaAPI) async -> String? {
+        guard let url = URL(string: AppConfig.apiBaseURL + "/portal/session-cookie") else { return nil }
+        do {
+            var request = URLRequest(url: url)
+            let token = await TokenStore().token
+            if let token {
+                request.setValue("\(AppConfig.sessionCookieName)=\(token)", forHTTPHeaderField: "Cookie")
+                request.setValue(token, forHTTPHeaderField: "X-Extension-Token")
+            }
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+            let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            let cookie = json?["cookie"] as? String
+            if let cookie, !cookie.isEmpty {
+                NSLog("[SilentSync] Got backend cookie (%d chars)", cookie.count)
+            }
+            return cookie
+        } catch {
+            NSLog("[SilentSync] Backend cookie fetch failed: %@", String(describing: error))
+            return nil
+        }
+    }
+
+    /// Inject cookie string into WKWebView cookie store before page load
+    private func injectCookies(_ cookieString: String, into webView: WKWebView, for urlString: String) async {
+        guard let url = URL(string: urlString), let host = url.host else { return }
+        let pairs = cookieString.components(separatedBy: "; ")
+        for pair in pairs {
+            let parts = pair.split(separator: "=", maxSplits: 1)
+            guard parts.count == 2 else { continue }
+            let name = String(parts[0]).trimmingCharacters(in: .whitespaces)
+            let value = String(parts[1]).trimmingCharacters(in: .whitespaces)
+            var props: [HTTPCookiePropertyKey: Any] = [
+                .name: name, .value: value, .domain: host, .path: "/",
+            ]
+            if url.scheme == "https" { props[.secure] = true }
+            if let cookie = HTTPCookie(properties: props) {
+                await webView.configuration.websiteDataStore.httpCookieStore.setCookie(cookie)
+            }
+        }
+        NSLog("[SilentSync] Injected %d cookies for %@", pairs.count, host)
+    }
+
     private func fetchBridgeJS(api: VitaAPI) async -> String? {
         guard let url = URL(string: AppConfig.apiBaseURL + "/portal/bridge") else { return nil }
         do {
@@ -166,15 +218,19 @@ final class SilentPortalSync {
         }
     }
 
-    private func extractPHPSESSID(from webView: WKWebView) async -> String? {
+    private func extractAllCookies(from webView: WKWebView) async -> String? {
         let cookies = await webView.configuration.websiteDataStore.httpCookieStore.allCookies()
-        for cookie in cookies where cookie.name == "PHPSESSID" {
-            let value = "PHPSESSID=\(cookie.value)"
-            NSLog("[SilentSync] Captured PHPSESSID for server-side sync")
-            return value
+        let relevant = cookies.filter { c in
+            let n = c.name.lowercased()
+            return n == "phpsessid" || n.hasPrefix("cf_") || n.hasPrefix("__cf")
         }
-        NSLog("[SilentSync] No PHPSESSID found in cookies")
-        return nil
+        guard !relevant.isEmpty else {
+            NSLog("[SilentSync] No relevant cookies found")
+            return nil
+        }
+        let str = relevant.map { "\($0.name)=\($0.value)" }.joined(separator: "; ")
+        NSLog("[SilentSync] Captured %d cookies for server-side sync", relevant.count)
+        return str
     }
 
     private func sendToExtract(pages: [CapturedPortalPage], api: VitaAPI, sessionCookie: String? = nil) async {

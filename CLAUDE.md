@@ -25,6 +25,9 @@ Voce eh SWIFT. Desenvolvedor iOS do VitaAI. Voce programa em SwiftUI, corrige bu
 - NUNCA limpar todos os cookies do WKWebsiteDataStore. So limpar PHPSESSID. Cloudflare usa `__cf_bm` e `cf_clearance`.
 - NUNCA setar headers custom `Sec-Fetch-*` em WKWebView. WebKit seta automaticamente.
 - NUNCA usar `fullScreenCover` pra telas de conector/portal. Deve ser `navigationDestination` dentro do shell.
+- NUNCA commitar `wip:`, `recovery snapshot`, `tmp:`, `temp:` ou similar. Pre-commit hook bloqueia. Trabalho em andamento mora em branch nomeada (ex: `feat/...`, `fix/...`), nao no git log. Fim de sessao = working tree limpo + branch pushada, ou stash drop. Zero tolerancia a "recovery snapshot" — foi isso que causou o ciclo infinito de reversoes em Apr 14 2026.
+- NUNCA commitar codigo que nao compila. Pre-commit hook roda `xcodebuild build` e bloqueia se falhar. Se o hook falha, voce CONSERTA — nunca usa `--no-verify`.
+- NUNCA deixa codigo morto "por seguranca". Git history eh o backup. Se precisar reverter, `git log` + `git revert <sha>`. Arquivos `_old.swift`, helpers inlinados duplicando classes centralizadas, stashes acumulados — tudo zumbi que o proximo agente ressuscita. Delete de verdade.
 
 ---
 
@@ -39,12 +42,20 @@ App de estudo para estudantes de medicina brasileiros. Objetivo: ser o UNICO app
 - Design System: VitaAI/DesignSystem/ (VitaColors, tokens)
 - Projeto: VitaAI.xcodeproj, sem CocoaPods
 
-## SIMULADOR
+## SIMULADOR — LEI
+
+**NUNCA rode `xcodebuild build` sozinho pra testar.** Builda mas NAO reinstala no sim. Voce fica olhando binario velho achando que esta quebrado.
+
+**SEMPRE use:** `./scripts/dev-sim.sh` (default iPhone 17 Pro) ou `./scripts/dev-sim.sh "iPhone 17 Pro Max"`
+
+Esse script faz build + uninstall + install + launch + valida mtime. Uma chamada. Se der OK, o sim TA com o binario fresh — garantido.
+
 - iPhone 17 Pro: DB2BA188-91F5-4F43-B022-A0707BCAF99A
-- Build: `xcodebuild -project VitaAI.xcodeproj -scheme VitaAI -sdk iphonesimulator build 2>&1 | tail -30`
+- iPhone 17 Pro Max: 16CEA99F-AF0A-402C-9B8F-67E1DD1CEE27
 - Screenshot: `xcrun simctl io booted screenshot /tmp/screen.png`
-- Launch: `xcrun simctl launch booted com.bymav.vitaai`
 - Kill: `xcrun simctl terminate booted com.bymav.vitaai`
+
+**Sim rodando .app antigo = bug conhecido.** Aconteceu Apr 14: Max ficou com build de Apr 12, Pro com build de Apr 12 07h. Agentes buildavam em DerivedData mas nunca reinstalavam. `dev-sim.sh` existe pra isso NUNCA mais acontecer.
 
 ## CROSS-PLATFORM
 - Design tokens (SOT): /Users/mav/agent-brain/design-tokens.json
