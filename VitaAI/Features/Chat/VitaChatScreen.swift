@@ -17,8 +17,16 @@ struct VitaChatScreen: View {
                 .fill(.ultraThinMaterial)
                 .environment(\.colorScheme, .dark)
 
-            // Subtle gold tint over blur
-            VitaColors.accent.opacity(0.03)
+            // Soft gold ambient — top fades in, bottom transparent
+            LinearGradient(
+                colors: [
+                    VitaColors.accent.opacity(0.07),
+                    VitaColors.accent.opacity(0.02),
+                    .clear
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
 
             if let viewModel {
                 chatContent(viewModel: viewModel)
@@ -139,18 +147,12 @@ private struct EmptyState: View {
             Spacer()
 
             VStack(spacing: 16) {
-                // Sparkles icon
-                ZStack {
-                    Circle()
-                        .fill(VitaColors.accent.opacity(0.08))
-                        .frame(width: 56, height: 56)
-                    Circle()
-                        .stroke(VitaColors.glassBorder, lineWidth: 1)
-                        .frame(width: 56, height: 56)
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(VitaColors.accent.opacity(0.60))
-                }
+                // Sparkles icon — liquid glass orb
+                Image(systemName: "sparkles")
+                    .font(.system(size: 24, weight: .medium))
+                    .foregroundColor(VitaColors.accent.opacity(0.75))
+                    .frame(width: 56, height: 56)
+                    .liquidGlassOrb(diameter: 56)
 
                 Text("Como posso te ajudar?")
                     .font(.system(size: 14))
@@ -170,15 +172,10 @@ private struct EmptyState: View {
                                 Text(text)
                                     .font(.system(size: 11, weight: .medium))
                             }
-                            .foregroundColor(VitaColors.accent.opacity(0.60))
+                            .foregroundColor(VitaColors.accent.opacity(0.75))
                             .padding(.horizontal, 14)
                             .padding(.vertical, 9)
-                            .background(VitaColors.accent.opacity(0.04))
-                            .clipShape(RoundedRectangle(cornerRadius: 20))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(VitaColors.glassBorder, lineWidth: 1)
-                            )
+                            .liquidGlassChip(cornerRadius: 20)
                         }
                         .buttonStyle(.plain)
                     }
@@ -292,13 +289,12 @@ private struct MessageRow: View {
             if message.content != "[Imagem]" || !message.hasImage {
                 Text(message.content)
                     .font(.system(size: 13))
-                    .foregroundColor(Color(red: 0.05, green: 0.03, blue: 0.01).opacity(0.95))
+                    .foregroundColor(VitaColors.textPrimary)
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(VitaColors.accent.opacity(0.85))
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .liquidGlassUserBubble(cornerRadius: 20)
     }
 
     private var assistantAvatar: some View {
@@ -334,12 +330,7 @@ private struct MessageRow: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(VitaColors.glassBg)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(VitaColors.glassBorder, lineWidth: 1)
-        )
+        .liquidGlassAssistantBubble(cornerRadius: 20)
         .onAppear {
             if isStreaming { startCursorBlink() }
         }
@@ -725,15 +716,7 @@ private struct ChatInput: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(VitaColors.glassBg)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(
-                        isInputFocused.wrappedValue ? VitaColors.accent.opacity(0.18) : VitaColors.glassBorder,
-                        lineWidth: 1
-                    )
-            )
+            .liquidGlassInput(focused: isInputFocused.wrappedValue, cornerRadius: 22)
             .padding(.horizontal, 14)
             .padding(.bottom, 12)
             .padding(.top, 8)
