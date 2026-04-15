@@ -146,17 +146,14 @@ private struct EmptyState: View {
         VStack(spacing: 0) {
             Spacer()
 
-            VStack(spacing: 16) {
-                // Sparkles icon — liquid glass orb
-                Image(systemName: "sparkles")
-                    .font(.system(size: 24, weight: .medium))
-                    .foregroundColor(VitaColors.accent.opacity(0.75))
-                    .frame(width: 56, height: 56)
-                    .liquidGlassOrb(diameter: 56)
+            VStack(spacing: 24) {
+                // Vita mascot — animated (aura, blink, float, breath)
+                VitaMascot(state: .awake, size: 100, showStaff: false)
+                    .frame(height: 120)
 
                 Text("Como posso te ajudar?")
-                    .font(.system(size: 14))
-                    .foregroundColor(VitaColors.textSecondary)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(VitaColors.textPrimary)
 
                 // Quick action chips
                 HStack(spacing: 8) {
