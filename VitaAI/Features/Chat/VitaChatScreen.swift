@@ -9,6 +9,7 @@ struct VitaChatScreen: View {
     @State private var viewModel: ChatViewModel?
     @State private var showVoiceMode: Bool = false
     @FocusState private var isInputFocused: Bool
+    @Namespace private var mascotNS
 
     var body: some View {
         ZStack {
@@ -78,15 +79,16 @@ struct VitaChatScreen: View {
 
                 // Messages or empty state
                 if viewModel.messages.isEmpty {
-                    EmptyState(viewModel: viewModel, isInputFocused: $isInputFocused)
+                    EmptyState(viewModel: viewModel, isInputFocused: $isInputFocused, mascotNS: mascotNS)
                 } else {
-                    MessagesList(viewModel: viewModel)
+                    MessagesList(viewModel: viewModel, mascotNS: mascotNS)
                 }
 
                 // Input bar
                 ChatInput(viewModel: viewModel, isInputFocused: $isInputFocused)
             }
             .ignoresSafeArea(.keyboard)
+            .animation(.spring(response: 0.65, dampingFraction: 0.78), value: viewModel.messages.isEmpty)
 
             // History sidebar overlay
             if viewModel.showHistory {
@@ -136,6 +138,7 @@ private struct ChatHeader: View {
 private struct EmptyState: View {
     let viewModel: ChatViewModel
     var isInputFocused: FocusState<Bool>.Binding
+    let mascotNS: Namespace.ID
 
     private let suggestions = [
         "O que estudar hoje?",
@@ -147,8 +150,10 @@ private struct EmptyState: View {
             Spacer()
 
             VStack(spacing: 24) {
-                // Vita mascot — animated (aura, blink, float, breath)
+                // Vita mascot — animated. Shares id with the first assistant
+                // avatar so it "flies" to the bubble when conversation starts.
                 VitaMascot(state: .awake, size: 100, showStaff: false)
+                    .matchedGeometryEffect(id: "vitaMascot", in: mascotNS, properties: .position)
                     .frame(height: 120)
 
                 Text("Como posso te ajudar?")
@@ -189,6 +194,11 @@ private struct EmptyState: View {
 
 private struct MessagesList: View {
     let viewModel: ChatViewModel
+    let mascotNS: Namespace.ID
+
+    private var firstAssistantId: String? {
+        viewModel.messages.first(where: { $0.role == "assistant" })?.id
+    }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -198,6 +208,8 @@ private struct MessagesList: View {
                         MessageRow(
                             message: message,
                             isStreaming: viewModel.isStreaming && message.id == viewModel.messages.last?.id,
+                            isFirstAssistant: message.id == firstAssistantId,
+                            mascotNS: mascotNS,
                             onRetry: message.isError ? {
                                 Task { await viewModel.retryLastMessage() }
                             } : nil,
@@ -233,6 +245,8 @@ private struct MessagesList: View {
 private struct MessageRow: View {
     let message: ChatMessage
     let isStreaming: Bool
+    let isFirstAssistant: Bool
+    let mascotNS: Namespace.ID
     var onRetry: (() -> Void)?
     var onFeedback: ((Int) -> Void)?
     @State private var cursorVisible: Bool = true
@@ -294,13 +308,22 @@ private struct MessageRow: View {
         .liquidGlassUserBubble(cornerRadius: 20)
     }
 
+    @ViewBuilder
     private var assistantAvatar: some View {
-        Image("vita-btn-active")
-            .resizable()
-            .scaledToFit()
-            .frame(width: 24, height: 24)
-            .clipShape(Circle())
-            .alignmentGuide(.bottom) { d in d[.bottom] }
+        if isFirstAssistant {
+            // Mascot flies from the empty-state center via matchedGeometry
+            VitaMascot(state: isStreaming ? .thinking : .awake, size: 32, showStaff: false)
+                .matchedGeometryEffect(id: "vitaMascot", in: mascotNS, properties: .position)
+                .frame(width: 40, height: 40)
+                .alignmentGuide(.bottom) { d in d[.bottom] }
+        } else {
+            Image("vita-btn-active")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 24, height: 24)
+                .clipShape(Circle())
+                .alignmentGuide(.bottom) { d in d[.bottom] }
+        }
     }
 
     private var assistantBubble: some View {
