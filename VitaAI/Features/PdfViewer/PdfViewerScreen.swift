@@ -53,6 +53,7 @@ struct PdfViewerScreen: View {
                 isSaving: viewModel.isSaving,
                 isAnnotating: viewModel.isAnnotating,
                 isSearching: viewModel.isSearching,
+                isBookmarked: viewModel.isCurrentPageBookmarked,
                 showThumbnailToggle: viewModel.pageCount > 1,
                 onBack: {
                     viewModel.saveAllAnnotations()
@@ -66,6 +67,7 @@ struct PdfViewerScreen: View {
                         isSearchFocused = true
                     }
                 },
+                onToggleBookmark: viewModel.toggleBookmark,
                 onExport: {
                     Task { await exportPDF(document: document) }
                 }
@@ -108,6 +110,7 @@ struct PdfViewerScreen: View {
                     pageCount: viewModel.pageCount,
                     currentPage: viewModel.currentPage,
                     isVisible: viewModel.showThumbnails,
+                    bookmarkedPages: viewModel.bookmarkedPages,
                     onPageSelected: { page in
                         viewModel.currentPage = page
                     }
@@ -311,11 +314,13 @@ private struct PdfTopBar: View {
     let isSaving: Bool
     let isAnnotating: Bool
     let isSearching: Bool
+    let isBookmarked: Bool
     let showThumbnailToggle: Bool
     let onBack: () -> Void
     let onToggleThumbnails: () -> Void
     let onToggleAnnotating: () -> Void
     let onToggleSearch: () -> Void
+    let onToggleBookmark: () -> Void
     let onExport: () -> Void
 
     var body: some View {
@@ -360,6 +365,14 @@ private struct PdfTopBar: View {
                 Image(systemName: isAnnotating ? "pencil.circle.fill" : "pencil.circle")
                     .font(.system(size: 22))
                     .foregroundStyle(isAnnotating ? VitaColors.accent : VitaColors.textSecondary)
+                    .frame(width: 36, height: 36)
+            }
+
+            // Bookmark toggle
+            Button(action: onToggleBookmark) {
+                Image(systemName: isBookmarked ? "bookmark.fill" : "bookmark")
+                    .font(.system(size: 16))
+                    .foregroundStyle(isBookmarked ? VitaColors.accentHover : VitaColors.textSecondary)
                     .frame(width: 36, height: 36)
             }
 

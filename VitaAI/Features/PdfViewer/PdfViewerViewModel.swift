@@ -26,6 +26,43 @@ final class PdfViewerViewModel {
 
     private(set) var fileHash: String = ""
 
+    // MARK: - Bookmarks
+    var bookmarkedPages: Set<Int> = []
+
+    var isCurrentPageBookmarked: Bool {
+        bookmarkedPages.contains(currentPage)
+    }
+
+    func toggleBookmark() {
+        if bookmarkedPages.contains(currentPage) {
+            bookmarkedPages.remove(currentPage)
+        } else {
+            bookmarkedPages.insert(currentPage)
+        }
+        saveBookmarks()
+    }
+
+    func loadBookmarks() {
+        let url = bookmarksFileURL()
+        guard let data = try? Data(contentsOf: url),
+              let pages = try? JSONDecoder().decode([Int].self, from: data) else { return }
+        bookmarkedPages = Set(pages)
+    }
+
+    func saveBookmarks() {
+        let url = bookmarksFileURL()
+        let sorted = Array(bookmarkedPages).sorted()
+        guard let data = try? JSONEncoder().encode(sorted) else { return }
+        try? data.write(to: url)
+    }
+
+    private func bookmarksFileURL() -> URL {
+        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("pdf_annotations", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("\(fileHash)_bookmarks.json")
+    }
+
     // MARK: - Load
 
     func load(url: URL, tokenStore: TokenStore? = nil) async {
@@ -51,6 +88,7 @@ final class PdfViewerViewModel {
         }
 
         pageCount = document?.pageCount ?? 0
+        loadBookmarks()
         isLoading = false
     }
 
