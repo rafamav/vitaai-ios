@@ -28,7 +28,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>55</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -36,6 +36,8 @@
 	</dict>
 	<key>NSHealthShareUsageDescription</key>
 	<string>VitaAI usa dados de sono e exercicio para correlacionar com seu desempenho academico.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>VitaAI pode registrar sessoes de estudo como atividade mindfulness na Saude, so com sua permissao.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>VitaAI precisa do microfone para gravar suas aulas e gerar transcricoes automaticas.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
