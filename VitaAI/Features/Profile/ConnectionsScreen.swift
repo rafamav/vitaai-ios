@@ -45,6 +45,7 @@ struct ConnectionsScreen: View {
     @State private var syncConnectorName: String = ""
     @State private var syncPhase: String = "login"
     @State private var syncMessage: String?
+    @State private var syncProgress: Double = 0 // 0-100, used for webaluno+mannesoft overlay
     @State private var canvasSyncPhase: CanvasSyncOrchestrator.Phase = .starting
     @State private var canvasSyncProgress: Double = 0
     @State private var isCanvasSync = false
@@ -143,7 +144,8 @@ struct ConnectionsScreen: View {
                         ConnectorSyncView(
                             connectorName: syncConnectorName,
                             steps: SyncStep.webalunoSteps(phase: syncPhase),
-                            message: syncMessage
+                            message: syncMessage,
+                            progress: syncProgress > 0 && syncProgress < 100 ? syncProgress : nil
                         )
                     }
                 }
@@ -556,84 +558,174 @@ struct ConnectionsScreen: View {
 
     private func sendExtractedPages(_ pages: [CapturedPortalPage]) {
         guard let vm else { return }
-        Task {
-            let apiPages = pages.map { page in
-                PortalExtractRequestPagesInner(type: page.type, html: page.html, linkText: page.linkText)
-            }
-            guard !apiPages.isEmpty else { return }
+        // Bridge has captured the HTML. Backend POST /extract returns in ~400ms
+        // with a syncId; the actual Haiku extraction runs in background (~1-2min).
+        // We MUST poll /portal/sync-progress?syncId=X until isDone, otherwise the
+        // overlay closes with grades=0/schedule=0 (still-running state) and the
+        // user has no idea anything is happening. Fix: 2s poll loop up to 180s.
+        isCanvasSync = false
+        syncConnectorName = "Portal Acadêmico"
+        syncPhase = "extracting"
+        syncMessage = "Vita analisando \(pages.count) páginas…"
+        syncProgress = 10
+        withAnimation { syncing = true }
+        Task { await runExtraction(pages: pages, vm: vm) }
+    }
+
+    @MainActor
+    private func runExtraction(pages: [CapturedPortalPage], vm: ConnectorsViewModel) async {
+        let apiPages = pages.map { page in
+            PortalExtractRequestPagesInner(type: page.type, html: page.html, linkText: page.linkText)
+        }
+        guard !apiPages.isEmpty else {
+            withAnimation { syncing = false }
+            return
+        }
+        let portalUrl = vm.universityPortals.first(where: { $0.portalType == "webaluno" || $0.portalType == "mannesoft" })?.instanceUrl ?? webalunoInstanceUrl
+        let result: PortalExtract200Response
+        do {
+            result = try await container.api.extractPortalPages(
+                pages: apiPages,
+                instanceUrl: portalUrl,
+                university: ""
+            )
+        } catch {
+            NSLog("[Connections] Extract failed: %@", error.localizedDescription)
+            withAnimation { syncing = false }
+            toastState.show("Falha ao extrair dados do portal. Tenta reconectar.", type: .error)
+            return
+        }
+        NSLog("[Connections] POST /extract returned, syncId=%@", result.syncId ?? "nil")
+        guard let syncId = result.syncId, !syncId.isEmpty else {
+            finishSync(grades: result.grades ?? 0, schedule: result.schedule ?? 0, vm: vm)
+            return
+        }
+        await pollUntilDone(syncId: syncId, pagesCount: pages.count, vm: vm)
+    }
+
+    /// Polls /api/portal/sync-progress until the backend reports done/error.
+    /// Timer-driven fallback percent keeps the progress bar moving even when the
+    /// in-memory sync store returns 404 (happens after vita-web container
+    /// restart). Hard cap at 180s.
+    @MainActor
+    private func pollUntilDone(syncId: String, pagesCount: Int, vm: ConnectorsViewModel) async {
+        let estimatedTotalSeconds = 120.0
+        // Honesty guard: if we never hear back from the sync store (404 or network
+        // error for 5 consecutive polls = 10s silent), we STOP claiming "Vita
+        // analisando" and surface a real error. The user never gets stuck
+        // watching a lying progress bar for 3 minutes.
+        var consecutiveMisses = 0
+        let missThreshold = 5
+        for tick in 0..<90 {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            let elapsed = Double(tick + 1) * 2.0
+            let timerPct = min(95.0, (elapsed / estimatedTotalSeconds) * 90.0 + 10.0)
+            var progress: SyncProgressResponse? = nil
             do {
-                let portalUrl = vm.universityPortals.first(where: { $0.portalType == "webaluno" || $0.portalType == "mannesoft" })?.instanceUrl ?? webalunoInstanceUrl
-                let result = try await container.api.extractPortalPages(
-                    pages: apiPages,
-                    instanceUrl: portalUrl,
-                    university: ""
-                )
-                NSLog("[Connections] Extract done: grades=%d, schedule=%d", result.grades ?? 0, result.schedule ?? 0)
-                toastState.show("Dados extraídos!", type: .success)
-                await vm.loadAll()
+                progress = try await container.api.getSyncProgress(syncId: syncId)
             } catch {
-                NSLog("[Connections] Extract failed: %@", error.localizedDescription)
+                NSLog("[Connections] poll err: %@", error.localizedDescription)
             }
+            if let p = progress {
+                consecutiveMisses = 0
+                let label: String = {
+                    if let lbl = p.label, !lbl.isEmpty { return lbl }
+                    return "Vita trabalhando… (\(Int(elapsed))s)"
+                }()
+                syncMessage = label
+                syncPhase = phaseFromLabel(label)
+                syncProgress = p.percent ?? timerPct
+                if p.isDone {
+                    syncProgress = 100
+                    await vm.loadAll()
+                    let s = vm.state(for: "mannesoft")
+                    let subjects = s.stats.first(where: { $0.label == "disciplinas" })?.value ?? 0
+                    let evals = s.stats.first(where: { $0.label == "notas" })?.value ?? 0
+                    finishSync(grades: subjects, schedule: evals, vm: vm, label: "notas")
+                    return
+                }
+                if p.isError {
+                    withAnimation { syncing = false }
+                    toastState.show(label, type: .error)
+                    return
+                }
+            } else {
+                consecutiveMisses += 1
+                if consecutiveMisses >= missThreshold {
+                    NSLog("[Connections] %d consecutive poll misses — surfacing error", consecutiveMisses)
+                    withAnimation { syncing = false }
+                    toastState.show("Vita não conseguiu processar o portal. Tenta reconectar em alguns minutos.", type: .error)
+                    return
+                }
+                syncMessage = "Aguardando Vita responder… (\(Int(elapsed))s)"
+                syncProgress = timerPct
+            }
+        }
+        NSLog("[Connections] sync-progress timed out after 180s")
+        withAnimation { syncing = false }
+        toastState.show("Processamento demorou mais que o esperado. Verifique depois se as notas apareceram.", type: .error)
+    }
+
+    /// Close the overlay after extraction completes. Called both for the
+    /// synchronous path (no syncId in response) and at the end of the poll loop.
+    @MainActor
+    private func finishSync(grades: Int, schedule: Int, vm: ConnectorsViewModel, label: String = "aulas") {
+        syncPhase = "done"
+        let msg: String
+        if grades > 0 {
+            msg = "Pronto! \(grades) matérias · \(schedule) \(label)."
+        } else {
+            msg = "Pronto! Dados atualizados."
+        }
+        syncMessage = msg
+        Task {
+            await vm.loadAll()
+            // Linger so user reads the success state
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            withAnimation { syncing = false }
+            toastState.show(msg, type: .success)
         }
     }
 
+    /// Map the free-text progress label from backend into the webalunoSteps phase enum.
+    private func phaseFromLabel(_ label: String) -> String {
+        let l = label.lowercased()
+        if l.contains("disciplina") || l.contains("matéria") { return "disciplines" }
+        if l.contains("nota") || l.contains("grade") { return "grades" }
+        if l.contains("horário") || l.contains("aula") || l.contains("schedule") { return "schedule" }
+        if l.contains("extrai") || l.contains("extract") || l.contains("process") || l.contains("analis") {
+            return "extracting"
+        }
+        if l.contains("conclu") || l.contains("done") || l.contains("pronto") { return "done" }
+        return "extracting"
+    }
+
+    /// Registers the captured Mannesoft/WebAluno session with the backend.
+    ///
+    /// In the current client-bridge architecture this call is just the cookie
+    /// hand-off — the backend persists PHPSESSID + Cloudflare cookies and returns
+    /// immediately. Actual data extraction happens a moment later when
+    /// `onPagesExtracted` fires and `sendExtractedPages` POSTs to /api/portal/extract.
+    ///
+    /// We do NOT show a sync overlay here. The overlay is owned by
+    /// `sendExtractedPages` so it stays visible across the full Hub VITA
+    /// processing window (~1-2min) — not just the 500ms it takes to save cookies.
+    /// Previous legacy code looped getSyncProgress for up to 2min against
+    /// startVitaCrawl which is Mannesoft-incompatible (Cloudflare blocks
+    /// server-side validation) — it always fell through silently before the
+    /// bridge even finished, leaving the user in the WebView with zero feedback.
     private func connectWebaluno(cookie: String) {
         guard let vm else { return }
-        isCanvasSync = false
-        syncConnectorName = "Portal Acadêmico"
-        syncPhase = "login"
-        syncMessage = "Conectando ao portal..."
-        withAnimation { syncing = true }
         Task {
             do {
                 let portalUrl = vm.universityPortals.first(where: { $0.portalType == "webaluno" || $0.portalType == "mannesoft" })?.instanceUrl ?? webalunoInstanceUrl
-                syncPhase = "disciplines"
-                syncMessage = "Vita buscando disciplinas..."
-                let crawlResult = try await container.api.startVitaCrawl(
+                _ = try await container.api.startVitaCrawl(
                     cookies: "PHPSESSID=\(cookie)",
                     instanceUrl: portalUrl
                 )
-                if let syncId = crawlResult.syncId, !syncId.isEmpty {
-                    for _ in 0..<60 {
-                        try await Task.sleep(for: .seconds(2))
-                        let progress = try await container.api.getSyncProgress(syncId: syncId)
-                        let label = (progress.label ?? "").isEmpty ? "Vita trabalhando..." : (progress.label ?? "")
-                        syncMessage = label
-                        if label.contains("disciplina") || label.contains("matéria") {
-                            syncPhase = "disciplines"
-                        } else if label.contains("nota") || label.contains("grade") {
-                            syncPhase = "grades"
-                        } else if label.contains("horário") || label.contains("schedule") || label.contains("aula") {
-                            syncPhase = "schedule"
-                        } else if label.contains("extrai") || label.contains("extract") || label.contains("process") {
-                            syncPhase = "extracting"
-                        }
-                        if progress.isDone {
-                            syncPhase = "done"
-                            syncMessage = "Extração completa!"
-                            withAnimation { syncing = false }
-                            toastState.show("Portal conectado!", type: .success)
-                            await vm.loadAll()
-                            return
-                        }
-                        if progress.isError {
-                            withAnimation { syncing = false }
-                            toastState.show(label, type: .error)
-                            return
-                        }
-                    }
-                    withAnimation { syncing = false }
-                    toastState.show("Vita continua em background...", type: .success)
-                    await vm.loadAll()
-                } else {
-                    syncPhase = "done"
-                    withAnimation { syncing = false }
-                    toastState.show("Portal conectado!", type: .success)
-                    await vm.loadAll()
-                }
+                NSLog("[Connections] Session registered with backend; waiting for bridge extraction")
             } catch {
-                withAnimation { syncing = false }
-                toastState.show("Erro ao conectar portal", type: .error)
+                NSLog("[Connections] Connect failed (will still try bridge path): %@", error.localizedDescription)
             }
         }
     }

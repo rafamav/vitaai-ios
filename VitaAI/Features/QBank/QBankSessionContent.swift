@@ -226,6 +226,22 @@ struct QBankSessionContent: View {
 
             // Bottom actions
             VStack(spacing: 8) {
+                if let answerError = vm.state.answerError {
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(VitaColors.dataRed.opacity(0.9))
+                        Text(answerError)
+                            .font(.system(size: 11))
+                            .foregroundStyle(VitaColors.dataRed.opacity(0.9))
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(VitaColors.dataRed.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
                 if vm.state.showFeedback {
                     HStack(spacing: 10) {
                         Button {

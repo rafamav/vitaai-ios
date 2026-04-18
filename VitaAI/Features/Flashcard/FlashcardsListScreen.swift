@@ -30,7 +30,7 @@ struct FlashcardsListScreen: View {
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
 
-                // Unified study hero stat (replaces the standalone banner image)
+                // Unified study hero stat — themed purple for flashcards
                 StudyHeroStat(
                     primary: "\(container.studyOverviewStore.snapshot?.flashcards.dueNow ?? 0)",
                     primaryCaption: "cards pra revisar agora",
@@ -44,7 +44,7 @@ struct FlashcardsListScreen: View {
                             label: "hoje"
                         ),
                     ],
-                    subtitle: "Flashcards"
+                    theme: .flashcards
                 )
                 .padding(.top, 14)
 
@@ -99,37 +99,72 @@ struct FlashcardsListScreen: View {
                             }
 
                             VStack(spacing: 10) {
-                                // Primary CTA — Gerar com IA (calls autoSeed)
+                                // Primary CTA — Gerar com IA (themed purple, liquid-glass)
+                                let theme = StudyShellTheme.flashcards
                                 Button(action: { Task { await generateWithAI() } }) {
                                     HStack(spacing: 8) {
                                         if isGenerating {
-                                            ProgressView().tint(VitaColors.surface).scaleEffect(0.8)
+                                            ProgressView().tint(theme.primaryLight).scaleEffect(0.8)
                                         } else {
                                             Image(systemName: "sparkles")
                                                 .font(.system(size: 14, weight: .semibold))
                                         }
                                         Text(isGenerating ? "Gerando..." : "Gerar com IA")
-                                            .font(.system(size: 14, weight: .semibold))
+                                            .font(.system(size: 15, weight: .semibold))
+                                            .tracking(-0.1)
                                     }
-                                    .foregroundStyle(VitaColors.surface)
+                                    .foregroundStyle(theme.primaryLight.opacity(0.98))
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 13)
+                                    .padding(.vertical, 15)
                                     .background(
-                                        LinearGradient(
-                                            colors: [VitaColors.accentHover, VitaColors.accent],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
+                                        ZStack {
+                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                .fill(.ultraThinMaterial)
+                                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                .fill(
+                                                    LinearGradient(
+                                                        colors: [
+                                                            theme.primary.opacity(0.32),
+                                                            theme.primary.opacity(0.18),
+                                                            theme.primary.opacity(0.10),
+                                                        ],
+                                                        startPoint: .topLeading, endPoint: .bottomTrailing
+                                                    )
+                                                )
+                                        }
                                     )
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    .shadow(color: VitaColors.accent.opacity(0.25), radius: 12, x: 0, y: 4)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                                    .overlay(alignment: .top) {
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [Color.white.opacity(0.18), .clear],
+                                                    startPoint: .top, endPoint: .init(x: 0.5, y: 0.20)
+                                                )
+                                            )
+                                            .frame(height: 10)
+                                            .padding(.horizontal, 1)
+                                            .allowsHitTesting(false)
+                                    }
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                            .stroke(
+                                                LinearGradient(
+                                                    colors: [
+                                                        theme.primaryLight.opacity(0.45),
+                                                        theme.primary.opacity(0.08),
+                                                        theme.primaryLight.opacity(0.22),
+                                                    ],
+                                                    startPoint: .topLeading, endPoint: .bottomTrailing
+                                                ),
+                                                lineWidth: 0.75
+                                            )
+                                    )
+                                    .shadow(color: theme.primary.opacity(0.18), radius: 10, y: 5)
                                 }
                                 .buttonStyle(.plain)
 
-                                // Secondary CTA — Criar manualmente (opens the first
-                                // deck's editor if one exists; otherwise creates a
-                                // blank-titled deck and opens it). Keeps the "everything
-                                // navigates" rule of the unified screens.
+                                // Secondary CTA — Criar manualmente (themed outline)
                                 Button(action: { Task { await createManualDeck() } }) {
                                     HStack(spacing: 8) {
                                         Image(systemName: "plus")
@@ -137,14 +172,14 @@ struct FlashcardsListScreen: View {
                                         Text("Criar manualmente")
                                             .font(.system(size: 14, weight: .semibold))
                                     }
-                                    .foregroundStyle(VitaColors.accentLight.opacity(0.80))
+                                    .foregroundStyle(theme.primaryLight.opacity(0.90))
                                     .frame(maxWidth: .infinity)
                                     .padding(.vertical, 13)
                                     .background(VitaColors.glassBg)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 12)
-                                            .stroke(VitaColors.glassBorder, lineWidth: 1)
+                                            .stroke(theme.primaryMuted, lineWidth: 1)
                                     )
                                 }
                                 .buttonStyle(.plain)
@@ -254,8 +289,12 @@ struct FlashcardsListScreen: View {
 
             // "Suas disciplinas" = only decks matching user's current semester subjects
             // "Biblioteca" = everything else (AnKing library, other disciplines)
+            //
+            // SOT: AppDataManager.gradesResponse.current — same source Dashboard
+            // uses. One canonical disciplines list across the app.
             let subjectIds = Set(
-                container.studyOverviewStore.snapshot?.subjects.map(\.id) ?? []
+                (container.dataManager.gradesResponse?.current ?? [])
+                    .compactMap { $0.subjectId }
             )
             let scoreFor: (FlashcardDeckEntry) -> Double = { deck in
                 container.dataManager.vitaScore(for: deck.title)
@@ -335,9 +374,9 @@ struct FlashcardsListScreen: View {
             .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(VitaColors.accentHover.opacity(0.14), lineWidth: 0.5)
+                    .stroke(StudyShellTheme.flashcards.primaryMuted, lineWidth: 0.75)
             )
-            .shadow(color: .black.opacity(0.40), radius: 18, x: 0, y: 7)
+            .shadow(color: StudyShellTheme.flashcards.primary.opacity(0.22), radius: 18, x: 0, y: 7)
         }
         .buttonStyle(.plain)
     }
@@ -429,7 +468,7 @@ struct FlashcardsListScreen: View {
 
                         Text("\(deck.cardCount)")
                             .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(VitaColors.accent)
+                            .foregroundStyle(StudyShellTheme.flashcards.primaryLight)
                         + Text(" cards")
                             .font(.system(size: 11))
                             .foregroundStyle(VitaColors.textWarm.opacity(0.40))
@@ -451,7 +490,7 @@ struct FlashcardsListScreen: View {
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
-                            .stroke(VitaColors.accentHover.opacity(0.12), lineWidth: 1)
+                            .stroke(StudyShellTheme.flashcards.primaryMuted.opacity(0.60), lineWidth: 1)
                     )
                     .shadow(color: .black.opacity(0.30), radius: 11, x: 0, y: 4)
                 }
@@ -508,7 +547,7 @@ struct FlashcardsListScreen: View {
 
                                 Text("\(deck.cardCount)")
                                     .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(VitaColors.accent.opacity(0.7))
+                                    .foregroundStyle(StudyShellTheme.flashcards.primaryLight.opacity(0.80))
                             }
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)

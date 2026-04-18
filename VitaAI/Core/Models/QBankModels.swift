@@ -236,6 +236,10 @@ struct QBankCreateSessionRequest: Encodable {
     let difficulties: [String]?
     let topicIds: [Int]?
     let disciplineIds: [Int]?
+    /// MedSimple catalog slugs derived from the selected enrolled/catalog disciplines.
+    /// Backend uses this (via qbank_topics.disciplineSlug) to filter questions; the Int
+    /// `disciplineIds` are local synthetic IDs and are ignored server-side.
+    let disciplineSlugs: [String]?
     let onlyResidence: Bool?
     let onlyUnanswered: Bool?
     let title: String?
@@ -263,6 +267,11 @@ struct QBankProgressResponse: Decodable {
     var accuracy: Double = 0
     var byDifficulty: [QBankProgressByDifficulty] = []
     var byTopic: [QBankProgressByTopic] = []
+    /// "global" when totals reflect the whole catalogue (stage-scoped), "enrolled" when the
+    /// request was filtered by `disciplineSlugs[]`. Added 2026-04-17b.
+    var scope: String? = nil
+    /// Echo of the slugs the server used to scope this response (empty for "global").
+    var scopedSlugs: [String]? = nil
 }
 
 struct QBankProgressByDifficulty: Decodable, Identifiable {
@@ -315,6 +324,9 @@ struct QBankSessionSummary: Decodable, Identifiable {
     var correctCount: Int = 0
     var completedAt: String? = nil
     var createdAt: String = ""
+    /// Display labels for the disciplines this session was scoped to.
+    /// Used as a fallback when `title` is nil; also feeds the chips on the session card.
+    var disciplineTitles: [String]? = nil
 
     var isActive: Bool { completedAt == nil }
 }

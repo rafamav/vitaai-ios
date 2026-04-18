@@ -288,8 +288,15 @@ actor VitaAPI {
 
     // MARK: - QBank
 
-    func getQBankProgress() async throws -> QBankProgressResponse {
-        try await client.get("qbank/progress")
+    /// Fetches QBank progress. When `disciplineSlugs` is non-empty, the response is
+    /// scoped to the enrolled subset (Hero "X/Y questões das suas matérias") instead of
+    /// the global catalog.
+    func getQBankProgress(disciplineSlugs: [String] = []) async throws -> QBankProgressResponse {
+        if disciplineSlugs.isEmpty {
+            return try await client.get("qbank/progress")
+        }
+        let items = disciplineSlugs.map { URLQueryItem(name: "disciplineSlugs[]", value: $0) }
+        return try await client.get("qbank/progress", queryItems: items)
     }
 
     func getQBankFilters() async throws -> QBankFiltersResponse {

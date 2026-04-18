@@ -1,28 +1,25 @@
 import SwiftUI
 
-// MARK: - Simulado colors (remapped to gold palette, unified with VitaColors)
+// MARK: - Simulado colors — themed blue (StudyShellTheme.simulados)
 private enum SimuladoColors {
-    static let tealPrimary = VitaColors.accentLight
-    static let tealDark = VitaColors.accentDark
+    static let shell = StudyShellTheme.simulados
+
+    static let tealPrimary = shell.primaryLight
+    static let tealDark = shell.primary
     static let sectionLabel = VitaColors.sectionLabel
 
     static let textPrimary = Color.white.opacity(0.90)
     static let textMuted = VitaColors.textSecondary
 
-    static let cardBorder = VitaColors.surfaceBorder
-
-    static let ctaGradient = LinearGradient(
-        colors: [VitaColors.accent.opacity(0.65), VitaColors.accentDark.opacity(0.45)],
-        startPoint: .topLeading, endPoint: .bottomTrailing
-    )
+    static let cardBorder = shell.primaryMuted.opacity(0.55)
 
     static let badgeDoneBg = VitaColors.dataGreen.opacity(0.15)
     static let badgeDoneText = VitaColors.dataGreen.opacity(0.85)
     static let badgeDoneBorder = VitaColors.dataGreen.opacity(0.20)
 
-    static let badgeProgressBg = VitaColors.accent.opacity(0.15)
-    static let badgeProgressText = VitaColors.accentLight.opacity(0.85)
-    static let badgeProgressBorder = VitaColors.accent.opacity(0.20)
+    static let badgeProgressBg = shell.primary.opacity(0.18)
+    static let badgeProgressText = shell.primaryLight.opacity(0.90)
+    static let badgeProgressBorder = shell.primary.opacity(0.25)
 }
 
 // MARK: - SimuladoHomeScreen
@@ -81,16 +78,11 @@ struct SimuladoHomeScreen: View {
                 .foregroundStyle(SimuladoColors.textMuted)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
-            Button(action: onNewSimulado) {
-                Text("Começar primeiro simulado")
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.95))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(SimuladoColors.ctaGradient)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .shadow(color: SimuladoColors.tealDark.opacity(0.25), radius: 12, y: 8)
-            }
+            StudyShellCTA(
+                title: "Começar primeiro simulado",
+                theme: .simulados,
+                action: onNewSimulado
+            )
             .padding(.horizontal, 16)
             Spacer()
         }
@@ -100,34 +92,27 @@ struct SimuladoHomeScreen: View {
     private func scrollContent(vm: SimuladoViewModel) -> some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
-                // Stats hero card
-                SimuladoStatsHero(stats: vm.state.stats)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
+                // Hero — themed blue (StudyHeroStat shared across shells)
+                StudyHeroStat(
+                    primary: heroPrimary(vm.state.stats),
+                    primaryCaption: "score médio",
+                    stats: [
+                        .init(value: "\(vm.state.stats.completedAttempts)", label: "simulados"),
+                        .init(value: "\(vm.state.stats.totalQuestions)", label: "questões"),
+                        .init(value: "\(vm.state.stats.totalCorrect)", label: "acertos"),
+                    ],
+                    theme: .simulados
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
 
-                // CTA button
-                Button(action: onNewSimulado) {
-                    Text("Novo Simulado")
-                        .font(.system(size: 15, weight: .bold, design: .default))
-                        .tracking(-0.15)
-                        .foregroundStyle(.white.opacity(0.95))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(SimuladoColors.ctaGradient)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(alignment: .top) {
-                            // inset 0 1px 0 rgba(120,220,240,0.20) — top inner highlight
-                            RoundedRectangle(cornerRadius: 14)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [SimuladoColors.tealPrimary.opacity(0.20), .clear],
-                                        startPoint: .top, endPoint: .init(x: 0.5, y: 0.08)
-                                    )
-                                )
-                                .frame(height: 4)
-                        }
-                        .shadow(color: SimuladoColors.tealDark.opacity(0.25), radius: 12, y: 8)
-                }
+                // CTA — themed blue shell button
+                StudyShellCTA(
+                    title: "Novo Simulado",
+                    theme: .simulados,
+                    action: onNewSimulado,
+                    systemImage: "plus.circle.fill"
+                )
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
 
@@ -186,64 +171,12 @@ struct SimuladoHomeScreen: View {
             try? await Task.sleep(for: .milliseconds(500))
         }
     }
-}
 
-// MARK: - Stats Hero Card
-
-private struct SimuladoStatsHero: View {
-    let stats: SimuladoStats
-
-    private var avgPercent: String {
+    // Format avgScore (0.0–1.0) into the big hero number string.
+    private func heroPrimary(_ stats: SimuladoStats) -> String {
         let pct = stats.avgScore * 100
-        if pct == pct.rounded() {
-            return "\(Int(pct))%"
-        }
+        if pct == pct.rounded() { return "\(Int(pct))%" }
         return String(format: "%.1f%%", pct)
-    }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Big score
-            Text(avgPercent)
-                .font(.system(size: 48, weight: .heavy))
-                .tracking(-1.9)
-                .foregroundStyle(SimuladoColors.tealPrimary.opacity(0.92))
-                .padding(.top, 22)
-
-            Text("Score médio")
-                .font(.system(size: 12))
-                .foregroundStyle(SimuladoColors.textMuted)
-                .tracking(0.5)
-                .padding(.top, 4)
-
-            // Stats row
-            HStack(spacing: 24) {
-                SimuladoMiniStat(value: "\(stats.completedAttempts)", label: "Simulados")
-                SimuladoMiniStat(value: "\(stats.totalQuestions)", label: "Questões")
-                SimuladoMiniStat(value: "\(stats.totalCorrect)", label: "Acertos")
-            }
-            .padding(.top, 16)
-            .padding(.bottom, 22)
-        }
-        .frame(maxWidth: .infinity)
-        .vitaGlassCard(cornerRadius: 18)
-    }
-}
-
-private struct SimuladoMiniStat: View {
-    let value: String
-    let label: String
-    var body: some View {
-        VStack(spacing: 2) {
-            Text(value)
-                .font(.system(size: 20, weight: .bold))
-                .foregroundStyle(Color.white.opacity(0.88))
-            Text(label)
-                .font(.system(size: 9.5, weight: .regular))
-                .foregroundStyle(SimuladoColors.textMuted)
-                .tracking(0.4)
-                .textCase(.uppercase)
-        }
     }
 }
 

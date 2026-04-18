@@ -41,6 +41,12 @@ struct QBankUiState {
     // Status filter: "unanswered" | "wrong" | "correct" | nil
     var selectedStatus: String? = nil
 
+    // Home chip selection. nil => all enrolled disciplines (default scope).
+    // Holds the StudyOverviewSubject.id so UI and VM agree without embedding
+    // the full subject name in state.
+    var selectedSubjectId: String? = nil
+    var selectedSubjectName: String? = nil
+
     // Search (client-side)
     var institutionSearch: String = ""
     var topicSearch: String = ""
@@ -72,6 +78,7 @@ struct QBankUiState {
     // Error -- scoped per concern so filter errors don't leak to home screen
     var error: String? = nil
     var filterError: String? = nil
+    var answerError: String? = nil
 
     // MARK: - Computed
 
@@ -160,6 +167,23 @@ struct QBankUiState {
     }
 }
 
+extension QBankViewModel {
+    /// Inverse of backend `humanizeSlug`: "Patologia Geral" → "patologia-geral".
+    /// Strips diacritics, lowercases, drops non-alphanumerics, joins words with dashes.
+    static func slugifyDisciplineTitle(_ title: String) -> String {
+        let folded = title.folding(options: .diacriticInsensitive, locale: Locale(identifier: "pt_BR"))
+        let lower = folded.lowercased()
+        let cleaned = lower.unicodeScalars.map { scalar -> Character in
+            if CharacterSet.alphanumerics.contains(scalar) { return Character(scalar) }
+            return " "
+        }
+        let str = String(cleaned)
+        return str
+            .split(separator: " ", omittingEmptySubsequences: true)
+            .joined(separator: "-")
+    }
+}
+
 // MARK: - ViewModel
 
 @Observable
@@ -190,11 +214,21 @@ final class QBankViewModel {
 
     // MARK: - Home
 
+    /// Slugify enrolled subject names into discipline slugs that the backend
+    /// resolves (exact / alias / token-trim) against qbank_topics.disciplineSlug.
+    /// e.g. "Patologia Medica" -> "patologia-medica" -> canonical "patologia-geral".
+    var enrolledDisciplineSlugs: [String] {
+        let all = (dataManager.gradesResponse?.current ?? []) + (dataManager.gradesResponse?.completed ?? [])
+        let slugs = all.map { Self.slugifyDisciplineTitle($0.subjectName) }.filter { !$0.isEmpty }
+        return Array(Set(slugs)).sorted()
+    }
+
     func loadHomeData() {
         Task {
             state.progressLoading = true
             do {
-                async let progressTask = api.getQBankProgress()
+                let slugs = scopedSlugsForHome()
+                async let progressTask = api.getQBankProgress(disciplineSlugs: slugs)
                 async let sessionsTask = api.getQBankSessions(limit: 5)
                 state.progress = try await progressTask
                 let sessionsResponse = try? await sessionsTask
@@ -210,6 +244,26 @@ final class QBankViewModel {
         }
     }
 
+    /// Home chip selection: scope progress to one enrolled subject, or clear
+    /// to show all enrolled. Recent sessions are filtered client-side in the
+    /// view so a single slug lookup is enough here.
+    func setSelectedSubject(id: String?, name: String?) {
+        state.selectedSubjectId = id
+        state.selectedSubjectName = name
+        loadHomeData()
+    }
+
+    /// Slugs to send to `/api/qbank/progress`. One slug when a chip is
+    /// selected, all enrolled slugs otherwise. Empty array = backend falls
+    /// back to global scope which we intentionally avoid here.
+    private func scopedSlugsForHome() -> [String] {
+        if let name = state.selectedSubjectName, !name.isEmpty {
+            let slug = Self.slugifyDisciplineTitle(name)
+            if !slug.isEmpty { return [slug] }
+        }
+        return enrolledDisciplineSlugs
+    }
+
     func startSmartStudy() {
         Task {
             state.isCreatingSmartSession = true
@@ -222,6 +276,7 @@ final class QBankViewModel {
                     difficulties: nil,
                     topicIds: nil,
                     disciplineIds: nil,
+                    disciplineSlugs: nil,
                     onlyResidence: nil,
                     onlyUnanswered: true,
                     title: nil,
@@ -459,20 +514,31 @@ final class QBankViewModel {
             state.sessionLoading = true
             state.error = nil
             do {
+                // Resolve selected synthetic discipline IDs → catalog slugs.
+                // Backend filters by slug through qbank_topics.disciplineSlug; the Int
+                // `disciplineIds` are iOS-synthetic and intentionally not sent.
+                // Slug is derived from title (strip accents + lowercase + dash-join)
+                // to match backend's humanizeSlug() inverse.
+                let allDisc = QBankUiState.flattenDisciplines(state.filters.disciplines)
+                let selectedSlugs = state.selectedDisciplineIds
+                    .compactMap { id in allDisc.first(where: { $0.id == id })?.title }
+                    .map { Self.slugifyDisciplineTitle($0) }
+                    .filter { !$0.isEmpty }
                 let req = QBankCreateSessionRequest(
                     questionCount: state.questionCount,
                     institutionIds: state.selectedInstitutionIds.isEmpty ? nil : Array(state.selectedInstitutionIds),
                     years: state.selectedYears.isEmpty ? nil : Array(state.selectedYears).sorted(),
                     difficulties: state.selectedDifficulties.isEmpty ? nil : Array(state.selectedDifficulties),
                     topicIds: state.selectedTopicIds.isEmpty ? nil : Array(state.selectedTopicIds),
-                    disciplineIds: state.selectedDisciplineIds.isEmpty ? nil : Array(state.selectedDisciplineIds),
+                    disciplineIds: nil, // synthetic IDs are iOS-only; backend ignores
+                    disciplineSlugs: selectedSlugs.isEmpty ? nil : selectedSlugs,
                     onlyResidence: state.onlyResidence ? true : nil,
                     onlyUnanswered: {
                         if state.selectedStatus == "unanswered" { return true }
                         if state.onlyUnanswered { return true }
                         return nil
                     }(),
-                    title: nil,
+                    title: nil, // backend auto-derives from disciplineSlugs when nil
                     status: state.selectedStatus
                 )
                 let session = try await api.createQBankSession(request: req)
@@ -538,18 +604,22 @@ final class QBankViewModel {
                 sessionId: state.session?.id
             )
             var result: QBankAnswerResponse?
+            var lastError: Error?
             // Try up to 2 times (initial + 1 retry)
             for attempt in 0..<2 {
                 do {
                     result = try await api.answerQBankQuestion(id: question.id, request: request)
+                    lastError = nil
                     break
                 } catch {
+                    lastError = error
                     if attempt == 0 {
                         try? await Task.sleep(for: .milliseconds(500))
                     }
                 }
             }
             if let result {
+                state.answerError = nil
                 state.answerResult = result
                 state.sessionAnswers[question.id] = result
                 state.showFeedback = true
@@ -560,7 +630,11 @@ final class QBankViewModel {
                     }
                 }
             } else {
-                // Fallback to local calculation
+                // Surface the real error to the UI instead of silently faking success.
+                // Local fallback keeps the session moving but we flag it so the student
+                // knows the answer didn't reach the server (progress won't persist).
+                print("[QBank] confirmAnswer failed after retry: \(String(describing: lastError))")
+                state.answerError = "N\u{e3}o consegui registrar sua resposta no servidor. Sua sess\u{e3}o continua, mas esta quest\u{e3}o pode n\u{e3}o aparecer no progresso."
                 let isCorrect = question.alternatives.first(where: { $0.id == alternativeId })?.isCorrect ?? false
                 let fallback = QBankAnswerResponse(isCorrect: isCorrect, answerId: 0)
                 state.answerResult = fallback
