@@ -147,8 +147,12 @@ struct DisciplinasConfigScreen: View {
         isLoading = true
         // SOT: AppDataManager.enrolledDisciplines (populated by the shared
         // refresh cycle with status=in_progress). Screens must never issue
-        // their own /api/subjects call. Falls back to a direct fetch only
-        // when the store is still empty.
+        // their own /api/subjects call. If the store is empty (cold launch
+        // straight into this screen), trigger a load so the cache hydrates
+        // for every other screen too instead of doing a private fetch.
+        if appData.enrolledDisciplines.isEmpty {
+            await appData.loadIfNeeded()
+        }
         if !appData.enrolledDisciplines.isEmpty {
             subjects = appData.enrolledDisciplines.map {
                 SubjectDifficultyItem(id: $0.id, name: $0.name, difficulty: $0.difficulty)
@@ -156,8 +160,11 @@ struct DisciplinasConfigScreen: View {
             isLoading = false
             return
         }
+        // Last-resort fallback: hit the API with the canonical status the
+        // backend actually stores ("in_progress", NOT "cursando" — the old
+        // call was always returning empty).
         do {
-            let resp = try await container.api.getSubjects(status: "cursando")
+            let resp = try await container.api.getSubjects(status: "in_progress")
             subjects = resp.subjects.map {
                 SubjectDifficultyItem(id: $0.id, name: $0.name, difficulty: $0.difficulty)
             }
