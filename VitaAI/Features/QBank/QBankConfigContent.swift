@@ -7,7 +7,6 @@ struct QBankConfigContent: View {
     let onBack: () -> Void
 
     @State private var showInstitutionSheet = false
-    @State private var showTopicSheet = false
     @State private var showCustomSlider = false
 
     private let presetCounts = [10, 20, 30, 50]
@@ -49,6 +48,9 @@ struct QBankConfigContent: View {
             } else {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 20) {
+                        // [M] Mode toggle (Prática / Simulado)
+                        modeToggleSection
+
                         // [0] Selected disciplines summary
                         if !vm.state.selectedDisciplineIds.isEmpty {
                             selectedDisciplinesSummary
@@ -60,10 +62,7 @@ struct QBankConfigContent: View {
                         // [2] Question count
                         questionCountSection
 
-                        // [3] Status filter (unanswered / wrong / correct)
-                        statusFilterSection
-
-                        // [4] Difficulty
+                        // [3] Difficulty
                         if !vm.state.filters.difficulties.isEmpty {
                             difficultySection
                         }
@@ -89,39 +88,9 @@ struct QBankConfigContent: View {
                             }
                         }
 
-                        // [7] Topic picker
+                        // [7] Topic expandable section
                         if !vm.state.filters.topics.isEmpty {
-                            filterPickerCard(
-                                title: "TEMA",
-                                selectedCount: vm.state.selectedTopicIds.count,
-                                totalCount: vm.state.filters.topics.count,
-                                selectedPreview: vm.state.filters.topics
-                                    .filter { vm.state.selectedTopicIds.contains($0.id) }
-                                    .prefix(3)
-                                    .map(\.displayTitle)
-                                    .joined(separator: ", ")
-                            ) {
-                                showTopicSheet = true
-                            }
-                        }
-
-                        // [8] Toggles
-                        configGlassSection(title: "OPÇÕES") {
-                            VStack(spacing: 10) {
-                                QBankConfigToggleRow(
-                                    icon: "graduationcap",
-                                    title: "Apenas Residência Médica",
-                                    description: "Filtra somente questões de prova de residência",
-                                    isOn: vm.state.onlyResidence
-                                ) { vm.setOnlyResidence(!vm.state.onlyResidence) }
-
-                                QBankConfigToggleRow(
-                                    icon: "circle.dotted",
-                                    title: "Apenas Não Respondidas",
-                                    description: "Exclui questões que você já respondeu",
-                                    isOn: vm.state.onlyUnanswered
-                                ) { vm.setOnlyUnanswered(!vm.state.onlyUnanswered) }
-                            }
+                            topicExpandableSection
                         }
 
                         // Filter error
@@ -171,11 +140,6 @@ struct QBankConfigContent: View {
         .background(Color.clear)
         .sheet(isPresented: $showInstitutionSheet) {
             QBankInstitutionSheet(vm: vm)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $showTopicSheet) {
-            QBankTopicSheet(vm: vm)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
@@ -288,39 +252,6 @@ struct QBankConfigContent: View {
         }
         .onAppear {
             showCustomSlider = !presetCounts.contains(vm.state.questionCount)
-        }
-    }
-
-    private var statusFilterSection: some View {
-        configGlassSection(title: "TIPO DE QUESTAO") {
-            VStack(alignment: .leading, spacing: 6) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        QBankStatusChip(
-                            label: "Não respondidas",
-                            isSelected: vm.state.selectedStatus == "unanswered",
-                            color: VitaColors.accent
-                        ) { vm.setStatus("unanswered") }
-
-                        QBankStatusChip(
-                            label: "Erradas",
-                            isSelected: vm.state.selectedStatus == "wrong",
-                            color: VitaColors.dataRed
-                        ) { vm.setStatus("wrong") }
-
-                        QBankStatusChip(
-                            label: "Acertadas",
-                            isSelected: vm.state.selectedStatus == "correct",
-                            color: VitaColors.dataGreen
-                        ) { vm.setStatus("correct") }
-                    }
-                }
-                if vm.state.selectedStatus != nil {
-                    Text("Toque novamente para remover")
-                        .font(.system(size: 10))
-                        .foregroundStyle(VitaColors.textTertiary)
-                }
-            }
         }
     }
 
@@ -495,6 +426,213 @@ struct QBankConfigContent: View {
             )
             .ignoresSafeArea(edges: .bottom)
         )
+    }
+
+    // MARK: - Mode toggle (Prática vs Simulado)
+
+    private var modeToggleSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("MODO")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.8)
+                .foregroundStyle(VitaColors.sectionLabel)
+
+            HStack(spacing: 0) {
+                ForEach(QBankMode.allCases, id: \.self) { mode in
+                    let isSelected = vm.state.mode == mode
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { vm.setMode(mode) }
+                    } label: {
+                        VStack(spacing: 2) {
+                            Text(mode.displayName)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(isSelected ? VitaColors.accent : VitaColors.textSecondary)
+                            Text(mode == .pratica ? "feedback a cada questão" : "igual prova, gabarito no final")
+                                .font(.system(size: 9))
+                                .foregroundStyle(isSelected ? VitaColors.accent.opacity(0.7) : VitaColors.textTertiary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(isSelected ? VitaColors.accent.opacity(0.1) : Color.clear)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(isSelected ? VitaColors.accent.opacity(0.3) : Color.clear, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(4)
+            .background(VitaColors.glassBg)
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(VitaColors.glassBorder, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+        }
+    }
+
+    // MARK: - Topic expandable section (inline search + checkbox list)
+
+    private var topicExpandableSection: some View {
+        let topics = vm.state.filters.topics
+        let selectedCount = vm.state.selectedTopicIds.count
+        let totalCount = topics.count
+
+        return VStack(alignment: .leading, spacing: 0) {
+            // Header row — tap to expand/collapse
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) { vm.toggleThemeExpanded() }
+            } label: {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("TEMA")
+                            .font(.system(size: 11, weight: .bold))
+                            .tracking(0.8)
+                            .foregroundStyle(VitaColors.sectionLabel)
+                        if selectedCount > 0 {
+                            Text("\(selectedCount) de \(totalCount) selecionados")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(VitaColors.accentLight)
+                        } else {
+                            Text("Todos (\(totalCount))")
+                                .font(.system(size: 12))
+                                .foregroundStyle(VitaColors.textSecondary)
+                        }
+                    }
+                    Spacer()
+                    HStack(spacing: 4) {
+                        if selectedCount > 0 {
+                            Text("\(selectedCount)")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(VitaColors.accent)
+                        }
+                        Image(systemName: vm.state.themeExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(VitaColors.textTertiary)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            // Expanded body
+            if vm.state.themeExpanded {
+                VStack(spacing: 10) {
+                    // Search
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 13))
+                            .foregroundStyle(VitaColors.textTertiary)
+                        TextField(
+                            "Buscar tema...",
+                            text: Binding(
+                                get: { vm.state.topicSearch },
+                                set: { vm.setTopicSearch($0) }
+                            )
+                        )
+                        .font(.system(size: 13))
+                        .foregroundStyle(VitaColors.textPrimary)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        if !vm.state.topicSearch.isEmpty {
+                            Button { vm.setTopicSearch("") } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(VitaColors.textTertiary)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(VitaColors.surfaceElevated.opacity(0.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                    // Quick actions
+                    HStack(spacing: 8) {
+                        Button { vm.selectAllTopics() } label: {
+                            Text("Todos")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(VitaColors.accent)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(VitaColors.accent.opacity(0.1))
+                                .overlay(Capsule().stroke(VitaColors.accent.opacity(0.3), lineWidth: 1))
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        Button { vm.deselectAllTopics() } label: {
+                            Text("Nenhum")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(VitaColors.textSecondary)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(VitaColors.glassBg)
+                                .overlay(Capsule().stroke(VitaColors.glassBorder, lineWidth: 1))
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        Spacer()
+                        Text("\(selectedCount)/\(totalCount)")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(VitaColors.textTertiary)
+                    }
+
+                    // Checkbox list (capped height, scroll inside)
+                    let filteredTopics = vm.state.filteredTopics
+                    if filteredTopics.isEmpty {
+                        Text(vm.state.topicSearch.isEmpty ? "Nenhum tema disponível" : "Nada encontrado para \"\(vm.state.topicSearch)\"")
+                            .font(.system(size: 12))
+                            .foregroundStyle(VitaColors.textTertiary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 20)
+                    } else {
+                        ScrollView {
+                            LazyVStack(alignment: .leading, spacing: 0) {
+                                ForEach(filteredTopics) { topic in
+                                    let isSelected = vm.state.selectedTopicIds.contains(topic.id)
+                                    Button { vm.toggleTopic(topic.id) } label: {
+                                        HStack(spacing: 10) {
+                                            Image(systemName: isSelected ? "checkmark.square.fill" : "square")
+                                                .font(.system(size: 16))
+                                                .foregroundStyle(isSelected ? VitaColors.accent : VitaColors.textTertiary.opacity(0.5))
+                                            Text(topic.displayTitle)
+                                                .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                                                .foregroundStyle(isSelected ? VitaColors.accentLight : VitaColors.textPrimary)
+                                                .lineLimit(2)
+                                                .multilineTextAlignment(.leading)
+                                            Spacer()
+                                        }
+                                        .padding(.vertical, 8)
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    if topic.id != filteredTopics.last?.id {
+                                        Rectangle()
+                                            .fill(VitaColors.glassBorder.opacity(0.4))
+                                            .frame(height: 1)
+                                            .padding(.leading, 26)
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxHeight: 280)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 14)
+                .transition(.opacity)
+            }
+        }
+        .background(VitaColors.glassBg)
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(vm.state.themeExpanded ? VitaColors.accent.opacity(0.2) : VitaColors.glassBorder, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
     // MARK: - Helpers
@@ -718,96 +856,3 @@ private struct QBankInstitutionSheet: View {
     }
 }
 
-// MARK: - Topic Bottom Sheet
-
-private struct QBankTopicSheet: View {
-    @Bindable var vm: QBankViewModel
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Temas")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(VitaColors.textPrimary)
-                Spacer()
-                if !vm.state.selectedTopicIds.isEmpty {
-                    Button("Limpar") {
-                        vm.state.selectedTopicIds = []
-                    }
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(VitaColors.accent)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
-            .padding(.bottom, 8)
-
-            // Search
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14))
-                    .foregroundStyle(VitaColors.textTertiary)
-                TextField("Buscar tema...", text: Binding(
-                    get: { vm.state.topicSearch },
-                    set: { vm.setTopicSearch($0) }
-                ))
-                .font(.system(size: 14))
-                .foregroundStyle(VitaColors.textPrimary)
-                .autocorrectionDisabled()
-                .textInputAutocapitalization(.never)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(VitaColors.glassBg)
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(VitaColors.glassBorder, lineWidth: 1)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .padding(.horizontal, 16)
-            .padding(.bottom, 8)
-
-            // List
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(vm.state.filteredTopics) { topic in
-                        let isSelected = vm.state.selectedTopicIds.contains(topic.id)
-                        Button {
-                            vm.toggleTopic(topic.id)
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: isSelected ? "checkmark.square.fill" : "square")
-                                    .font(.system(size: 18))
-                                    .foregroundStyle(isSelected ? VitaColors.accent : VitaColors.textTertiary)
-                                Text(topic.displayTitle)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(VitaColors.textPrimary)
-                                    .lineLimit(2)
-                                Spacer()
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                        }
-                        .buttonStyle(.plain)
-
-                        if topic.id != vm.state.filteredTopics.last?.id {
-                            Rectangle()
-                                .fill(VitaColors.glassBorder)
-                                .frame(height: 1)
-                                .padding(.leading, 46)
-                        }
-                    }
-                }
-            }
-
-            // Done button
-            VitaButton(text: "Confirmar (\(vm.state.selectedTopicIds.count) selecionados)") {
-                dismiss()
-            }
-            .padding(16)
-        }
-        .background(VitaColors.surface)
-    }
-}

@@ -27,13 +27,40 @@ struct QBankFiltersResponse: Decodable {
     }
 }
 
-struct QBankDiscipline: Decodable, Identifiable, Hashable {
+struct QBankDiscipline: Identifiable, Hashable {
     var id: Int = 0
     var title: String = ""
+    var slug: String? = nil
     var parentId: Int? = nil
     var level: Int = 0
     var questionCount: Int = 0
     var children: [QBankDiscipline] = []
+}
+
+extension QBankDiscipline: Decodable {
+    private enum CodingKeys: String, CodingKey {
+        case id, title, name, slug, parentId, level, questionCount, children
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        slug = try? c.decode(String.self, forKey: .slug)
+        // Backend new payload sends {slug, name, ...} without `id`; derive a stable
+        // per-session hash so Set<Int> and Identifiable still work.
+        if let rawId = try? c.decode(Int.self, forKey: .id) {
+            id = rawId
+        } else if let s = slug {
+            id = abs(s.hashValue)
+        }
+        // Backend uses `name`, legacy payload uses `title`. Accept either.
+        title = (try? c.decode(String.self, forKey: .title))
+            ?? (try? c.decode(String.self, forKey: .name))
+            ?? ""
+        parentId = try? c.decode(Int.self, forKey: .parentId)
+        level = (try? c.decode(Int.self, forKey: .level)) ?? 0
+        questionCount = (try? c.decode(Int.self, forKey: .questionCount)) ?? 0
+        children = (try? c.decode([QBankDiscipline].self, forKey: .children)) ?? []
+    }
 }
 
 struct QBankInstitution: Identifiable, Hashable {
@@ -65,6 +92,7 @@ struct QBankTopic: Identifiable, Hashable {
     var id: Int = 0
     var title: String = ""
     var disciplineId: Int? = nil
+    var disciplineSlug: String? = nil
     var name: String?
     var disciplineName: String?
     var count: Int?
@@ -75,7 +103,7 @@ struct QBankTopic: Identifiable, Hashable {
 
 extension QBankTopic: Decodable {
     private enum CodingKeys: String, CodingKey {
-        case id, title, disciplineId, name, disciplineName, count, iconSlug
+        case id, title, disciplineId, disciplineSlug, name, disciplineName, count, iconSlug
     }
 
     init(from decoder: Decoder) throws {
@@ -83,6 +111,7 @@ extension QBankTopic: Decodable {
         id = (try? c.decode(Int.self, forKey: .id)) ?? 0
         title = (try? c.decode(String.self, forKey: .title)) ?? ""
         disciplineId = try? c.decode(Int.self, forKey: .disciplineId)
+        disciplineSlug = try? c.decode(String.self, forKey: .disciplineSlug)
         name = try? c.decode(String.self, forKey: .name)
         disciplineName = try? c.decode(String.self, forKey: .disciplineName)
         count = try? c.decode(Int.self, forKey: .count)
@@ -236,6 +265,7 @@ struct QBankCreateSessionRequest: Encodable {
     let difficulties: [String]?
     let topicIds: [Int]?
     let disciplineIds: [Int]?
+    let disciplineSlugs: [String]?
     let onlyResidence: Bool?
     let onlyUnanswered: Bool?
     let title: String?

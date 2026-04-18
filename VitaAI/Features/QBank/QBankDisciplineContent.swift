@@ -86,10 +86,44 @@ struct QBankDisciplineContent: View {
                 ProgressView().tint(VitaColors.accent)
                 Spacer()
             } else {
-                // Discipline list
+                // Search field (applies to both Suas + Outras)
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 13))
+                        .foregroundStyle(VitaColors.textTertiary)
+                    TextField(
+                        "Buscar disciplina...",
+                        text: Binding(
+                            get: { vm.state.disciplineSearch },
+                            set: { vm.setDisciplineSearch($0) }
+                        )
+                    )
+                    .font(.system(size: 13))
+                    .foregroundStyle(VitaColors.textPrimary)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    if !vm.state.disciplineSearch.isEmpty {
+                        Button { vm.setDisciplineSearch("") } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(VitaColors.textTertiary)
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(VitaColors.glassBg)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(VitaColors.glassBorder, lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+
+                // Sections: Suas Disciplinas (enrolled) + Outras Disciplinas (catalog)
                 ScrollView {
-                    LazyVStack(spacing: 8) {
-                        // Subtle inline warning when filters failed to load
+                    LazyVStack(spacing: 14) {
                         if let filterError = vm.state.filterError {
                             HStack(spacing: 8) {
                                 Image(systemName: "wifi.slash")
@@ -99,64 +133,85 @@ struct QBankDisciplineContent: View {
                                     .font(.system(size: 12))
                                     .foregroundStyle(VitaColors.textSecondary)
                                 Spacer()
-                                Button {
-                                    vm.retryLoadFilters()
-                                } label: {
+                                Button { vm.retryLoadFilters() } label: {
                                     Text("Tentar novamente")
                                         .font(.system(size: 11, weight: .medium))
                                         .foregroundStyle(VitaColors.accent)
-                                }
-                                Button {
-                                    vm.dismissFilterError()
-                                } label: {
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundStyle(VitaColors.textTertiary)
                                 }
                             }
                             .padding(.horizontal, 12)
                             .padding(.vertical, 10)
                             .background(VitaColors.glassBg)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(VitaColors.glassBorder, lineWidth: 1)
-                            )
                             .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .transition(.opacity.combined(with: .move(edge: .top)))
                         }
 
-                        ForEach(vm.sortedDisciplines) { disc in
-                            QBankDisciplineCard(
-                                discipline: disc,
-                                isSelected: vm.state.selectedDisciplineIds.contains(disc.id),
-                                onTap: { vm.selectDiscipline(disc) },
-                                onToggle: { vm.toggleDisciplineSelection(disc.id) }
+                        // Suas Disciplinas
+                        let enrolled = vm.state.enrolledDisciplinesFiltered
+                            .sorted { vm.vitaScore(forTitle: $0.title) > vm.vitaScore(forTitle: $1.title) }
+                        if !enrolled.isEmpty {
+                            disciplineSectionHeader(
+                                title: "SUAS DISCIPLINAS",
+                                subtitle: "\(enrolled.count) da sua faculdade"
                             )
+                            ForEach(enrolled) { disc in
+                                QBankDisciplineCard(
+                                    discipline: disc,
+                                    isSelected: vm.state.selectedDisciplineIds.contains(disc.id),
+                                    onTap: { vm.toggleDisciplineSelection(disc.id) },
+                                    onToggle: { vm.toggleDisciplineSelection(disc.id) }
+                                )
+                            }
                         }
 
-                        if vm.state.currentDisciplines.isEmpty && vm.state.filterError == nil {
-                            Text("Nenhuma disciplina disponível")
+                        // Outras Disciplinas
+                        let others = vm.state.otherDisciplinesFiltered
+                        if !others.isEmpty {
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.25)) {
+                                    vm.toggleOtherDisciplinesExpanded()
+                                }
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("OUTRAS DISCIPLINAS")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .tracking(0.8)
+                                            .foregroundStyle(VitaColors.sectionLabel)
+                                        Text("\(others.count) disponíveis no catálogo")
+                                            .font(.system(size: 10))
+                                            .foregroundStyle(VitaColors.textTertiary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: vm.state.otherDisciplinesExpanded ? "chevron.up" : "chevron.down")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundStyle(VitaColors.textTertiary)
+                                }
+                                .padding(.vertical, 6)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+
+                            if vm.state.otherDisciplinesExpanded {
+                                ForEach(others) { disc in
+                                    QBankDisciplineCard(
+                                        discipline: disc,
+                                        isSelected: vm.state.selectedDisciplineIds.contains(disc.id),
+                                        onTap: { vm.toggleDisciplineSelection(disc.id) },
+                                        onToggle: { vm.toggleDisciplineSelection(disc.id) }
+                                    )
+                                }
+                            }
+                        }
+
+                        if enrolled.isEmpty && others.isEmpty {
+                            Text(vm.state.disciplineSearch.isEmpty ? "Nenhuma disciplina disponível" : "Nada encontrado para \"\(vm.state.disciplineSearch)\"")
                                 .font(.system(size: 13))
                                 .foregroundStyle(VitaColors.textTertiary)
                                 .padding(.vertical, 24)
                         }
-
-                        if vm.state.currentDisciplines.isEmpty && vm.state.filterError != nil {
-                            VStack(spacing: 8) {
-                                Image(systemName: "tray")
-                                    .font(.system(size: 24))
-                                    .foregroundStyle(VitaColors.textTertiary.opacity(0.5))
-                                Text("Pule esta etapa para usar todas as disciplinas")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(VitaColors.textTertiary)
-                                    .multilineTextAlignment(.center)
-                            }
-                            .padding(.vertical, 32)
-                        }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .animation(.easeInOut(duration: 0.3), value: vm.state.filterError == nil)
+                    .padding(.bottom, 8)
                 }
 
                 // Bottom CTA
@@ -186,6 +241,21 @@ struct QBankDisciplineContent: View {
             }
         }
         
+    }
+
+    @ViewBuilder
+    private func disciplineSectionHeader(title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.8)
+                .foregroundStyle(VitaColors.sectionLabel)
+            Text(subtitle)
+                .font(.system(size: 10))
+                .foregroundStyle(VitaColors.textTertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 6)
     }
 
     private func findDisciplineTitle(id: Int, in nodes: [QBankDiscipline]) -> String {
