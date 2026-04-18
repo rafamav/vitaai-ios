@@ -189,6 +189,7 @@ struct MainTabView: View {
     let authManager: AuthManager
     @Environment(\.appContainer) private var container
     @Environment(\.subscriptionStatus) private var subStatus
+    @ObservedObject private var pushManager = PushManager.shared
     @State private var showChat = false
     @State private var showMenuPopout = false
     @State private var showNotifPopout = false
@@ -206,7 +207,7 @@ struct MainTabView: View {
                     level: container.gamificationEvents.currentLevel,
                     xpProgress: container.gamificationEvents.currentXpProgress,
                     xpToast: container.gamificationEvents.xpToast,
-                    notificationCount: PushManager.shared.unreadNotificationCount,
+                    notificationCount: pushManager.unreadNotificationCount,
                     onAvatarTap: { router.selectedTab = .progresso },
                     onBellTap: {
                         showMenuPopout = false
