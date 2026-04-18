@@ -357,6 +357,18 @@ struct WebAlunoWebView: UIViewRepresentable {
                     return
                 }
 
+                // Transient post-OAuth stubs (webaluno_login.php&AUTENTICADO=1, redirect=1)
+                // finish with empty DOM (menuLinks=0, frames=0) ~650ms BEFORE Mannesoft
+                // navigates to the real landing page (webaluno_aviso.view.php). If we
+                // capture+inject here, sessionFound=true blocks the next didFinish, and
+                // the bridge we just injected is destroyed by WebKit's navigation —
+                // no vita-bridge-complete, no POST /api/portal/extract, silent failure.
+                // See connector incident 2026-04-17_bridge-empty-html-webview-inject-too-early.md.
+                if hasMenuLinks == 0 && hasFrames == 0 {
+                    NSLog("[WebAluno] Empty transient page (menuLinks=0, frames=0) — waiting for real landing page")
+                    return
+                }
+
                 self.captureSessionIfValid(webView: webView, currentURL: currentURL)
             }
         }
