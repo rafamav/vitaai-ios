@@ -72,6 +72,7 @@ struct QBankUiState {
     // Error -- scoped per concern so filter errors don't leak to home screen
     var error: String? = nil
     var filterError: String? = nil
+    var answerError: String? = nil
 
     // MARK: - Computed
 
@@ -207,11 +208,21 @@ final class QBankViewModel {
 
     // MARK: - Home
 
+    /// Slugify enrolled subject names into discipline slugs that the backend
+    /// resolves (exact / alias / token-trim) against qbank_topics.disciplineSlug.
+    /// e.g. "Patologia Medica" -> "patologia-medica" -> canonical "patologia-geral".
+    var enrolledDisciplineSlugs: [String] {
+        let all = (dataManager.gradesResponse?.current ?? []) + (dataManager.gradesResponse?.completed ?? [])
+        let slugs = all.map { Self.slugifyDisciplineTitle($0.subjectName) }.filter { !$0.isEmpty }
+        return Array(Set(slugs)).sorted()
+    }
+
     func loadHomeData() {
         Task {
             state.progressLoading = true
             do {
-                async let progressTask = api.getQBankProgress()
+                let slugs = enrolledDisciplineSlugs
+                async let progressTask = api.getQBankProgress(disciplineSlugs: slugs)
                 async let sessionsTask = api.getQBankSessions(limit: 5)
                 state.progress = try await progressTask
                 let sessionsResponse = try? await sessionsTask
@@ -567,18 +578,22 @@ final class QBankViewModel {
                 sessionId: state.session?.id
             )
             var result: QBankAnswerResponse?
+            var lastError: Error?
             // Try up to 2 times (initial + 1 retry)
             for attempt in 0..<2 {
                 do {
                     result = try await api.answerQBankQuestion(id: question.id, request: request)
+                    lastError = nil
                     break
                 } catch {
+                    lastError = error
                     if attempt == 0 {
                         try? await Task.sleep(for: .milliseconds(500))
                     }
                 }
             }
             if let result {
+                state.answerError = nil
                 state.answerResult = result
                 state.sessionAnswers[question.id] = result
                 state.showFeedback = true
@@ -589,7 +604,11 @@ final class QBankViewModel {
                     }
                 }
             } else {
-                // Fallback to local calculation
+                // Surface the real error to the UI instead of silently faking success.
+                // Local fallback keeps the session moving but we flag it so the student
+                // knows the answer didn't reach the server (progress won't persist).
+                print("[QBank] confirmAnswer failed after retry: \(String(describing: lastError))")
+                state.answerError = "N\u{e3}o consegui registrar sua resposta no servidor. Sua sess\u{e3}o continua, mas esta quest\u{e3}o pode n\u{e3}o aparecer no progresso."
                 let isCorrect = question.alternatives.first(where: { $0.id == alternativeId })?.isCorrect ?? false
                 let fallback = QBankAnswerResponse(isCorrect: isCorrect, answerId: 0)
                 state.answerResult = fallback

@@ -15,7 +15,10 @@ struct QBankHomeContent: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 0) {
                         // -- PROGRESS HERO card
-                        QBankProgressHero(progress: vm.state.progress)
+                        QBankProgressHero(
+                            progress: vm.state.progress,
+                            enrolledCount: vm.enrolledDisciplineSlugs.count
+                        )
                             .padding(.horizontal, 16)
                             .padding(.top, 8)
 
@@ -122,7 +125,18 @@ struct QBankHomeContent: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
-        .onAppear { vm.loadHomeData() }
+        .onAppear {
+            vm.loadHomeData()
+        }
+        .onChange(of: vm.state.progressLoading) { _, loading in
+            // After first load completes: if the student has zero enrolled questions
+            // AND zero recent sessions, jump straight to Disciplinas so the Home screen
+            // never shows a lie like "0 / 95.424".
+            guard !loading else { return }
+            if vm.state.progress.totalAvailable == 0 && vm.state.recentSessions.isEmpty {
+                vm.goToDisciplines()
+            }
+        }
     }
 }
 
@@ -177,69 +191,145 @@ struct QBankBackground: View {
     }
 }
 
-// MARK: - Progress Hero (234 / 1.248 big number + bar + accuracy)
+// MARK: - Progress Hero (Faculdade pattern — dark gradient + gold radial + motif + stats strip)
 
 struct QBankProgressHero: View {
     let progress: QBankProgressResponse
+    let enrolledCount: Int
+
+    private var goldPrimary: Color { VitaColors.accentHover }
+    private var goldMuted: Color { VitaColors.accentLight }
 
     var body: some View {
-        VitaGlassCard(cornerRadius: 18) {
-            VStack(alignment: .leading, spacing: 0) {
-                // Big number row
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(formatNumber(progress.totalAnswered))
-                        .font(.system(size: 36, weight: .heavy))
-                        .tracking(-0.04 * 36)
-                        .foregroundStyle(VitaColors.accentLight.opacity(0.92))
+        ZStack(alignment: .topLeading) {
+            heroSolidBackground
+            heroGoldAccent
+            heroQuestionMotif
+            heroContent
+        }
+        .frame(height: 162)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            goldPrimary.opacity(0.40),
+                            goldPrimary.opacity(0.10),
+                            goldPrimary.opacity(0.25)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .shadow(color: .black.opacity(0.30), radius: 14, y: 6)
+    }
 
-                    Text("/ \(formatNumber(progress.totalAvailable))")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(VitaColors.textSecondary)
-                }
+    private var heroSolidBackground: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 0.10, green: 0.07, blue: 0.045),
+                Color(red: 0.05, green: 0.035, blue: 0.022)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
 
-                // Label
-                Text("quest\u{f5}es respondidas")
-                    .font(.system(size: 11))
-                    .foregroundStyle(VitaColors.textSecondary)
-                    .padding(.top, 4)
+    private var heroGoldAccent: some View {
+        RadialGradient(
+            colors: [goldPrimary.opacity(0.22), Color.clear],
+            center: UnitPoint(x: 1.0, y: 0.0),
+            startRadius: 0,
+            endRadius: 140
+        )
+    }
 
-                // Progress bar
-                let pctFill = progress.totalAvailable > 0
-                    ? Double(progress.totalAnswered) / Double(progress.totalAvailable)
-                    : 0
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 99)
-                            .fill(Color.white.opacity(0.06))
-                        RoundedRectangle(cornerRadius: 99)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        VitaColors.accent.opacity(0.7),
-                                        VitaColors.accentHover.opacity(0.9)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .shadow(color: VitaColors.accentHover.opacity(0.30), radius: 6)
-                            .frame(width: max(geo.size.width * CGFloat(pctFill), 2))
-                    }
-                }
-                .frame(height: 6)
-                .padding(.top, 14)
+    private var heroQuestionMotif: some View {
+        Image(systemName: "questionmark.square.fill")
+            .font(.system(size: 64, weight: .ultraLight))
+            .foregroundStyle(goldPrimary.opacity(0.08))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .padding(.top, 14)
+            .padding(.trailing, 16)
+    }
 
-                // Accuracy row
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle")
-                        .font(.system(size: 14, weight: .medium))
-                    Text("\(Int(progress.normalizedAccuracy * 100))% de acerto")
-                        .font(.system(size: 13, weight: .semibold))
-                }
-                .foregroundStyle(VitaColors.dataGreen.opacity(0.85))
-                .padding(.top, 12)
+    private var heroContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Zona 1: eyebrow
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(goldPrimary)
+                    .frame(width: 5, height: 5)
+                Text("SUAS DISCIPLINAS")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.2)
+                    .foregroundStyle(goldPrimary)
             }
-            .padding(.vertical, 20).padding(.horizontal, 18)
+            .padding(.bottom, 6)
+
+            // Zona 2: big number (enrolled-scoped total)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(formatNumber(progress.totalAnswered))
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(Color.white)
+                    .kerning(-0.4)
+                    .monospacedDigit()
+                Text("/ \(formatNumber(progress.totalAvailable))")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.55))
+                    .monospacedDigit()
+            }
+
+            HStack(spacing: 6) {
+                Image(systemName: "book.closed.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(goldMuted.opacity(0.75))
+                Text("quest\u{f5}es das suas mat\u{e9}rias")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.72))
+            }
+            .padding(.top, 3)
+
+            Spacer(minLength: 0)
+
+            // Zona 3: stats strip
+            heroStatsStrip
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    private var heroStatsStrip: some View {
+        HStack(spacing: 14) {
+            heroStat(label: "Disciplinas", value: "\(enrolledCount)")
+            heroStatDivider
+            heroStat(label: "Respondidas", value: formatNumber(progress.totalAnswered))
+            heroStatDivider
+            heroStat(label: "Acerto", value: "\(Int(progress.normalizedAccuracy * 100))%")
+            Spacer()
+        }
+    }
+
+    private var heroStatDivider: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.12))
+            .frame(width: 1, height: 16)
+    }
+
+    private func heroStat(label: String, value: String) -> some View {
+        HStack(spacing: 5) {
+            Text(value)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(goldPrimary)
+            Text(label)
+                .font(.system(size: 9, weight: .semibold))
+                .tracking(0.4)
+                .foregroundStyle(Color.white.opacity(0.55))
         }
     }
 
@@ -320,15 +410,25 @@ struct QBankSessionCard: View {
     let action: () -> Void
 
     private var pct: Int {
-        session.totalQuestions > 0
-            ? Int(Double(session.correctCount) / Double(session.totalQuestions) * 100)
-            : 0
+        guard !session.isActive, session.totalQuestions > 0 else { return 0 }
+        return Int(Double(session.correctCount) / Double(session.totalQuestions) * 100)
     }
-    private var metaText: String {
-        if session.isActive {
-            return "\(session.currentIndex)/\(session.totalQuestions) respondidas \u{b7} hoje"
+
+    private var displayTitle: String {
+        if let t = session.title, !t.isEmpty { return t }
+        if let first = session.disciplineTitles?.first, !first.isEmpty {
+            let count = session.disciplineTitles?.count ?? 1
+            return count > 1 ? "\(first) +\(count - 1)" : first
         }
-        return "\(session.correctCount)/\(session.totalQuestions) corretas"
+        return "Sess\u{e3}o de \(session.totalQuestions) quest\u{f5}es"
+    }
+
+    private var metaText: String {
+        let when = Self.formatRelative(session.createdAt)
+        if session.isActive {
+            return "\(session.currentIndex)/\(session.totalQuestions) \u{b7} \(when)"
+        }
+        return "\(session.correctCount)/\(session.totalQuestions) \u{b7} \(pct)% \u{b7} \(when)"
     }
 
     var body: some View {
@@ -357,7 +457,7 @@ struct QBankSessionCard: View {
 
                     // Info
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(session.title ?? "Sess\u{e3}o de \(session.totalQuestions) quest\u{f5}es")
+                        Text(displayTitle)
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(Color.white.opacity(0.90))
                             .lineLimit(1)
@@ -367,16 +467,66 @@ struct QBankSessionCard: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    // Accuracy %
-                    Text("\(pct)%")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(VitaColors.accentLight.opacity(0.90))
+                    // Accuracy % (only for finished sessions)
+                    if !session.isActive {
+                        Text("\(pct)%")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundStyle(VitaColors.accentLight.opacity(0.90))
+                    } else {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(VitaColors.textSecondary.opacity(0.6))
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
             }
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Date formatting (pt_BR)
+
+    private static let iso8601WithFrac: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    private static let iso8601: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "pt_BR")
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+
+    private static let shortDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "pt_BR")
+        f.dateFormat = "dd MMM HH:mm"
+        return f
+    }()
+
+    static func formatRelative(_ raw: String, now: Date = Date(), calendar: Calendar = Calendar(identifier: .gregorian)) -> String {
+        guard !raw.isEmpty else { return "" }
+        let date = iso8601WithFrac.date(from: raw) ?? iso8601.date(from: raw)
+        guard let date else { return "" }
+        var cal = calendar
+        cal.locale = Locale(identifier: "pt_BR")
+        cal.timeZone = TimeZone.current
+        let today = cal.startOfDay(for: now)
+        let sessionDay = cal.startOfDay(for: date)
+        if let diff = cal.dateComponents([.day], from: sessionDay, to: today).day {
+            if diff == 0 { return "hoje \(timeFormatter.string(from: date))" }
+            if diff == 1 { return "ontem \(timeFormatter.string(from: date))" }
+        }
+        return shortDateFormatter.string(from: date)
     }
 }
 
