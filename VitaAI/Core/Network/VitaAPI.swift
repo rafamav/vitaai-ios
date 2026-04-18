@@ -346,17 +346,18 @@ actor VitaAPI {
             URLQueryItem(name: "page", value: String(page)),
             URLQueryItem(name: "limit", value: String(limit)),
         ]
-        if !institutionIds.isEmpty {
-            items.append(URLQueryItem(name: "institutionIds", value: institutionIds.map(String.init).joined(separator: ",")))
+        // Backend expects array-style repeated params (name[]=a&name[]=b), not CSV.
+        for id in institutionIds {
+            items.append(URLQueryItem(name: "institutionIds[]", value: String(id)))
         }
-        if !years.isEmpty {
-            items.append(URLQueryItem(name: "years", value: years.map(String.init).joined(separator: ",")))
+        for year in years {
+            items.append(URLQueryItem(name: "years[]", value: String(year)))
         }
-        if !difficulties.isEmpty {
-            items.append(URLQueryItem(name: "difficulties", value: difficulties.joined(separator: ",")))
+        for d in difficulties {
+            items.append(URLQueryItem(name: "difficulties[]", value: d))
         }
-        if !topicIds.isEmpty {
-            items.append(URLQueryItem(name: "topicIds", value: topicIds.map(String.init).joined(separator: ",")))
+        for id in topicIds {
+            items.append(URLQueryItem(name: "topicIds[]", value: String(id)))
         }
         if let status {
             items.append(URLQueryItem(name: "status", value: status))

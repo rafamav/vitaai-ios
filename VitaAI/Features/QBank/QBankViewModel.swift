@@ -11,6 +11,14 @@ enum QBankScreen {
     case result
 }
 
+/// Session mode — Prática: 1 by 1 with immediate feedback (study).
+/// Simulado: exam-style, no feedback until final submit, optional timer.
+enum QBankMode: String, CaseIterable {
+    case pratica
+    case simulado
+    var displayName: String { self == .pratica ? "Prática" : "Simulado" }
+}
+
 struct QBankUiState {
     // Navigation
     var activeScreen: QBankScreen = .home
@@ -28,6 +36,23 @@ struct QBankUiState {
     // Discipline selection (progressive step)
     var disciplinePath: [QBankDiscipline] = []
     var selectedDisciplineIds: Set<Int> = []
+
+    /// Backend catalog of ALL available disciplines (47 slugs). Kept separate
+    /// from `filters.disciplines` (which holds the student's enrolled subjects).
+    /// Powers the "Outras Disciplinas" collapsible section.
+    var catalogDisciplines: [QBankDiscipline] = []
+    var otherDisciplinesExpanded: Bool = false
+    var disciplineSearch: String = ""
+
+    // Session mode (Prática by default, Simulado for exam-style)
+    var mode: QBankMode = .pratica
+    /// Optional time limit in seconds (Simulado only). nil = no limit.
+    var timeLimitSeconds: Int? = nil
+    /// Question IDs the user has flagged to revisit during Simulado.
+    var markedForReview: Set<Int> = []
+
+    // Theme picker UI state (inline expansion on config)
+    var themeExpanded: Bool = false
 
     // Config selections
     var selectedInstitutionIds: Set<Int> = []
@@ -142,6 +167,31 @@ struct QBankUiState {
         return disciplinePath.last?.children ?? []
     }
 
+    /// "Suas Disciplinas" — enrolled subjects, optionally filtered by search.
+    var enrolledDisciplinesFiltered: [QBankDiscipline] {
+        let list = filters.disciplines
+        guard !disciplineSearch.isEmpty else { return list }
+        let q = disciplineSearch.folding(options: .diacriticInsensitive, locale: Locale(identifier: "pt_BR")).lowercased()
+        return list.filter { d in
+            d.title.folding(options: .diacriticInsensitive, locale: Locale(identifier: "pt_BR")).lowercased().contains(q)
+        }
+    }
+
+    /// "Outras Disciplinas" — full backend catalog minus the slugs already in
+    /// Suas Disciplinas, optionally filtered by search.
+    var otherDisciplinesFiltered: [QBankDiscipline] {
+        let enrolledSlugs = Set(filters.disciplines.compactMap { $0.slug })
+        let base = catalogDisciplines.filter { d in
+            guard let slug = d.slug else { return true }
+            return !enrolledSlugs.contains(slug)
+        }
+        guard !disciplineSearch.isEmpty else { return base }
+        let q = disciplineSearch.folding(options: .diacriticInsensitive, locale: Locale(identifier: "pt_BR")).lowercased()
+        return base.filter { d in
+            d.title.folding(options: .diacriticInsensitive, locale: Locale(identifier: "pt_BR")).lowercased().contains(q)
+        }
+    }
+
     /// Breadcrumb labels for discipline navigation
     var disciplineBreadcrumb: [String] {
         ["Todas"] + disciplinePath.map(\.title)
@@ -194,6 +244,11 @@ final class QBankViewModel {
     private let api: VitaAPI
     private let gamificationEvents: GamificationEventManager
     private let dataManager: AppDataManager
+
+    /// Public accessor so views can sort by VitaScore without exposing AppDataManager.
+    func vitaScore(forTitle title: String) -> Double {
+        dataManager.vitaScore(for: title)
+    }
 
     /// Debounce task for dynamic count refresh
     private var countTask: Task<Void, Never>?
@@ -312,20 +367,40 @@ final class QBankViewModel {
                 let filters = try await api.getQBankFilters()
                 state.filters = filters
                 state.availableCount = filters.totalQuestions
-                // If API returned no disciplines, fallback to user's enrolled subjects
-                if filters.disciplines.isEmpty {
-                    let dashboard = try? await api.getDashboard()
-                    if let subjects = dashboard?.subjects, !subjects.isEmpty {
-                        state.filters.disciplines = subjects.enumerated().map { index, subject in
-                            QBankDiscipline(
-                                id: index + 1,
-                                title: subject.name ?? "",
-                                parentId: nil,
-                                level: 0,
-                                questionCount: 0,
-                                children: []
-                            )
-                        }
+                // Persist the full backend catalog separately — the UI needs it for
+                // "Outras Disciplinas" (search/browse beyond the enrolled set).
+                // Give each catalog entry a stable synthetic Int id in a distinct
+                // range (10_000+) so it never collides with the enrolled block.
+                let rawCatalog = filters.disciplines
+                state.catalogDisciplines = rawCatalog.enumerated().map { index, d in
+                    QBankDiscipline(
+                        id: 10_000 + index,
+                        title: d.title,
+                        slug: d.slug,
+                        parentId: nil,
+                        level: 0,
+                        questionCount: d.questionCount,
+                        children: []
+                    )
+                }
+                // ALWAYS overlay the discipline list with the student's actually enrolled
+                // subjects (from dashboard). The backend catalog (47 disciplines) is useful
+                // only for resolving slug/questionCount per subject — the UI must show what
+                // the student is STUDYING first.
+                if let dashboard = try? await api.getDashboard(),
+                   let subjects = dashboard.subjects, !subjects.isEmpty {
+                    state.filters.disciplines = subjects.enumerated().map { index, subject in
+                        let subjectName = subject.name ?? ""
+                        let matched = matchCatalog(subjectName: subjectName, catalog: rawCatalog)
+                        return QBankDiscipline(
+                            id: index + 1,
+                            title: subjectName,
+                            slug: matched?.slug,
+                            parentId: nil,
+                            level: 0,
+                            questionCount: matched?.questionCount ?? 0,
+                            children: []
+                        )
                     }
                 }
                 state.filterError = nil
@@ -337,6 +412,7 @@ final class QBankViewModel {
                         QBankDiscipline(
                             id: index + 1,
                             title: subject.name ?? "",
+                            slug: nil,
                             parentId: nil,
                             level: 0,
                             questionCount: 0,
@@ -351,6 +427,35 @@ final class QBankViewModel {
             }
             state.filtersLoading = false
         }
+    }
+
+    /// Fuzzy-match an enrolled subject name to the backend discipline catalog.
+    /// Uses diacritic-insensitive substring matching on both directions — the
+    /// catalog names are short ("Patologia") and enrolled subjects often have
+    /// qualifiers ("PATOLOGIA MÉDICA"), so either may contain the other.
+    private func matchCatalog(subjectName: String, catalog: [QBankDiscipline]) -> QBankDiscipline? {
+        let normalize: (String) -> String = {
+            $0.folding(options: .diacriticInsensitive, locale: Locale(identifier: "pt_BR"))
+              .lowercased()
+        }
+        let target = normalize(subjectName)
+        guard !target.isEmpty else { return nil }
+        // First pass: direct containment
+        if let hit = catalog.first(where: {
+            let n = normalize($0.title)
+            return !n.isEmpty && (target.contains(n) || n.contains(target))
+        }) {
+            return hit
+        }
+        // Second pass: word overlap — take the longest word (> 3 chars) from the
+        // subject name and look for it in any catalog title.
+        let words = target.split(separator: " ").map(String.init).filter { $0.count > 3 }
+        for word in words.sorted(by: { $0.count > $1.count }) {
+            if let hit = catalog.first(where: { normalize($0.title).contains(word) }) {
+                return hit
+            }
+        }
+        return nil
     }
 
     func retryLoadFilters() {
@@ -471,6 +576,47 @@ final class QBankViewModel {
         state.topicSearch = query
     }
 
+    func setDisciplineSearch(_ query: String) {
+        state.disciplineSearch = query
+        // If the user is searching, auto-expand "Outras Disciplinas" so matches
+        // outside their enrolled set are visible.
+        if !query.isEmpty { state.otherDisciplinesExpanded = true }
+    }
+
+    func toggleOtherDisciplinesExpanded() {
+        state.otherDisciplinesExpanded.toggle()
+    }
+
+    // MARK: - Mode (Simulado vs Prática)
+
+    func setMode(_ mode: QBankMode) {
+        state.mode = mode
+        // Simulado default: 3 minutes per question (ENARE pace).
+        if mode == .simulado, state.timeLimitSeconds == nil {
+            state.timeLimitSeconds = state.questionCount * 180
+        }
+    }
+
+    func setTimeLimitSeconds(_ seconds: Int?) {
+        state.timeLimitSeconds = seconds
+    }
+
+    // MARK: - Theme expansion
+
+    func toggleThemeExpanded() {
+        state.themeExpanded.toggle()
+    }
+
+    func selectAllTopics() {
+        state.selectedTopicIds = Set(state.filters.topics.map(\.id))
+        scheduleCountRefresh()
+    }
+
+    func deselectAllTopics() {
+        state.selectedTopicIds = []
+        scheduleCountRefresh()
+    }
+
     // MARK: - Year Range
 
     func setYearRange(start: Int, end: Int) {
@@ -514,16 +660,15 @@ final class QBankViewModel {
             state.sessionLoading = true
             state.error = nil
             do {
-                // Resolve selected synthetic discipline IDs → catalog slugs.
-                // Backend filters by slug through qbank_topics.disciplineSlug; the Int
+                // Resolve slugs from selected discipline rows (enrolled subjects
+                // enriched via matchCatalog). The backend's preferred filter key is
+                // `disciplineSlugs` (maps to qbank_topics.disciplineSlug); the Int
                 // `disciplineIds` are iOS-synthetic and intentionally not sent.
-                // Slug is derived from title (strip accents + lowercase + dash-join)
-                // to match backend's humanizeSlug() inverse.
                 let allDisc = QBankUiState.flattenDisciplines(state.filters.disciplines)
-                let selectedSlugs = state.selectedDisciplineIds
-                    .compactMap { id in allDisc.first(where: { $0.id == id })?.title }
-                    .map { Self.slugifyDisciplineTitle($0) }
-                    .filter { !$0.isEmpty }
+                    + state.catalogDisciplines
+                let selectedSlugs = state.selectedDisciplineIds.compactMap { id in
+                    allDisc.first(where: { $0.id == id })?.slug
+                }
                 let req = QBankCreateSessionRequest(
                     questionCount: state.questionCount,
                     institutionIds: state.selectedInstitutionIds.isEmpty ? nil : Array(state.selectedInstitutionIds),
@@ -746,13 +891,25 @@ final class QBankViewModel {
     }
 
     func proceedFromDisciplines() {
-        // Collect topic IDs for selected disciplines
+        // Collect topic IDs for selected disciplines. The new backend payload
+        // keys topics by `disciplineSlug` (String), so match via the resolved slug
+        // on each selected discipline. Fall back to Int disciplineId for any
+        // legacy payload.
         let allDisc = QBankUiState.flattenDisciplines(state.filters.disciplines)
+            + state.catalogDisciplines
+        let selectedSlugs = Set(
+            state.selectedDisciplineIds.compactMap { id in
+                allDisc.first(where: { $0.id == id })?.slug
+            }
+        )
         var topicIds = Set<Int>()
-        for discId in state.selectedDisciplineIds {
-            guard let disc = allDisc.first(where: { $0.id == discId }) else { continue }
-            let descIds = collectDescendantIds(disc)
-            for topic in state.filters.topics where descIds.contains(topic.disciplineId ?? -1) {
+        for topic in state.filters.topics {
+            if let slug = topic.disciplineSlug, selectedSlugs.contains(slug) {
+                topicIds.insert(topic.id)
+                continue
+            }
+            if let did = topic.disciplineId,
+               state.selectedDisciplineIds.contains(did) {
                 topicIds.insert(topic.id)
             }
         }
