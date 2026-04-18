@@ -33,9 +33,16 @@ class VitaAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenter
 
     /// Silent (content-available) push handler — app is woken in the background
     /// with a ~30s window to run work.
-    /// Handles:
-    ///   - `canvas_reauth`: Canvas session about to expire → reauth via WKWebView
-    ///   - `mannesoft_sync`: Cron triggers Mannesoft keep-alive + data extraction
+    ///
+    /// Portal-agnostic contract (backend: /api/cron/portal-silent-sync):
+    ///   type: "portal_sync"
+    ///   strategy: "webview-bridge" | "oauth-replay"
+    ///   connectionId, portalType, instanceUrl
+    ///
+    /// Legacy type-specific pushes are still accepted for rollout compat:
+    ///   - `canvas_reauth` (→ oauth-replay)
+    ///   - `mannesoft_sync` (→ webview-bridge)
+    /// Will be removed once backend fully emits `portal_sync` only.
     func application(
         _ application: UIApplication,
         didReceiveRemoteNotification userInfo: [AnyHashable: Any],
@@ -45,6 +52,35 @@ class VitaAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenter
         NSLog("[PushBG] Silent push received: type=%@", type)
 
         switch type {
+        case "portal_sync":
+            let strategy = userInfo["strategy"] as? String ?? "webview-bridge"
+            let instanceUrl = userInfo["instanceUrl"] as? String ?? ""
+            let portalType = userInfo["portalType"] as? String ?? "?"
+            NSLog("[PushBG] portal_sync portalType=%@ strategy=%@", portalType, strategy)
+            Task { @MainActor in
+                let api = VitaAPI(client: HTTPClient(tokenStore: TokenStore()))
+                switch strategy {
+                case "oauth-replay":
+                    guard !instanceUrl.isEmpty else {
+                        completionHandler(.noData)
+                        return
+                    }
+                    let ok = await CanvasSilentReauth.shared.forceReauth(
+                        instanceUrl: instanceUrl,
+                        api: api
+                    )
+                    NSLog("[PushBG] oauth-replay result: %@", ok ? "success" : "failed")
+                    completionHandler(ok ? .newData : .failed)
+                default: // "webview-bridge"
+                    SilentPortalSync.shared.resetThrottle()
+                    SilentPortalSync.shared.syncIfNeeded(api: api)
+                    try? await Task.sleep(for: .seconds(25))
+                    NSLog("[PushBG] webview-bridge window ending")
+                    completionHandler(.newData)
+                }
+            }
+
+        // Legacy type-specific silent pushes (pre-issue #59). Kept during rollout.
         case "canvas_reauth":
             guard let instanceUrl = userInfo["instanceUrl"] as? String, !instanceUrl.isEmpty else {
                 completionHandler(.noData)
