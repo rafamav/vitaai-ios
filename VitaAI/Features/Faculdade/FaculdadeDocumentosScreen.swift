@@ -239,7 +239,7 @@ struct FaculdadeDocumentosScreen: View {
 
     private func docRow(_ doc: VitaDocument) -> some View {
         Button {
-            router.navigate(to: .pdfViewer(url: doc.fileUrl))
+            router.navigate(to: .pdfViewer(url: "\(AppConfig.apiBaseURL)/documents/\(doc.id)/file"))
         } label: {
             HStack(spacing: 12) {
                 ZStack {

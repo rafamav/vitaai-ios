@@ -916,7 +916,7 @@ struct DisciplineDetailScreen: View {
                         .padding(.horizontal, 16)
                 }
                 Button {
-                    router.navigate(to: .pdfViewer(url: doc.fileUrl))
+                    router.navigate(to: .pdfViewer(url: "\(AppConfig.apiBaseURL)/documents/\(doc.id)/file"))
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: docIcon(doc.fileName))
