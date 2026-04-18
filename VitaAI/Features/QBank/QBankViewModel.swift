@@ -160,6 +160,23 @@ struct QBankUiState {
     }
 }
 
+extension QBankViewModel {
+    /// Inverse of backend `humanizeSlug`: "Patologia Geral" → "patologia-geral".
+    /// Strips diacritics, lowercases, drops non-alphanumerics, joins words with dashes.
+    static func slugifyDisciplineTitle(_ title: String) -> String {
+        let folded = title.folding(options: .diacriticInsensitive, locale: Locale(identifier: "pt_BR"))
+        let lower = folded.lowercased()
+        let cleaned = lower.unicodeScalars.map { scalar -> Character in
+            if CharacterSet.alphanumerics.contains(scalar) { return Character(scalar) }
+            return " "
+        }
+        let str = String(cleaned)
+        return str
+            .split(separator: " ", omittingEmptySubsequences: true)
+            .joined(separator: "-")
+    }
+}
+
 // MARK: - ViewModel
 
 @Observable
@@ -222,6 +239,7 @@ final class QBankViewModel {
                     difficulties: nil,
                     topicIds: nil,
                     disciplineIds: nil,
+                    disciplineSlugs: nil,
                     onlyResidence: nil,
                     onlyUnanswered: true,
                     title: nil,
@@ -459,20 +477,31 @@ final class QBankViewModel {
             state.sessionLoading = true
             state.error = nil
             do {
+                // Resolve selected synthetic discipline IDs → catalog slugs.
+                // Backend filters by slug through qbank_topics.disciplineSlug; the Int
+                // `disciplineIds` are iOS-synthetic and intentionally not sent.
+                // Slug is derived from title (strip accents + lowercase + dash-join)
+                // to match backend's humanizeSlug() inverse.
+                let allDisc = QBankUiState.flattenDisciplines(state.filters.disciplines)
+                let selectedSlugs = state.selectedDisciplineIds
+                    .compactMap { id in allDisc.first(where: { $0.id == id })?.title }
+                    .map { Self.slugifyDisciplineTitle($0) }
+                    .filter { !$0.isEmpty }
                 let req = QBankCreateSessionRequest(
                     questionCount: state.questionCount,
                     institutionIds: state.selectedInstitutionIds.isEmpty ? nil : Array(state.selectedInstitutionIds),
                     years: state.selectedYears.isEmpty ? nil : Array(state.selectedYears).sorted(),
                     difficulties: state.selectedDifficulties.isEmpty ? nil : Array(state.selectedDifficulties),
                     topicIds: state.selectedTopicIds.isEmpty ? nil : Array(state.selectedTopicIds),
-                    disciplineIds: state.selectedDisciplineIds.isEmpty ? nil : Array(state.selectedDisciplineIds),
+                    disciplineIds: nil, // synthetic IDs are iOS-only; backend ignores
+                    disciplineSlugs: selectedSlugs.isEmpty ? nil : selectedSlugs,
                     onlyResidence: state.onlyResidence ? true : nil,
                     onlyUnanswered: {
                         if state.selectedStatus == "unanswered" { return true }
                         if state.onlyUnanswered { return true }
                         return nil
                     }(),
-                    title: nil,
+                    title: nil, // backend auto-derives from disciplineSlugs when nil
                     status: state.selectedStatus
                 )
                 let session = try await api.createQBankSession(request: req)
