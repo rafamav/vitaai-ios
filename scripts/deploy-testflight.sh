@@ -42,55 +42,24 @@ ASC_KEY_FILE="$HOME/.private_keys/AuthKey_${ASC_KEY_ID}.p8"
 ASC_ISSUER_ID="6fc1df15-2bd3-4fcf-8251-0a12be7d26d3"
 ASC_APP_ID="6759848167"
 
-# Required Info.plist purpose strings. Keep this list in sync with the SDKs
-# and capabilities we actually ship. Missing => FAIL pre-flight, don't burn
-# a build number or wait 3 minutes for Apple to reject the upload.
-REQUIRED_PURPOSE_KEYS=(
-    "NSMicrophoneUsageDescription"         # transcrição (usado)
-    "NSSpeechRecognitionUsageDescription"  # transcrição (usado)
-    "NSCameraUsageDescription"             # foto de prova (usado)
-    "NSPhotoLibraryUsageDescription"       # upload de material (usado)
-    "NSPhotoLibraryAddUsageDescription"    # salvar screenshot (usado)
-    # Indirect via SDKs (not used in code, required because frameworks reference APIs):
-    "NSHealthShareUsageDescription"        # Sentry/PostHog — any HealthKit API ref
-    "NSHealthUpdateUsageDescription"       # same (required since ~Sentry 8.58)
-    "NSUserTrackingUsageDescription"       # ATT required if any SDK uses IDFA
-)
-
 echo "=============================="
 echo "  VitaAI TestFlight Deploy"
 echo "=============================="
+echo ""
+echo "Pre-flight validation (Info.plist purpose strings, build compile) is"
+echo "enforced by .git/hooks/pre-commit. Any code that gets this far ALREADY"
+echo "passed those gates. If deploy fails, it's a packaging/signing issue,"
+echo "not missing keys."
+echo ""
 
 # 0. Unlock keychain (avoids errSecInternalComponent)
 security unlock-keychain -p "" ~/Library/Keychains/login.keychain-db 2>/dev/null || true
 
 # -------------------------------------------------------------------------
-# STEP 1: PRE-FLIGHT — validate Info.plist requirements BEFORE any work
+# STEP 1: Build number — ASC-as-source-of-truth, rollback on failure
 # -------------------------------------------------------------------------
 echo ""
-echo "[1/5] Pre-flight validation..."
-MISSING=()
-for key in "${REQUIRED_PURPOSE_KEYS[@]}"; do
-    if ! /usr/libexec/PlistBuddy -c "Print :$key" "$INFO_PLIST" > /dev/null 2>&1; then
-        MISSING+=("$key")
-    fi
-done
-if [[ ${#MISSING[@]} -gt 0 ]]; then
-    echo "       FAIL — missing Info.plist keys:"
-    for k in "${MISSING[@]}"; do echo "         - $k"; done
-    echo ""
-    echo "       Add each to VitaAI/Info.plist AND project.yml, then retry."
-    echo "       Apple rejects uploads that reference these APIs (even via SDKs)"
-    echo "       without a user-facing purpose string."
-    exit 1
-fi
-echo "       Info.plist OK (${#REQUIRED_PURPOSE_KEYS[@]} purpose strings validated)"
-
-# -------------------------------------------------------------------------
-# STEP 2: Build number — ASC-as-source-of-truth, rollback on failure
-# -------------------------------------------------------------------------
-echo ""
-echo "[2/5] Resolving build number from ASC..."
+echo "[1/4] Resolving build number from ASC..."
 ORIGINAL_BUILD=$(agvtool what-version -terse 2>/dev/null || echo "0")
 
 HIGHEST_ASC_BUILD=$(python3 - <<PYEOF 2>/dev/null || echo "0"
@@ -131,10 +100,10 @@ echo "       ASC highest: $HIGHEST_ASC_BUILD  |  local: $ORIGINAL_BUILD  ->  new
 echo "       v$VERSION ($NEW_BUILD)"
 
 # -------------------------------------------------------------------------
-# STEP 3: Archive (no DerivedData wipe — xcodebuild manages cache)
+# STEP 2: Archive (no DerivedData wipe — xcodebuild manages cache)
 # -------------------------------------------------------------------------
 echo ""
-echo "[3/5] Archiving... (60-90s)"
+echo "[2/4] Archiving... (60-90s)"
 find "$ARCHIVE_PATH" -delete 2>/dev/null || true
 set +e
 xcodebuild \
@@ -159,10 +128,10 @@ fi
 echo "       Archive OK"
 
 # -------------------------------------------------------------------------
-# STEP 4: Export + Upload
+# STEP 3: Export + Upload
 # -------------------------------------------------------------------------
 echo ""
-echo "[4/5] Uploading to ASC... (30-60s)"
+echo "[3/4] Uploading to ASC... (30-60s)"
 find "$EXPORT_PATH" -delete 2>/dev/null || true
 set +e
 OUTPUT=$(xcodebuild \
@@ -177,7 +146,8 @@ set -e
 if [[ $EXPORT_RC -ne 0 ]] || ! echo "$OUTPUT" | grep -q "Upload succeeded"; then
     echo "       FAIL — export exit=$EXPORT_RC"
     echo "$OUTPUT" | grep -iE "error:|failed|missing.*purpose|code = 90" | head -5 || true
-    echo "       Tip: add any missing Info.plist key to REQUIRED_PURPOSE_KEYS in this script."
+    echo "       Tip: if Apple complains of a missing purpose string, add the key to"
+    echo "       VitaAI/Info.plist + project.yml + .git/hooks/pre-commit REQUIRED_PURPOSE_KEYS."
     exit 1
 fi
 echo "       Upload succeeded"
@@ -186,10 +156,10 @@ echo "       Upload succeeded"
 DEPLOY_SUCCESS=1
 
 # -------------------------------------------------------------------------
-# STEP 5: Auto-resolve export compliance + report final state
+# STEP 4: Auto-resolve export compliance + report final state
 # -------------------------------------------------------------------------
 echo ""
-echo "[5/5] Waiting for ASC to process build $NEW_BUILD (up to 3min)..."
+echo "[4/4] Waiting for ASC to process build $NEW_BUILD (up to 3min)..."
 python3 - <<PYEOF
 import jwt, time, json, urllib.request, ssl, sys
 with open("${ASC_KEY_FILE}", "r") as f: pk = f.read()
