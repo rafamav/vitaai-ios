@@ -551,11 +551,7 @@ actor VitaAPI {
         return try await client.patch("subjects/\(id)", body: Body(difficulty: difficulty))
     }
 
-    // MARK: - Grades
-
-    func getGradesCurrent() async throws -> GradesCurrentResponse {
-        try await client.get("grades/current")
-    }
+    // MARK: - Agenda
 
     func getAgenda(from: String? = nil, to: String? = nil) async throws -> AgendaResponse {
         var path = "agenda"

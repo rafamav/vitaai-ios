@@ -188,8 +188,8 @@ struct StudyHeroStat: View {
 // MARK: - Subject chip strip (themed selected state)
 
 /// Lightweight row used by `StudySubjectChips` — decoupled from any specific
-/// API response (GradeSubject, StudyOverviewSubject, etc.) so the shell only
-/// depends on the canonical SOT (AppDataManager.gradesResponse) upstream.
+/// API response (AcademicSubject, StudyOverviewSubject, etc.) so the shell only
+/// depends on the canonical SOT (AppDataManager.enrolledDisciplines) upstream.
 struct StudySubjectChipItem: Identifiable, Hashable {
     let id: String
     let name: String

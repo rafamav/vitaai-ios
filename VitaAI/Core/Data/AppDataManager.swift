@@ -11,7 +11,6 @@ final class AppDataManager {
     // MARK: - Shared state
 
     var profile: ProfileResponse?
-    var gradesResponse: GradesCurrentResponse?
     var classSchedule: [AgendaClassBlock] = []
     var academicEvaluations: [AgendaEvaluation] = []
     var studyEvents: [StudyEventEntry] = []
@@ -39,7 +38,7 @@ final class AppDataManager {
     // MARK: - Full load (shows spinner)
 
     func loadIfNeeded() async {
-        guard gradesResponse == nil && classSchedule.isEmpty && enrolledDisciplines.isEmpty else { return }
+        guard classSchedule.isEmpty && enrolledDisciplines.isEmpty else { return }
         isLoading = true
         await refreshAll()
         isLoading = false
@@ -71,16 +70,19 @@ final class AppDataManager {
     private func refreshAll() async {
         lastRefresh = Date()
         async let p: () = refreshProfile()
-        async let g: () = refreshGrades()
         async let s: () = refreshSchedule()
         async let e: () = refreshEvents()
         async let d: () = refreshDashboard()
         async let en: () = refreshEnrolled()
-        _ = await (p, g, s, e, d, en)
+        _ = await (p, s, e, d, en)
     }
 
     private func refreshEnrolled() async {
-        if let resp = try? await api.getSubjects(status: "in_progress") {
+        // Canonical list: `/api/subjects` returns the full academic_subjects set
+        // (current + completed) enriched with disciplineSlug/canonicalName/area/
+        // icon and grade/attendance derived from academic_evaluations. Every
+        // tab filters by `status` locally.
+        if let resp = try? await api.getSubjects() {
             enrolledDisciplines = resp.subjects
         }
     }
@@ -88,12 +90,6 @@ final class AppDataManager {
     private func refreshProfile() async {
         if let resp = try? await api.getProfile() {
             profile = resp
-        }
-    }
-
-    private func refreshGrades() async {
-        if let resp = try? await api.getGradesCurrent() {
-            gradesResponse = resp
         }
     }
 

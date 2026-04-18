@@ -182,7 +182,7 @@ private struct InsightsContentView: View {
                     SectionHeader(
                         title: "Notas do Portal",
                         subtitle: "\(vm.portalGrades.count) disciplinas"
-                            + (vm.portalSummary.flatMap { $0.averageGrade }.map { " · Média \(String(format: "%.1f", $0))" } ?? "")
+                            + (vm.portalAverage.map { " · Média \(String(format: "%.1f", $0))" } ?? "")
                     )
                     .staggerTransition(visible: gradesVisible)
 
@@ -704,7 +704,7 @@ private struct SubjectRow: View {
 // MARK: - PortalGradeRow
 
 private struct PortalGradeRow: View {
-    let grade: GradeSubject
+    let grade: AcademicSubject
     let index: Int
 
     @State private var appeared = false
@@ -714,7 +714,8 @@ private struct PortalGradeRow: View {
     }
 
     private var statusText: String {
-        grade.status.isEmpty ? "Cursando" : grade.status
+        let s = grade.status ?? ""
+        return s.isEmpty ? "Cursando" : s
     }
 
     private var statusColor: Color {
@@ -747,7 +748,7 @@ private struct PortalGradeRow: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(grade.subjectName)
+                    Text(grade.displayName)
                         .font(VitaTypography.bodyMedium)
                         .fontWeight(.medium)
                         .foregroundStyle(VitaColors.textPrimary)
@@ -760,7 +761,7 @@ private struct PortalGradeRow: View {
                     }
 
                     if let att = grade.attendance {
-                        Text("Frequência: \(att)%")
+                        Text("Frequência: \(String(format: "%.0f", att))%")
                             .font(VitaTypography.labelSmall)
                             .foregroundStyle(att >= 75 ? VitaColors.dataGreen : VitaColors.dataRed)
                     }

@@ -124,18 +124,20 @@ final class OnboardingViewModel {
             print("[Onboarding] Canvas courses fetch failed: \(error)")
         }
 
-        // Fallback: portal grades (subjects come from grade entries)
+        // Fallback: academic_subjects (canonical SOT, includes portal-synced rows)
         do {
-            let gradesResp = try await api.getGradesCurrent()
-            let allSubjects = gradesResp.current + gradesResp.completed
-            let uniqueSubjects = Set(allSubjects.map(\.subjectName).filter { !$0.isEmpty }).sorted()
+            let subjectsResp = try await api.getSubjects()
+            let names = subjectsResp.subjects
+                .map { $0.canonicalName ?? $0.name }
+                .filter { !$0.isEmpty }
+            let uniqueSubjects = Set(names).sorted()
             if !uniqueSubjects.isEmpty {
                 syncedSubjects = uniqueSubjects.map { SyncedSubject(name: $0, source: "portal") }
-                syncGrades = allSubjects.count
+                syncGrades = subjectsResp.subjects.count
                 return
             }
         } catch {
-            print("[Onboarding] Portal grades fetch failed: \(error)")
+            print("[Onboarding] Subjects fetch failed: \(error)")
         }
 
         // Fallback: agenda schedule

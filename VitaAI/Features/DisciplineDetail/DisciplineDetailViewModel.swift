@@ -9,6 +9,7 @@ import SwiftUI
 @Observable
 final class DisciplineDetailViewModel {
     private let api: VitaAPI
+    private let dataManager: AppDataManager
     let disciplineId: String
     let disciplineName: String
 
@@ -18,7 +19,10 @@ final class DisciplineDetailViewModel {
     private(set) var error: String?
 
     private(set) var subjectProgress: SubjectProgress?
-    private(set) var gradeSubject: GradeSubject?
+    /// The enrolled `AcademicSubject` backing this discipline detail.
+    /// Resolved from `AppDataManager.enrolledDisciplines` (single SOT) — no
+    /// separate `/api/grades/current` fetch.
+    private(set) var enrolledSubject: AcademicSubject?
     private(set) var exams: [ExamEntry] = []
     private(set) var flashcardDecks: [FlashcardDeckEntry] = []
     private(set) var documents: [VitaDocument] = []
@@ -32,8 +36,9 @@ final class DisciplineDetailViewModel {
 
     // MARK: - Init
 
-    init(api: VitaAPI, disciplineId: String, disciplineName: String) {
+    init(api: VitaAPI, dataManager: AppDataManager, disciplineId: String, disciplineName: String) {
         self.api = api
+        self.dataManager = dataManager
         self.disciplineId = disciplineId
         self.disciplineName = disciplineName
     }
@@ -60,21 +65,23 @@ final class DisciplineDetailViewModel {
         subjectExams.filter { $0.daysUntil < 0 || $0.result != nil }
     }
 
-    // MARK: - Computed: grades (from /grades/current — canonical source)
-    // Weights come from API (backend returns weight1/weight2/weight3 from portal config)
+    // MARK: - Computed: grades (from enrolledDisciplines — single SOT)
+    // Weights default to ULBRA's 2/3/5 — per-portal weights now live on the
+    // server (academic_subjects) and will be added to AcademicSubject when
+    // the backend exposes them.
 
-    var grade1: Double? { gradeSubject?.grade1 }
-    var grade2: Double? { gradeSubject?.grade2 }
-    var grade3: Double? { gradeSubject?.grade3 }
-    var finalGrade: Double? { gradeSubject?.finalGrade }
-    var attendance: Double? { gradeSubject?.attendance }
-    var absences: Double? { gradeSubject?.absences }
-    var workload: Double? { gradeSubject?.workload }
-    var subjectStatus: String? { gradeSubject?.status }
+    var grade1: Double? { enrolledSubject?.grade1 }
+    var grade2: Double? { enrolledSubject?.grade2 }
+    var grade3: Double? { enrolledSubject?.grade3 }
+    var finalGrade: Double? { enrolledSubject?.finalGrade }
+    var attendance: Double? { enrolledSubject?.attendance }
+    var absences: Double? { enrolledSubject?.absences.map(Double.init) }
+    var workload: Double? { enrolledSubject?.workload.map(Double.init) }
+    var subjectStatus: String? { enrolledSubject?.status }
 
-    var weight1: Double { gradeSubject?.weight1 ?? 2 }
-    var weight2: Double { gradeSubject?.weight2 ?? 3 }
-    var weight3: Double { gradeSubject?.weight3 ?? 5 }
+    var weight1: Double { 2 }
+    var weight2: Double { 3 }
+    var weight3: Double { 5 }
 
     /// Normalizes a raw grade to 0-10 scale given its weight
     static func normalized(_ value: Double, weight: Double) -> Double {
@@ -177,7 +184,7 @@ final class DisciplineDetailViewModel {
     }
 
     var professorName: String? {
-        if let p = gradeSubject?.professor, !p.isEmpty { return p }
+        if let p = enrolledSubject?.professor, !p.isEmpty { return p }
         return subjectSchedule.compactMap(\.professor).first { !$0.isEmpty }
     }
 
@@ -192,7 +199,6 @@ final class DisciplineDetailViewModel {
         error = nil
 
         async let progressTask: ProgressResponse? = try? api.getProgress()
-        async let gradesTask: GradesCurrentResponse? = try? api.getGradesCurrent()
         async let examsTask: ExamsResponse? = try? api.getExams()
         async let decksTask: [FlashcardDeckEntry]? = try? api.getFlashcardDecks()
         async let docsTask: [VitaDocument]? = try? api.getDocuments(subjectId: nil)
@@ -200,9 +206,8 @@ final class DisciplineDetailViewModel {
         async let trabalhosTask: TrabalhosResponse? = try? api.getTrabalhos()
         async let dashboardTask: Dashboard? = try? api.getDashboard()
 
-        let (progressResponse, gradesResponse, examsResponse, decks, docs, agenda, trabalhosResp, dash) = await (
+        let (progressResponse, examsResponse, decks, docs, agenda, trabalhosResp, dash) = await (
             progressTask,
-            gradesTask,
             examsTask,
             decksTask,
             docsTask,
@@ -223,12 +228,13 @@ final class DisciplineDetailViewModel {
             }
         }
 
-        if let gradesResponse {
-            gradeSubject = gradesResponse.current.first { $0.subjectId == disciplineId }
-                ?? gradesResponse.completed.first { $0.subjectId == disciplineId }
-                ?? gradesResponse.current.first { matchesDiscipline($0.subjectName) }
-                ?? gradesResponse.completed.first { matchesDiscipline($0.subjectName) }
-        }
+        // Resolve the enrolled AcademicSubject from the shared store.
+        // Same semantics as the old /api/grades/current lookup: prefer id match,
+        // fall back to name match.
+        let enrolled = dataManager.enrolledDisciplines
+        enrolledSubject = enrolled.first { $0.id == disciplineId }
+            ?? enrolled.first { matchesDiscipline($0.name) }
+            ?? enrolled.first { matchesDiscipline($0.canonicalName ?? "") }
 
         if let examsResponse {
             exams = examsResponse.exams

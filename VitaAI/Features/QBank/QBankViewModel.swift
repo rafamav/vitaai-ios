@@ -273,8 +273,13 @@ final class QBankViewModel {
     /// resolves (exact / alias / token-trim) against qbank_topics.disciplineSlug.
     /// e.g. "Patologia Medica" -> "patologia-medica" -> canonical "patologia-geral".
     var enrolledDisciplineSlugs: [String] {
-        let all = (dataManager.gradesResponse?.current ?? []) + (dataManager.gradesResponse?.completed ?? [])
-        let slugs = all.map { Self.slugifyDisciplineTitle($0.subjectName) }.filter { !$0.isEmpty }
+        // Prefer the canonical disciplineSlug that the server-side LLM normalizer
+        // already attached; fall back to local slugification only when the
+        // academic_subject hasn't been mapped yet.
+        let slugs = dataManager.enrolledDisciplines.map { subject -> String in
+            if let s = subject.disciplineSlug, !s.isEmpty { return s }
+            return Self.slugifyDisciplineTitle(subject.displayName)
+        }.filter { !$0.isEmpty }
         return Array(Set(slugs)).sorted()
     }
 

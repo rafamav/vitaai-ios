@@ -46,8 +46,7 @@ final class TrabalhoViewModel {
 
     private func fetchGrades() async {
         do {
-            let portalResp = try await api.getGradesCurrent()
-            let allSubjects = portalResp.current + portalResp.completed
+            let allSubjects = try await api.getSubjects().subjects
             if !allSubjects.isEmpty {
                 grades = allSubjects.compactMap { gs -> GradeEntry? in
                     let value: Double
@@ -61,18 +60,18 @@ final class TrabalhoViewModel {
                     return GradeEntry(
                         id: UUID().uuidString,
                         userId: "",
-                        subjectId: gs.subjectName,
-                        label: gs.subjectName,
+                        subjectId: gs.displayName,
+                        label: gs.displayName,
                         value: value,
                         maxValue: 10.0,
-                        notes: gs.status,
+                        notes: gs.status ?? "",
                         date: nil
                     )
                 }
                 return
             }
         } catch {
-            print("[TrabalhoViewModel] portal grades fallback: \(error)")
+            print("[TrabalhoViewModel] subjects fallback: \(error)")
         }
 
         do {

@@ -18,11 +18,11 @@ final class InsightsViewModel {
     var subjects: [SubjectProgress] = []
     var upcomingExams: [ExamEntry] = []
 
-    // MARK: - Grades data (from /grades + /canvas/courses + /grades/current)
+    // MARK: - Grades data (from /grades + /canvas/courses + enrolled subjects)
     var studyStats: StudyStats? = nil
     var courseGrades: [CourseGrade] = []
-    var portalGrades: [GradeSubject] = []
-    var portalSummary: GradesSummary? = nil
+    var portalGrades: [AcademicSubject] = []
+    var portalAverage: Double? = nil
     var portalConnected: Bool = false
 
     // MARK: - Chart data
@@ -39,7 +39,7 @@ final class InsightsViewModel {
 
     /// Best available average: portal average if present, else avgAccuracy from progress
     var displayAverage: Double {
-        portalSummary?.averageGrade ?? avgAccuracy
+        portalAverage ?? avgAccuracy
     }
 
     var isEmptyState: Bool {
@@ -112,10 +112,15 @@ final class InsightsViewModel {
                 )
             }
 
-            // Portal grades
-            if let resp = portalResp {
-                portalGrades = resp.current + resp.completed
-                portalSummary = resp.summary
+            // Portal grades (from academic_subjects, single SOT)
+            if let subjects = portalResp, !subjects.isEmpty {
+                portalGrades = subjects
+                let completedGrades = subjects
+                    .filter { $0.status == "completed" || $0.status == "approved" }
+                    .compactMap { $0.finalGrade }
+                portalAverage = completedGrades.isEmpty
+                    ? nil
+                    : completedGrades.reduce(0, +) / Double(completedGrades.count)
                 portalConnected = true
             }
 
@@ -143,9 +148,9 @@ final class InsightsViewModel {
         isLoading = false
     }
 
-    /// Fetches portal grades, returning nil on error (portal may not be connected).
-    private func tryFetchPortalGrades() async -> GradesCurrentResponse? {
-        do { return try await api.getGradesCurrent() } catch { return nil }
+    /// Fetches enrolled academic subjects (portal-synced), returning nil on error.
+    private func tryFetchPortalGrades() async -> [AcademicSubject]? {
+        do { return try await api.getSubjects().subjects } catch { return nil }
     }
 
     /// Fetches flashcard stats (FSRS data), returning nil on error.

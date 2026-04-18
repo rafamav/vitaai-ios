@@ -75,6 +75,7 @@ struct DisciplineDetailScreen: View {
             if vm == nil {
                 vm = DisciplineDetailViewModel(
                     api: container.api,
+                    dataManager: container.dataManager,
                     disciplineId: disciplineId,
                     disciplineName: disciplineName
                 )
