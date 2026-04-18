@@ -15,10 +15,16 @@ enum AppConfig {
     static let onboardingKey = "vita_is_onboarded"
     static let legacyOnboardingKey = "vita_onboarding_done"
 
-    // TODO: Switch back to vita-ai.cloud for production release
-    // For now, TestFlight builds also use dev server for testing with real data
+    // DEBUG builds hit the dev server on monstro via Tailscale (hot-reload backend).
+    // Release builds (TestFlight / App Store) hit production vita-ai.cloud — the
+    // tester's device cannot depend on Rafael's PC being online / Tailscale connected.
+    #if DEBUG
     private static let defaultAPIBaseURL = "http://monstro.tail7e98e6.ts.net:3110/api"
     private static let defaultAuthBaseURL = "http://monstro.tail7e98e6.ts.net:3110"
+    #else
+    private static let defaultAPIBaseURL = "https://vita-ai.cloud/api"
+    private static let defaultAuthBaseURL = "https://vita-ai.cloud"
+    #endif
 
     struct InjectedSession {
         let token: String
