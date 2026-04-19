@@ -11,8 +11,6 @@ actor TokenStore {
         static let userName = "vita_user_name"
         static let userEmail = "vita_user_email"
         static let userImage = "vita_user_image"
-        static let isOnboarded = "vita_is_onboarded"
-        static let legacyIsOnboarded = "vita_onboarding_done"
         static let onboardingNickname = "vita_onboarding_nickname"
         static let onboardingUniversity = "vita_onboarding_university"
         static let onboardingState = "vita_onboarding_state"
@@ -36,12 +34,8 @@ actor TokenStore {
         token != nil
     }
 
-    var isOnboarded: Bool {
-        #if DEBUG
-        if AppConfig.ciToken != nil { return true }
-        #endif
-        return AppConfig.isOnboardingComplete(in: defaults)
-    }
+    // NOTE: There is intentionally no `isOnboarded` here. Backend is the single
+    // source of truth via /api/profile — see AppRouter.AppState.
 
     // MARK: - User Info (Keychain-backed)
 
@@ -88,10 +82,10 @@ actor TokenStore {
         keychain.delete(key: Keys.userName)
         keychain.delete(key: Keys.userEmail)
         keychain.delete(key: Keys.userImage)
-        // Clear UserDefaults (onboarding + legacy)
+        // Clear UserDefaults (onboarding cached fields; backend flag is server-side)
         let keysToRemove = [
             Keys.userName, Keys.userEmail, Keys.userImage,
-            Keys.isOnboarded, Keys.legacyIsOnboarded, Keys.onboardingNickname, Keys.onboardingUniversity,
+            Keys.onboardingNickname, Keys.onboardingUniversity,
             Keys.onboardingState, Keys.onboardingSemester, Keys.onboardingSubjects,
             Keys.onboardingGoals, Keys.onboardingDailyMinutes
         ]
@@ -103,7 +97,8 @@ actor TokenStore {
     // MARK: - Onboarding
 
     func saveOnboardingData(_ data: OnboardingData) {
-        AppConfig.setOnboardingComplete(true, in: defaults)
+        // Backend is the source of truth for onboardingCompleted (see postOnboarding).
+        // We only cache the raw fields locally for offline read-back / prefill.
         defaults.set(data.nickname, forKey: Keys.onboardingNickname)
         defaults.set(data.universityName, forKey: Keys.onboardingUniversity)
         defaults.set(data.universityState, forKey: Keys.onboardingState)

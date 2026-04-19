@@ -187,9 +187,8 @@ private extension VitaAIApp {
         let defaults = UserDefaults.standard
         let keychain = KeychainHelper.shared
 
-        if AppConfig.shouldResetOnboarding {
-            AppConfig.setOnboardingComplete(false, in: defaults)
-        }
+        // Onboarding state is server-authoritative (/api/profile.onboardingCompleted).
+        // To reset, call the backend — never touch client UserDefaults for routing.
 
         if let injected = AppConfig.injectedSession {
             keychain.save(key: "vita_session_token", value: injected.token)

@@ -473,8 +473,10 @@ struct VitaOnboarding: View {
 
     private func saveOnboarding() async {
         guard let vm = viewModel else { return }
+        // Backend is the single source of truth. vm.complete() POSTs to
+        // /api/profile onboardingCompleted=true; AppRouter re-derives state
+        // from the fresh profile — no client-side flag needed.
         await vm.complete()
-        AppConfig.setOnboardingComplete(true)
     }
 
     private func requestNotificationPermission() {

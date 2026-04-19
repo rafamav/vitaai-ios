@@ -66,87 +66,54 @@ private struct NavControllerBackgroundClearer: UIViewRepresentable {
     }
 }
 
+/// Single source of truth for top-level app routing.
+///
+/// Derived exclusively from (authManager.isLoggedIn × /api/profile response).
+/// NO UserDefaults flags. NO @AppStorage. Backend is authority.
+enum AppState: Equatable {
+    case loading
+    case unauthenticated
+    case onboardingNeeded
+    case ready
+}
+
 struct AppRouter: View {
     @ObservedObject var authManager: AuthManager
     @Environment(\.appContainer) private var container
-    @AppStorage("vita_is_onboarded") private var isOnboardedStored = false
-    @AppStorage("vita_onboarding_done") private var legacyOnboardingStored = false
     @State private var router = Router()
-    @State private var profileChecked = false
-    @State private var needsOnboarding = false
+    @State private var appState: AppState = .loading
 
     var body: some View {
         Group {
-            if authManager.isLoading || (authManager.isLoggedIn && !profileChecked) {
-                // Show loading while auth is initializing OR profile check is pending.
-                // CRITICAL: do NOT show MainTabView before profileChecked — it fires
-                // background API calls (gamification, subscriptions) that can 401 and
-                // trigger global logout before onboarding even starts.
+            switch appState {
+            case .loading:
                 ZStack {
                     VitaColors.surface.ignoresSafeArea()
-                    ProgressView()
-                        .tint(VitaColors.accent)
+                    ProgressView().tint(VitaColors.accent)
                 }
-            } else if !authManager.isLoggedIn {
+            case .unauthenticated:
                 LoginScreen(authManager: authManager)
-            } else if needsOnboarding {
+            case .onboardingNeeded:
                 VitaOnboarding(
                     userName: authManager.userName ?? "",
-                    onLogout: {
-                        Task { await authManager.logout() }
-                    }
+                    onLogout: { Task { await authManager.logout() } }
                 ) {
-                    isOnboardedStored = true
-                    legacyOnboardingStored = true
-                    needsOnboarding = false
+                    // Onboarding completion writes to backend (postOnboarding).
+                    // Re-derive state from fresh profile — backend is authority.
+                    Task { await refreshAppState() }
                 }
-            } else {
+            case .ready:
                 MainTabView(router: router, authManager: authManager)
             }
         }
+        .task(id: authManager.isLoading) {
+            // Wait for auth manager to finish initializing before deriving state.
+            if !authManager.isLoading {
+                await refreshAppState()
+            }
+        }
         .task(id: authManager.isLoggedIn) {
-            guard authManager.isLoggedIn else {
-                profileChecked = false
-                needsOnboarding = false
-                return
-            }
-            do {
-                let profile = try await container.api.getProfile()
-                NSLog("[AppRouter] getProfile OK onboardingCompleted=\(String(describing: profile.onboardingCompleted)) university=\(String(describing: profile.university))")
-                if profile.onboardingCompleted != true {
-                    needsOnboarding = true
-                    isOnboardedStored = false
-                    legacyOnboardingStored = false
-                } else {
-                    needsOnboarding = false
-                    isOnboardedStored = true
-                }
-            } catch let error as APIError {
-                // 401 = token expired — let the global handler deal with it,
-                // but do NOT set needsOnboarding (we're about to be logged out).
-                if case .unauthorized = error {
-                    NSLog("[AppRouter] getProfile 401 — token expired, logout imminent")
-                    profileChecked = true
-                    return
-                }
-                if case .serverError(404) = error {
-                    // 404 = no profile exists = genuinely needs onboarding
-                    needsOnboarding = true
-                    isOnboardedStored = false
-                    legacyOnboardingStored = false
-                } else {
-                    // Other API errors (500, decode, etc) — DON'T assume onboarding.
-                    // Show main tab and let normal error handling deal with it.
-                    NSLog("[AppRouter] getProfile API error (not 404): \(error) — skipping onboarding check")
-                    needsOnboarding = false
-                }
-            } catch {
-                // Network error / timeout — DON'T force onboarding.
-                // The user may be fully onboarded but temporarily offline.
-                NSLog("[AppRouter] getProfile network error: \(error) — skipping onboarding check")
-                needsOnboarding = false
-            }
-            profileChecked = true
+            await refreshAppState()
         }
         .preferredColorScheme(.dark)
         .onOpenURL { url in
@@ -178,10 +145,80 @@ struct AppRouter: View {
         }
     }
 
-
-    // Note: onboarding check is now fully handled by the `needsOnboarding` state
-    // set from the profile check in `.task(id:)`. The `isOnboardedStored` and
-    // `legacyOnboardingStored` flags are kept as fallback for offline launches.
+    /// Derives `appState` purely from auth + /api/profile response.
+    /// Backend is the single source of truth — no client-side flags.
+    @MainActor
+    private func refreshAppState() async {
+        if authManager.isLoading {
+            appState = .loading
+            return
+        }
+        guard authManager.isLoggedIn else {
+            appState = .unauthenticated
+            return
+        }
+        // Only show loading while we don't know yet. Otherwise keep the
+        // previous resolved state to avoid a flash.
+        if appState == .unauthenticated {
+            appState = .loading
+        }
+        do {
+            let profile = try await container.api.getProfile()
+            NSLog("[AppRouter] getProfile OK onboardingCompleted=\(String(describing: profile.onboardingCompleted)) university=\(String(describing: profile.university))")
+            SentryConfig.addBreadcrumb(
+                message: "getProfile OK",
+                category: "onboarding",
+                data: [
+                    "onboardingCompleted": profile.onboardingCompleted ?? false,
+                    "hasUniversity": profile.university != nil,
+                ]
+            )
+            appState = (profile.onboardingCompleted == true) ? .ready : .onboardingNeeded
+        } catch let error as APIError {
+            switch error {
+            case .unauthorized:
+                // Global 401 handler will trigger logout → authManager.isLoggedIn flips,
+                // the isLoggedIn task re-runs, and state becomes .unauthenticated.
+                NSLog("[AppRouter] getProfile 401 — awaiting logout")
+                SentryConfig.addBreadcrumb(message: "getProfile 401", category: "onboarding")
+            case .serverError(404):
+                // Truly no profile → onboarding.
+                NSLog("[AppRouter] getProfile 404 — onboarding needed")
+                SentryConfig.addBreadcrumb(message: "getProfile 404 → onboarding", category: "onboarding")
+                appState = .onboardingNeeded
+            case .decodingError(let decodeErr):
+                // Contract drift: report to Sentry and keep user on dashboard.
+                // NEVER hijack an authenticated session back to onboarding over a parse bug.
+                NSLog("[AppRouter] getProfile DECODE ERROR: \(decodeErr) — staying on dashboard")
+                SentryConfig.capture(
+                    error: decodeErr,
+                    context: ["endpoint": "/api/profile", "phase": "router-state-derivation"]
+                )
+                appState = .ready
+            default:
+                // Transient 500/network error — keep user on dashboard; screens
+                // handle missing data with their own empty/error states.
+                NSLog("[AppRouter] getProfile API error (transient): \(error) — staying on dashboard")
+                SentryConfig.capture(
+                    error: error,
+                    context: ["endpoint": "/api/profile", "phase": "router-state-derivation"]
+                )
+                if appState == .loading { appState = .ready }
+            }
+        } catch {
+            NSLog("[AppRouter] getProfile network error: \(error) — staying on dashboard")
+            SentryConfig.addBreadcrumb(
+                message: "getProfile network error",
+                category: "onboarding",
+                data: ["error": String(describing: error)]
+            )
+            if appState == .loading { appState = .ready }
+        }
+        SentryConfig.addBreadcrumb(
+            message: "appState = \(appState)",
+            category: "navigation"
+        )
+    }
 }
 
 struct MainTabView: View {

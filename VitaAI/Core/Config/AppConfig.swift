@@ -12,9 +12,6 @@ enum AppConfig {
     static let environment: AppEnvironment = .production
     #endif
 
-    static let onboardingKey = "vita_is_onboarded"
-    static let legacyOnboardingKey = "vita_onboarding_done"
-
     // DEBUG builds hit the dev server on monstro via Tailscale (hot-reload backend).
     // Release builds (TestFlight / App Store) hit production vita-ai.cloud — the
     // tester's device cannot depend on Rafael's PC being online / Tailscale connected.
@@ -109,10 +106,6 @@ enum AppConfig {
         return defaultAuthBaseURL
     }
 
-    static var shouldResetOnboarding: Bool {
-        hasLaunchFlag("--reset-onboarding", defaultsKey: "vita_reset_onboarding", envKey: "VITA_RESET_ONBOARDING")
-    }
-
     static var injectedSession: InjectedSession? {
         let arguments = ProcessInfo.processInfo.arguments
         guard let idx = arguments.firstIndex(of: "--vita-inject-token"),
@@ -148,15 +141,6 @@ enum AppConfig {
             return explicit
         }
         return url.host
-    }
-
-    static func isOnboardingComplete(in defaults: UserDefaults = .standard) -> Bool {
-        defaults.bool(forKey: onboardingKey) || defaults.bool(forKey: legacyOnboardingKey)
-    }
-
-    static func setOnboardingComplete(_ value: Bool, in defaults: UserDefaults = .standard) {
-        defaults.set(value, forKey: onboardingKey)
-        defaults.set(value, forKey: legacyOnboardingKey)
     }
 
     static var sessionCookieName: String {
