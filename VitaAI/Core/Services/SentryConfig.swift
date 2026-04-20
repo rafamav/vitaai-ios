@@ -99,8 +99,26 @@ enum SentryConfig {
             // User interaction tracing
             options.enableUserInteractionTracing = true
 
-            // Diagnostics -- only warnings and above
+            // MetricKit — Apple-native launch histograms + hang reports,
+            // delivered daily to Sentry. Covers cold-launch and disk writes
+            // that the in-process SDK cannot instrument (iOS 15+).
+            options.enableMetricKit = true
+
+            // Session Replay (Sentry 8.36+) — record the screen when something
+            // breaks. 0% replay for healthy sessions; 100% when the session has
+            // an error so Rafael sees the broken UI without reproducing it.
+            options.sessionReplay.sessionSampleRate = 0.0
+            options.sessionReplay.onErrorSampleRate = 1.0
+
+            // Diagnostics
+            #if DEBUG
+            // Sentry SDK prints "transaction created/sampled/finished/dropped"
+            // in Xcode console. Only active in Debug so TestFlight stays clean.
+            options.debug = true
+            options.diagnosticLevel = .debug
+            #else
             options.diagnosticLevel = .warning
+            #endif
         }
 
         logger.info("Sentry initialized (env=\(environment, privacy: .public))")
