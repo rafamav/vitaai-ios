@@ -82,6 +82,9 @@ private struct EstudosContent: View {
     let onNavigateToTranscricao:       (() -> Void)?
     let onNavigateToTrabalhos:         (() -> Void)?
 
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var atlasCardWidth: CGFloat { sizeClass == .regular ? 160 : 106 }
+
     // Design tokens — matching FaculdadeHomeScreen
     private var goldPrimary: Color { VitaColors.accentHover }
     private var goldMuted: Color { VitaColors.accentLight }
@@ -292,7 +295,7 @@ private struct EstudosContent: View {
 
                 // Right: Atlas tall card
                 AtlasTallCard(onTap: { onNavigateToAtlas?() })
-                    .frame(width: 106)
+                    .frame(width: atlasCardWidth)
             }
         }
     }
@@ -618,12 +621,16 @@ private struct ToolCard: View {
     let accentColor: Color
     let onTap: () -> Void
 
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    private var cardHeight: CGFloat { sizeClass == .regular ? 140 : 90 }
+
     var body: some View {
         Button(action: onTap) {
             ZStack(alignment: .bottom) {
                 if UIImage(named: imageName) != nil {
                     Color.clear
-                        .frame(height: 90)
+                        .frame(height: cardHeight)
                         .overlay {
                             Image(imageName)
                                 .resizable()
@@ -634,7 +641,7 @@ private struct ToolCard: View {
                 } else {
                     RoundedRectangle(cornerRadius: 14)
                         .fill(VitaColors.surfaceCard.opacity(0.55))
-                        .frame(height: 90)
+                        .frame(height: cardHeight)
                         .overlay(
                             RoundedRectangle(cornerRadius: 14)
                                 .stroke(VitaColors.textWarm.opacity(0.06), lineWidth: 0.5)
@@ -654,7 +661,7 @@ private struct ToolCard: View {
                     .foregroundStyle(Color.white.opacity(0.90))
                     .padding(.bottom, 7)
             }
-            .frame(height: 90)
+            .frame(height: cardHeight)
             .frame(maxWidth: .infinity)
             .shadow(color: .black.opacity(0.30), radius: 6, y: 4)
         }

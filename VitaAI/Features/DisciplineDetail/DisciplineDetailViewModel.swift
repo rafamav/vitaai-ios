@@ -195,7 +195,9 @@ final class DisciplineDetailViewModel {
         async let gradesTask: GradesCurrentResponse? = try? api.getGradesCurrent()
         async let examsTask: ExamsResponse? = try? api.getExams()
         async let decksTask: [FlashcardDeckEntry]? = try? api.getFlashcardDecks()
-        async let docsTask: [VitaDocument]? = try? api.getDocuments(subjectId: nil)
+        // Filter by subjectId server-side — was nil (all user docs, 100s of MB of PDFs).
+        // This endpoint's payload was the #1 DisciplineDetail TTFD bottleneck.
+        async let docsTask: [VitaDocument]? = try? api.getDocuments(subjectId: disciplineId)
         async let agendaTask: AgendaResponse? = try? api.getAgenda()
         async let trabalhosTask: TrabalhosResponse? = try? api.getTrabalhos()
         async let dashboardTask: Dashboard? = try? api.getDashboard()
