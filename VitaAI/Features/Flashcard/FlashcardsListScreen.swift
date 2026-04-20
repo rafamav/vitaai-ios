@@ -25,6 +25,14 @@ struct FlashcardsListScreen: View {
     @State private var isGenerating = false
     @State private var showLibrary = false
     @State private var searchText = ""
+    // Mirror the study overview snapshot into @State so SwiftUI re-renders
+    // the Hero the moment the store finishes loading. Reading the nested
+    // @Observable store straight off @Environment(\.appContainer) does not
+    // trigger re-render reliably when the outer container is ObservableObject
+    // (not @Observable), so the Hero was stuck at 0 on first open.
+    @State private var heroDueNow: Int = 0
+    @State private var heroTotalCards: Int = 0
+    @State private var heroReviewedToday: Int = 0
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -32,17 +40,11 @@ struct FlashcardsListScreen: View {
 
                 // Unified study hero stat — themed purple for flashcards
                 StudyHeroStat(
-                    primary: "\(container.studyOverviewStore.snapshot?.flashcards.dueNow ?? 0)",
+                    primary: "\(heroDueNow)",
                     primaryCaption: "cards pra revisar agora",
                     stats: [
-                        .init(
-                            value: "\(container.studyOverviewStore.snapshot?.flashcards.totalCards ?? 0)",
-                            label: "no baralho"
-                        ),
-                        .init(
-                            value: "\(container.studyOverviewStore.snapshot?.flashcards.reviewedToday ?? 0)",
-                            label: "hoje"
-                        ),
+                        .init(value: "\(heroTotalCards)", label: "no baralho"),
+                        .init(value: "\(heroReviewedToday)", label: "hoje"),
                     ],
                     theme: .flashcards
                 )
@@ -211,10 +213,15 @@ struct FlashcardsListScreen: View {
                 }
                 .padding(.horizontal, 16)
             }
-        .refreshable { await loadData() }
+        .refreshable {
+            await container.studyOverviewStore.refresh()
+            hydrateHeroFromStore()
+            await loadData()
+        }
         .task {
             await appData.loadIfNeeded()
             await container.studyOverviewStore.loadIfNeeded()
+            hydrateHeroFromStore()
             await loadData()
             ScreenLoadContext.finish(for: "FlashcardsList")
         }
@@ -266,16 +273,26 @@ struct FlashcardsListScreen: View {
 
     // MARK: - Load Data
 
+    private func hydrateHeroFromStore() {
+        guard let snap = container.studyOverviewStore.snapshot?.flashcards else { return }
+        heroDueNow = snap.dueNow
+        heroTotalCards = snap.totalCards
+        heroReviewedToday = snap.reviewedToday
+    }
+
     private func loadData() async {
         isLoading = true
         do {
-            var fetched = try await container.api.getFlashcardDecks(cardsLimit: 0)
+            // deckLimit: 50 covers the 5 current disciplines (farmacologia alone
+            // has 26 decks). Backend default is 20, which capped the list to
+            // only farmacologia decks and hid mfc-1/medicina-legal/patologia-geral/humanidades.
+            var fetched = try await container.api.getFlashcardDecks(cardsLimit: 0, deckLimit: 50)
 
             // Auto-seed if user has no decks yet (first open)
             if fetched.isEmpty {
                 // Trigger autoSeed — generates decks from QBank for user's disciplines
                 _ = try? await container.api.generateFlashcardsAutoSeed()
-                fetched = try await container.api.getFlashcardDecks(cardsLimit: 0)
+                fetched = try await container.api.getFlashcardDecks(cardsLimit: 0, deckLimit: 50)
             }
 
             // Filter out empty decks
