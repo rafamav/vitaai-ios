@@ -31,6 +31,7 @@ struct TranscricaoScreen: View {
         .onDisappear {
             viewModel?.reset()
         }
+        .trackScreen("Transcricao")
     }
 }
 

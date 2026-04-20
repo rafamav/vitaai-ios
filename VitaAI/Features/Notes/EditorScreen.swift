@@ -102,6 +102,7 @@ struct EditorScreen: View {
         .onDisappear {
             Task { await viewModel.forceSave(drawing: currentDrawing) }
         }
+        .trackScreen("NotebookEditor")
     }
 
     // MARK: - Top bar

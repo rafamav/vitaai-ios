@@ -126,6 +126,7 @@ struct NotebookListScreen: View {
                 .presentationDragIndicator(.visible)
             }
         }
+        .trackScreen("NotebookList")
     }
 
     // MARK: - Empty state

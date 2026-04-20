@@ -26,6 +26,7 @@ struct OsceScreen: View {
                 vm.loadSpecialties()
             }
         }
+        .trackScreen("OSCE")
     }
 }
 

@@ -35,6 +35,7 @@ struct QBankCoordinatorScreen: View {
             }
         }
         .navigationBarHidden(true)
+        .trackScreen("QBank")
     }
 
     @ViewBuilder
