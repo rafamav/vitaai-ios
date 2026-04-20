@@ -156,6 +156,7 @@ struct VitaAIApp: App {
 
         // Boot observability FIRST so nothing else is invisible.
         SentryConfig.initialize()
+        VitaPostHogConfig.initialize()
         Self.logBootConfig()
 
         #if DEBUG

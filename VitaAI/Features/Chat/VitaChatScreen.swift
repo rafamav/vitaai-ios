@@ -6,6 +6,9 @@ import PhotosUI
 struct VitaChatScreen: View {
     @Environment(\.appContainer) private var container
     var onClose: () -> Void
+    /// Pre-attached image (JPEG Data) shown as soon as the chat opens.
+    /// Used by the PDF viewer "Pergunte ao Vita" scanner to pipe a page screenshot in.
+    var initialImageData: Data? = nil
     @State private var viewModel: ChatViewModel?
     @State private var showVoiceMode: Bool = false
     @FocusState private var isInputFocused: Bool
@@ -42,6 +45,13 @@ struct VitaChatScreen: View {
                 )
             }
             viewModel?.newConversation()
+            if let initialImageData {
+                viewModel?.setImageAttachment(data: initialImageData)
+                // Focus the input so Rafael can type a question immediately over the attached image.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    isInputFocused = true
+                }
+            }
         }
         .fullScreenCover(isPresented: $showVoiceMode) {
             VoiceModeScreen(

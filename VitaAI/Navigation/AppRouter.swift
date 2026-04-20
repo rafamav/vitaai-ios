@@ -194,34 +194,41 @@ struct MainTabView: View {
     @State private var showMenuPopout = false
     @State private var showNotifPopout = false
     @State private var dashboardSubtitle: String = ""
+    /// True when a descendant screen (e.g. PdfViewerScreen fullscreen) asks for
+    /// the chrome to go away. Hides TopBar, Breadcrumb, TabBar, safe-area inset.
+    @State private var isImmersiveMode: Bool = false
 
     var body: some View {
         // Shell OUTSIDE NavigationStack
         ZStack {
             // TopBar + Content (respects safe area)
             VStack(spacing: 0) {
-                VitaTopBar(
-                    userName: authManager.userName,
-                    userImageURL: authManager.userImage.flatMap(URL.init(string:)),
-                    subtitle: dashboardSubtitle,
-                    level: container.gamificationEvents.currentLevel,
-                    xpProgress: container.gamificationEvents.currentXpProgress,
-                    xpToast: container.gamificationEvents.xpToast,
-                    notificationCount: pushManager.unreadNotificationCount,
-                    onAvatarTap: { router.selectedTab = .progresso },
-                    onBellTap: {
-                        showMenuPopout = false
-                        withAnimation(.spring(duration: 0.3, bounce: 0.12)) { showNotifPopout.toggle() }
-                    },
-                    onMenuTap: {
-                        withAnimation(.spring(duration: 0.3, bounce: 0.12)) { showNotifPopout = false }
-                        showMenuPopout.toggle()
-                    }
-                )
-                .padding(.horizontal, 12)
-                .padding(.bottom, 4)
+                if !isImmersiveMode {
+                    VitaTopBar(
+                        userName: authManager.userName,
+                        userImageURL: authManager.userImage.flatMap(URL.init(string:)),
+                        subtitle: dashboardSubtitle,
+                        level: container.gamificationEvents.currentLevel,
+                        xpProgress: container.gamificationEvents.currentXpProgress,
+                        xpToast: container.gamificationEvents.xpToast,
+                        notificationCount: pushManager.unreadNotificationCount,
+                        onAvatarTap: { router.selectedTab = .progresso },
+                        onBellTap: {
+                            showMenuPopout = false
+                            withAnimation(.spring(duration: 0.3, bounce: 0.12)) { showNotifPopout.toggle() }
+                        },
+                        onMenuTap: {
+                            withAnimation(.spring(duration: 0.3, bounce: 0.12)) { showNotifPopout = false }
+                            showMenuPopout.toggle()
+                        }
+                    )
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 4)
+                    .transition(.move(edge: .top).combined(with: .opacity))
 
-                VitaBreadcrumb()
+                    VitaBreadcrumb()
+                        .transition(.opacity)
+                }
 
                 ZStack(alignment: .topTrailing) {
                     NavigationStack(path: $router.path) {
@@ -233,7 +240,7 @@ struct MainTabView: View {
                                     .frame(width: 0, height: 0)
                             }
                             .safeAreaInset(edge: .bottom, spacing: 0) {
-                                Color.clear.frame(height: 80)
+                                Color.clear.frame(height: isImmersiveMode ? 0 : 80)
                             }
                             .navigationDestination(for: Route.self) { route in
                                 routeDestination(for: route)
@@ -280,16 +287,19 @@ struct MainTabView: View {
                 }
             }
 
-            // TabBar always visible at bottom
-            VStack {
-                Spacer()
-                VitaTabBar(selectedTab: $router.selectedTab, onCenterTap: {
-                    withAnimation(.easeInOut(duration: 0.25)) { showChat.toggle() }
-                }, onTabReselect: { _ in
-                    router.popToRoot()
-                })
+            // TabBar — hidden in immersive mode (e.g. PDF fullscreen)
+            if !isImmersiveMode {
+                VStack {
+                    Spacer()
+                    VitaTabBar(selectedTab: $router.selectedTab, onCenterTap: {
+                        withAnimation(.easeInOut(duration: 0.25)) { showChat.toggle() }
+                    }, onTabReselect: { _ in
+                        router.popToRoot()
+                    })
+                }
+                .ignoresSafeArea(.keyboard)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
-            .ignoresSafeArea(.keyboard)
 
             // MARK: - Menu Popout Overlay
             if showMenuPopout {
@@ -316,6 +326,11 @@ struct MainTabView: View {
         .background {
             VitaAmbientBackground { Color.clear }
                 .ignoresSafeArea()
+        }
+        .onPreferenceChange(ImmersivePreferenceKey.self) { value in
+            withAnimation(.easeInOut(duration: 0.25)) {
+                isImmersiveMode = value
+            }
         }
         .onChange(of: router.path.count) { _, _ in
             // Sync routeStack when user swipes back (UIKit modifies path directly)

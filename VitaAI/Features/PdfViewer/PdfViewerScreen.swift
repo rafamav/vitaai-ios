@@ -17,6 +17,14 @@ struct PdfViewerScreen: View {
     @State private var exportedURL: URL? = nil
     @State private var searchDebounceTask: Task<Void, Never>? = nil
     @State private var recognitionCopied: Bool = false
+    @State private var isFullscreen: Bool = false
+    @State private var showPerguntaVita: Bool = false
+    @State private var perguntaVitaImageData: Data? = nil
+    // Scan mode (Pergunte ao Vita)
+    @State private var isScanMode: Bool = false
+    @State private var scanSelection: CGRect? = nil   // in pdfViewContainer coords
+    @State private var pdfViewContainerFrame: CGRect = .zero
+    @AppStorage("pdf_show_mascot") private var showMascot: Bool = true
     @FocusState private var isSearchFocused: Bool
 
     var body: some View {
@@ -29,11 +37,54 @@ struct PdfViewerScreen: View {
             } else {
                 errorView
             }
+
+            // Scan overlay — on top of PDF, below the mascot.
+            if isScanMode {
+                PdfScanOverlay(
+                    selection: $scanSelection,
+                    onConfirm: {
+                        performScan(rectInOverlay: scanSelection)
+                    },
+                    onFullPage: {
+                        performScan(rectInOverlay: nil)
+                    },
+                    onCancel: {
+                        exitScanMode()
+                    }
+                )
+                .frame(width: pdfViewContainerFrame.width, height: pdfViewContainerFrame.height)
+                .position(x: pdfViewContainerFrame.midX, y: pdfViewContainerFrame.midY)
+                .transition(.opacity)
+            }
+
+            // Vita mascot FAB — top-level overlay so it draws above everything,
+            // including the (hidden-when-fullscreen) tab bar.
+            // bottomInset reserves space for the app TabBar (~96pt) unless in fullscreen.
+            if viewModel.document != nil && !isScanMode && showMascot {
+                VitaFloatingMascot(
+                    positionKey: "pdf_mascot_pos",
+                    bottomInset: isFullscreen ? 16 : 96,
+                    isActive: isScanMode,
+                    onTap: {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            isScanMode = true
+                            scanSelection = nil
+                        }
+                    }
+                )
+                .transition(.opacity)
+            }
         }
         .task { await viewModel.load(url: url, tokenStore: container.tokenStore) }
         .onDisappear { viewModel.saveAllAnnotations() }
         .navigationBarHidden(true)
         .ignoresSafeArea(.keyboard)
+        // Fullscreen: hide status bar + home indicator. Propagate immersive state
+        // to AppRouter via preference so it hides TopBar + TabBar + breadcrumb.
+        .statusBarHidden(isFullscreen)
+        .persistentSystemOverlays(isFullscreen ? .hidden : .automatic)
+        .ignoresSafeArea(isFullscreen ? .all : [])
+        .preference(key: ImmersivePreferenceKey.self, value: isFullscreen)
         .sheet(isPresented: $showExportSheet) {
             if let exportedURL {
                 ShareSheet(items: [exportedURL])
@@ -43,6 +94,17 @@ struct PdfViewerScreen: View {
         .sheet(isPresented: $viewModel.showRecognitionResult) {
             recognitionResultSheet
         }
+        // Pergunte ao Vita chat opens as a sheet (not fullScreenCover) so the
+        // PDF stays visible underneath — user can cross-reference while chatting.
+        .sheet(isPresented: $showPerguntaVita) {
+            VitaChatScreen(
+                onClose: { showPerguntaVita = false },
+                initialImageData: perguntaVitaImageData
+            )
+            .presentationDetents([.large, .medium])
+            .presentationDragIndicator(.visible)
+            .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+        }
     }
 
     // MARK: - Main Content
@@ -50,45 +112,60 @@ struct PdfViewerScreen: View {
     @ViewBuilder
     private func mainContent(document: PDFDocument) -> some View {
         VStack(spacing: 0) {
-            PdfTopBar(
-                fileName: viewModel.fileName,
-                currentPage: viewModel.currentPage + 1,
-                pageCount: viewModel.pageCount,
-                isSaving: viewModel.isSaving,
-                isAnnotating: viewModel.isAnnotating,
-                isHighlightMode: viewModel.isHighlightMode,
-                isTextMode: viewModel.isTextMode,
-                isSearching: viewModel.isSearching,
-                isBookmarked: viewModel.isCurrentPageBookmarked,
-                showThumbnailToggle: viewModel.pageCount > 1,
-                hasInkOnCurrentPage: viewModel.currentDrawingProvider?()?.strokes.isEmpty == false,
-                isRecognizing: viewModel.isRecognizing,
-                isLassoMode: viewModel.isLassoMode,
-                onBack: {
-                    viewModel.saveAllAnnotations()
-                    onBack()
-                },
-                onToggleThumbnails: viewModel.toggleThumbnails,
-                onToggleAnnotating: viewModel.toggleAnnotating,
-                onToggleHighlight: viewModel.toggleHighlightMode,
-                onToggleText: viewModel.toggleTextMode,
-                onToggleSearch: {
-                    viewModel.toggleSearch()
-                    if viewModel.isSearching {
-                        isSearchFocused = true
+            if !isFullscreen {
+                PdfTopBar(
+                    fileName: viewModel.fileName,
+                    currentPage: viewModel.currentPage + 1,
+                    pageCount: viewModel.pageCount,
+                    isSaving: viewModel.isSaving,
+                    isAnnotating: viewModel.isAnnotating,
+                    isHighlightMode: viewModel.isHighlightMode,
+                    isTextMode: viewModel.isTextMode,
+                    isSearching: viewModel.isSearching,
+                    isBookmarked: viewModel.isCurrentPageBookmarked,
+                    showThumbnailToggle: viewModel.pageCount > 1,
+                    hasInkOnCurrentPage: viewModel.currentDrawingProvider?()?.strokes.isEmpty == false,
+                    isRecognizing: viewModel.isRecognizing,
+                    isLassoMode: viewModel.isLassoMode,
+                    isFullscreen: isFullscreen,
+                    showMascot: showMascot,
+                    onBack: {
+                        viewModel.saveAllAnnotations()
+                        onBack()
+                    },
+                    onToggleThumbnails: viewModel.toggleThumbnails,
+                    onToggleAnnotating: viewModel.toggleAnnotating,
+                    onToggleHighlight: viewModel.toggleHighlightMode,
+                    onToggleText: viewModel.toggleTextMode,
+                    onToggleSearch: {
+                        viewModel.toggleSearch()
+                        if viewModel.isSearching {
+                            isSearchFocused = true
+                        }
+                    },
+                    onToggleBookmark: viewModel.toggleBookmark,
+                    onToggleLasso: viewModel.toggleLassoMode,
+                    onToggleFullscreen: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isFullscreen.toggle()
+                        }
+                    },
+                    onToggleMascot: {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            showMascot.toggle()
+                        }
+                    },
+                    onExport: {
+                        Task { await exportPDF(document: document) }
+                    },
+                    onTranscribe: {
+                        guard let drawing = viewModel.currentDrawingProvider?(),
+                              !drawing.strokes.isEmpty else { return }
+                        Task { await viewModel.recognizeHandwriting(drawing: drawing) }
                     }
-                },
-                onToggleBookmark: viewModel.toggleBookmark,
-                onToggleLasso: viewModel.toggleLassoMode,
-                onExport: {
-                    Task { await exportPDF(document: document) }
-                },
-                onTranscribe: {
-                    guard let drawing = viewModel.currentDrawingProvider?(),
-                          !drawing.strokes.isEmpty else { return }
-                    Task { await viewModel.recognizeHandwriting(drawing: drawing) }
-                }
-            )
+                )
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
 
             // Search bar slides in below top bar
             if viewModel.isSearching {
@@ -121,6 +198,16 @@ struct PdfViewerScreen: View {
 
             ZStack(alignment: .leading) {
                 NativePdfView(viewModel: viewModel)
+                    .allowsHitTesting(!isScanMode)   // disable pan/zoom during scan
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear
+                                .onAppear { pdfViewContainerFrame = geo.frame(in: .global) }
+                                .onChange(of: geo.size) { _, _ in
+                                    pdfViewContainerFrame = geo.frame(in: .global)
+                                }
+                        }
+                    )
 
                 PageThumbnailSidebar(
                     document: document,
@@ -135,6 +222,127 @@ struct PdfViewerScreen: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.isSearching)
+        .overlay(alignment: .topLeading) {
+            if isFullscreen && !isScanMode {
+                fullscreenExitPill
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    // MARK: - Scan mode lifecycle
+
+    private func exitScanMode() {
+        withAnimation(.easeInOut(duration: 0.22)) {
+            isScanMode = false
+            scanSelection = nil
+        }
+    }
+
+    /// Renders the selected region (or full current page if rectInOverlay is nil)
+    /// as a JPEG and opens VitaChat with it attached.
+    private func performScan(rectInOverlay: CGRect?) {
+        guard let pdfView = NativePdfView.pdfViewRef,
+              let page = pdfView.currentPage else {
+            exitScanMode()
+            return
+        }
+
+        // Decide the region in PAGE space to render.
+        let pageBoxBounds = page.bounds(for: .mediaBox)
+        let pageRectToRender: CGRect
+
+        if let rect = rectInOverlay, rect.width > 0, rect.height > 0 {
+            // Convert the overlay rect (screen / container coords) → PDFView local → page.
+            // pdfViewContainerFrame is in .global, overlay rect was also captured
+            // relative to the container (PdfScanOverlay lives in that frame).
+            let topLeftInPDFView = CGPoint(x: rect.minX, y: rect.minY)
+            let bottomRightInPDFView = CGPoint(x: rect.maxX, y: rect.maxY)
+
+            let p1 = pdfView.convert(topLeftInPDFView, to: page)
+            let p2 = pdfView.convert(bottomRightInPDFView, to: page)
+
+            let minX = min(p1.x, p2.x)
+            let maxX = max(p1.x, p2.x)
+            let minY = min(p1.y, p2.y)
+            let maxY = max(p1.y, p2.y)
+
+            pageRectToRender = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+                .intersection(pageBoxBounds)
+        } else {
+            pageRectToRender = pageBoxBounds
+        }
+
+        // Render the chosen page rect to a UIImage, scaled to max 1024pt on the
+        // longest edge. Prevents OOM on very large pages.
+        let longest = max(pageRectToRender.width, pageRectToRender.height)
+        let scale = longest > 0 ? min(1024 / longest, 2.0) : 1.0
+        let targetSize = CGSize(
+            width: max(1, pageRectToRender.width * scale),
+            height: max(1, pageRectToRender.height * scale)
+        )
+
+        let renderer = UIGraphicsImageRenderer(size: targetSize)
+        let image = renderer.image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(origin: .zero, size: targetSize))
+            let cg = ctx.cgContext
+            // PDF page coordinates: origin bottom-left. UIImage: origin top-left.
+            // Translate so the selected region starts at (0, 0) in render space.
+            cg.translateBy(x: 0, y: targetSize.height)
+            cg.scaleBy(x: scale, y: -scale)
+            cg.translateBy(x: -pageRectToRender.minX, y: -pageRectToRender.minY)
+            page.draw(with: .mediaBox, to: cg)
+        }
+
+        perguntaVitaImageData = image.jpegData(compressionQuality: 0.78)
+        exitScanMode()
+        // Small delay lets the overlay animation finish before the chat presents.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            showPerguntaVita = true
+        }
+    }
+
+    // Small floating pill shown in fullscreen mode — back + exit fullscreen + page counter.
+    // Top-leading so it does not clash with the system clock/Dynamic Island on the right.
+    private var fullscreenExitPill: some View {
+        HStack(spacing: 12) {
+            Button {
+                viewModel.saveAllAnnotations()
+                onBack()
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(VitaColors.textPrimary)
+            }
+
+            if viewModel.pageCount > 0 {
+                Text("\(viewModel.currentPage + 1) / \(viewModel.pageCount)")
+                    .font(VitaTypography.labelSmall)
+                    .foregroundStyle(VitaColors.textSecondary)
+                    .monospacedDigit()
+            }
+
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isFullscreen = false
+                }
+            } label: {
+                Image(systemName: "arrow.down.right.and.arrow.up.left")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(VitaColors.accent)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(VitaColors.surfaceCard.opacity(0.85))
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .stroke(VitaColors.surfaceBorder.opacity(0.6), lineWidth: 0.5)
+        )
+        .padding(.top, 54)     // clear the status bar / notch area
+        .padding(.leading, 12)
     }
 
     // MARK: - Error View
@@ -640,6 +848,8 @@ private struct PdfTopBar: View {
     let hasInkOnCurrentPage: Bool
     let isRecognizing: Bool
     let isLassoMode: Bool
+    let isFullscreen: Bool
+    let showMascot: Bool
     let onBack: () -> Void
     let onToggleThumbnails: () -> Void
     let onToggleAnnotating: () -> Void
@@ -648,6 +858,8 @@ private struct PdfTopBar: View {
     let onToggleSearch: () -> Void
     let onToggleBookmark: () -> Void
     let onToggleLasso: () -> Void
+    let onToggleFullscreen: () -> Void
+    let onToggleMascot: () -> Void
     let onExport: () -> Void
     let onTranscribe: () -> Void
 
@@ -756,6 +968,22 @@ private struct PdfTopBar: View {
                         .foregroundStyle(VitaColors.textSecondary)
                         .frame(width: 36, height: 36)
                 }
+            }
+
+            // Pergunte ao Vita mascot toggle — for users who don't want the FAB.
+            Button(action: onToggleMascot) {
+                Image(systemName: showMascot ? "questionmark.bubble.fill" : "questionmark.bubble")
+                    .font(.system(size: 15))
+                    .foregroundStyle(showMascot ? VitaColors.accent : VitaColors.textTertiary)
+                    .frame(width: 36, height: 36)
+            }
+
+            // Fullscreen toggle — hides top bar so PDF fits the narrow iPhone portrait view.
+            Button(action: onToggleFullscreen) {
+                Image(systemName: isFullscreen ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(VitaColors.textSecondary)
+                    .frame(width: 36, height: 36)
             }
 
             Button(action: onExport) {
