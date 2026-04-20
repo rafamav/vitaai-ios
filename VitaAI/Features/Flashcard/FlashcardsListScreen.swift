@@ -292,24 +292,37 @@ struct FlashcardsListScreen: View {
             // "Suas disciplinas" = only decks matching user's current semester subjects
             // "Biblioteca" = everything else (AnKing library, other disciplines)
             //
-            // SOT: AppDataManager.gradesResponse.current — same source Dashboard
-            // uses. One canonical disciplines list across the app.
+            // Match by BOTH subjectId (old decks) AND disciplineSlug (auto-seeded
+            // decks with subjectId=null). Pre-fix, only subjectId was matched,
+            // which caused 0 visible decks for users whose entire library came
+            // from autoSeed (subjectId null, disciplineSlug populated).
             let subjectIds = Set(
                 (container.dataManager.gradesResponse?.current ?? [])
                     .compactMap { $0.subjectId }
             )
+            let subjectSlugs = Set(
+                container.dataManager.enrolledDisciplines
+                    .compactMap { $0.disciplineSlug }
+            )
             let scoreFor: (FlashcardDeckEntry) -> Double = { deck in
                 container.dataManager.vitaScore(for: deck.title)
             }
-            if subjectIds.isEmpty {
+            let isCurrent: (FlashcardDeckEntry) -> Bool = { deck in
+                if let sid = deck.subjectId, subjectIds.contains(sid) { return true }
+                if let slug = deck.disciplineSlug, subjectSlugs.contains(slug) { return true }
+                return false
+            }
+            if subjectIds.isEmpty && subjectSlugs.isEmpty {
+                // User has no subjects registered — treat everything as "current"
+                // so the library never shows empty when data exists.
                 currentDecks = withCards.sorted { scoreFor($0) > scoreFor($1) }
                 historyDecks = []
             } else {
                 currentDecks = withCards
-                    .filter { $0.subjectId != nil && subjectIds.contains($0.subjectId!) }
+                    .filter(isCurrent)
                     .sorted { scoreFor($0) > scoreFor($1) }
                 historyDecks = withCards
-                    .filter { $0.subjectId == nil || !subjectIds.contains($0.subjectId!) }
+                    .filter { !isCurrent($0) }
                     .sorted { scoreFor($0) > scoreFor($1) }
             }
 

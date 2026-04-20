@@ -139,6 +139,10 @@ struct FlashcardDeckEntry: Codable, Identifiable {
     var title: String = ""
     var subjectId: String?
     var disciplineId: String?
+    /// Canonical discipline slug (e.g. "farmacologia", "cardiologia"). Preferred
+    /// over subjectId for matching with the user's enrolled disciplines, because
+    /// most decks created by auto-seed have subjectId=null and only disciplineSlug.
+    var disciplineSlug: String?
     var userId: String?
     var createdAt: String?
     var updatedAt: String?
