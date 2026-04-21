@@ -291,13 +291,13 @@ struct FlashcardsListScreen: View {
             // updatedAt was hiding mfc-1/medicina-legal/patologia-geral/humanidades
             // because many library decks (cardiologia, pediatria-1) had more
             // recent updates. Backend cap raised to 500 in parallel.
-            var fetched = try await container.api.getFlashcardDecks(cardsLimit: 0, deckLimit: 500)
+            var fetched = try await container.api.getFlashcardDecks(cardsLimit: 0, deckLimit: 1000)
 
             // Auto-seed if user has no decks yet (first open)
             if fetched.isEmpty {
                 // Trigger autoSeed — generates decks from QBank for user's disciplines
                 _ = try? await container.api.generateFlashcardsAutoSeed()
-                fetched = try await container.api.getFlashcardDecks(cardsLimit: 0, deckLimit: 500)
+                fetched = try await container.api.getFlashcardDecks(cardsLimit: 0, deckLimit: 1000)
             }
 
             // Filter out empty decks
@@ -506,9 +506,12 @@ struct FlashcardsListScreen: View {
         var totalDue: Int { decks.reduce(0) { $0 + ($1.dueCount ?? 0) } }
     }
 
-    /// Group filteredCurrentDecks by disciplineSlug. One section per slug,
-    /// pulling canonicalName + icon from AppDataManager.enrolledDisciplines
-    /// (the same SOT Dashboard uses) so naming and iconography match.
+    /// Group filteredCurrentDecks by disciplineSlug. One section per slug.
+    /// Prefer the user's raw subject name (as seen on Canvas/Mannesoft) over
+    /// the catalog canonicalName — Rafael saw "Humanidades Médicas" and said
+    /// "de onde tiraram, não é subject meu". His real subjects for that slug
+    /// are "PRÁTICAS INTERPROFISSIONAIS..." and "SOCIEDADE E CONTEMPORANEIDADE".
+    /// When 2+ subjects share the same slug we concatenate titles.
     private var disciplineGroups: [DisciplineGroup] {
         let enrolledBySlug = Dictionary(
             grouping: container.dataManager.enrolledDisciplines,
@@ -517,13 +520,22 @@ struct FlashcardsListScreen: View {
         let grouped = Dictionary(grouping: filteredCurrentDecks, by: { $0.disciplineSlug ?? "" })
         return grouped
             .map { slug, decks -> DisciplineGroup in
-                let enrolled = enrolledBySlug[slug]?.first
-                let name = enrolled?.canonicalName?.isEmpty == false
-                    ? (enrolled?.canonicalName ?? slug)
-                    : (enrolled?.name ?? slug.replacingOccurrences(of: "-", with: " ").capitalized)
-                let icon = enrolled?.icon ?? "\(slug).webp"
+                let enrolled = enrolledBySlug[slug] ?? []
+                // Use raw subject names (what the user recognizes from the portal).
+                let realNames = enrolled.map { $0.name }.filter { !$0.isEmpty }
+                let displayName: String
+                if realNames.isEmpty {
+                    displayName = slug.replacingOccurrences(of: "-", with: " ").capitalized
+                } else if realNames.count == 1 {
+                    displayName = realNames[0]
+                } else {
+                    // 2+ subjects share the same slug — show both so the user
+                    // understands they pull from the same pool.
+                    displayName = realNames.joined(separator: " + ")
+                }
+                let icon = enrolled.first?.icon ?? "\(slug).webp"
                 let sorted = decks.sorted { $0.title < $1.title }
-                return DisciplineGroup(slug: slug, canonicalName: name, icon: icon, decks: sorted)
+                return DisciplineGroup(slug: slug, canonicalName: displayName, icon: icon, decks: sorted)
             }
             .sorted { $0.totalDue > $1.totalDue }  // most due first
     }
