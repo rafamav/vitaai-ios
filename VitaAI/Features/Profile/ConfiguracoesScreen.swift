@@ -60,13 +60,6 @@ struct ConfiguracoesScreen: View {
                 VitaGlassCard {
                     VStack(spacing: 0) {
                         settingsRow(
-                            icon: "sun.max",
-                            label: "Aparência",
-                            desc: "Tema, cores, tamanho de fonte",
-                            action: { onNavigateToAppearance?() }
-                        )
-                        settingsDivider
-                        settingsRow(
                             icon: "bell",
                             label: "Notificações",
                             desc: "Push, email, lembretes de estudo",

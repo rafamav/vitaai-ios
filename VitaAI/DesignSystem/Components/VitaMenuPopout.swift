@@ -92,9 +92,6 @@ struct VitaMenuPopout: View {
             menuItem(icon: "gearshape", label: "Configurações", identifier: "menu_config") {
                 dismiss(); onConfiguracoes()
             }
-            menuItem(icon: "paintpalette", label: "Aparência", identifier: "menu_aparencia") {
-                dismiss(); onAppearance()
-            }
             menuItem(icon: "square.3.layers.3d", label: "Conectores", identifier: "menu_conectores") {
                 dismiss(); onConnections()
             }
