@@ -363,7 +363,7 @@
 		2195501DA7E91A64A1786943 /* AchievementsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AchievementsScreen.swift; sourceTree = "<group>"; };
 		21F707CB00A1F232460531A0 /* PdfAnnotationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PdfAnnotationModels.swift; sourceTree = "<group>"; };
 		231B6498AE9ECCFB21DB6A6E /* VitaGlassCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitaGlassCard.swift; sourceTree = "<group>"; };
-		EE9FFC0C65AB46CCB8C56080 /* AgendaScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgendaScreen.swift; sourceTree = "<group>"; };
+		EE9FFC0C65AB46CCB8C56080 /* AgendaScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AgendaScreen.swift; path = VitaAI/Features/Agenda/AgendaScreen.swift; sourceTree = SOURCE_ROOT; };
 		A461F9DC20E84DA3A650A0B7 /* VitaHeroCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitaHeroCard.swift; sourceTree = "<group>"; };
 		2373B8651D45CEF182E7E602 /* ConnectorCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectorCard.swift; sourceTree = "<group>"; };
 		25016496DB7CB8AF6A989AE9 /* NotebookListScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotebookListScreen.swift; sourceTree = "<group>"; };
