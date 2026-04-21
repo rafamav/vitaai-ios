@@ -322,17 +322,15 @@ struct FaculdadeHomeScreen: View {
     // MARK: - Mini card: Trabalhos
 
     private var trabalhosMiniCard: some View {
-        let assignments = appData.academicEvaluations.filter {
-            $0.type == "assignment" || $0.type == "exam"
-        }
+        // Pending list: any assignment not yet submitted — includes overdue,
+        // because the student still needs to see them (and can submit late).
+        // Canvas marks submitted rows with status='completed' or submitted=true.
+        let assignments = appData.academicEvaluations.filter { $0.type == "assignment" }
         let upcoming = assignments.filter { eval in
-            guard let s = eval.date else { return eval.status == "pending" }
-            let fmt = ISO8601DateFormatter()
-            fmt.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-            let fmt2 = ISO8601DateFormatter()
-            fmt2.formatOptions = [.withInternetDateTime]
-            guard let d = fmt.date(from: s) ?? fmt2.date(from: s) else { return false }
-            return d > Date().addingTimeInterval(-86400)  // include today
+            // Show anything not yet submitted — overdue included. Student
+            // still needs to see (and can submit late) past-due work.
+            let status = eval.status.lowercased()
+            return status != "completed" && status != "graded" && status != "submitted"
         }.sorted { a, b in
             (a.date ?? "") < (b.date ?? "")
         }

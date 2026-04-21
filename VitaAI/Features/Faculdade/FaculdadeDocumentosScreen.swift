@@ -12,6 +12,7 @@ struct FaculdadeDocumentosScreen: View {
     let onBack: () -> Void
     @Environment(\.appContainer) private var container
     @Environment(Router.self) private var router
+    @Environment(AppDataManager.self) private var appData
 
     @State private var docs: [VitaDocument] = []
     @State private var isLoading = true
@@ -19,9 +20,19 @@ struct FaculdadeDocumentosScreen: View {
     @State private var searchText = ""
     @State private var expandedSections: Set<String> = []
 
-    /// Build subject name map from documents' subjectName field (returned by API)
+    /// Build subject name map: prefer the document's own subjectName, fall
+    /// back to the app-wide subjects store so we never render a raw UUID.
     private var subjectNameMap: [String: String] {
         var map: [String: String] = [:]
+        // Seed from the known subjects list (current + completed).
+        if let grades = appData.gradesResponse {
+            for s in grades.current + grades.completed {
+                if let sid = s.subjectId, !s.subjectName.isEmpty {
+                    map[sid] = s.subjectName
+                }
+            }
+        }
+        // Let the document's own subjectName override if present (freshest).
         for doc in docs {
             if let sid = doc.subjectId, let name = doc.subjectName, !name.isEmpty {
                 map[sid] = name
