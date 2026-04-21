@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import Sentry
 
 // MARK: - Flashcard Session accent colors (from flashcard-session-v1.html mockup)
 // Purple accent: rgba(148,75,220), rgba(100,40,180), rgba(120,50,200)
@@ -74,7 +75,10 @@ struct FlashcardSessionScreen: View {
             if viewModel == nil {
                 let vm = FlashcardViewModel(api: container.api, gamificationEvents: container.gamificationEvents)
                 viewModel = vm
-                vm.loadDeck(deckId, tagFilter: tagFilter)
+                Task {
+                    vm.loadDeck(deckId, tagFilter: tagFilter)
+                    SentrySDK.reportFullyDisplayed()
+                }
             }
             // Share VM + settings with router so pushed settings screen can access them
             router.activeFlashcardVM = viewModel

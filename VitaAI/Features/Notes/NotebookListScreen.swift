@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - NotebookListScreen
 // Grid of notebooks — mirrors NotebookListScreen.kt (Android).
@@ -114,6 +115,7 @@ struct NotebookListScreen: View {
             .task {
                 await viewModel.onAppear()
                 withAnimation { appeared = true }
+                SentrySDK.reportFullyDisplayed()
             }
             .sheet(isPresented: $viewModel.showCreateDialog) {
                 CreateNotebookSheet(

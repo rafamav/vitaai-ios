@@ -245,7 +245,7 @@ struct ProfileScreen: View {
     // MARK: - XP Bar (inside glass card)
 
     private var xpBarSection: some View {
-        VStack(spacing: 6) {
+        VitaGlassCard(cornerRadius: 14) { VStack(spacing: 6) {
             let currentXp = gamStats?.currentLevelXp ?? 1250
             let totalXp = (gamStats.map { $0.currentLevelXp + $0.xpToNextLevel }) ?? 2000
             let level = gamStats?.level ?? 7
@@ -275,10 +275,6 @@ struct ProfileScreen: View {
             }
             .frame(height: 6)
         }
-        .padding(14)
-        .background(VitaColors.glassBg)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(VitaColors.glassBorder, lineWidth: 1))
     }
 
     // MARK: - Section label
@@ -287,8 +283,8 @@ struct ProfileScreen: View {
         HStack {
             Text(text.uppercased())
                 .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(VitaColors.textTertiary)
-                .kerning(0.4)
+                .foregroundStyle(VitaColors.sectionLabel)
+                .kerning(0.8)
             Spacer()
         }
         .padding(.horizontal, 14)
@@ -297,13 +293,11 @@ struct ProfileScreen: View {
     // MARK: - Conquistas (emoji badges, horizontal scroll inside glass card)
 
     private var conquistas: some View {
-        badgesScrollView
-            .padding(14)
-            .background(VitaColors.glassBg)
-            .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(VitaColors.glassBorder, lineWidth: 1))
-            .padding(.horizontal, 14)
-            .padding(.top, 10)
+        VitaGlassCard(cornerRadius: 14) {
+            badgesScrollView.padding(14)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
     }
 
     @ViewBuilder
@@ -415,26 +409,7 @@ struct ProfileScreen: View {
         }
         .frame(maxWidth: .infinity)
         .padding(14)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(VitaColors.glassBg)
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(
-                        RadialGradient(
-                            colors: [VitaColors.accent.opacity(0.06), Color.clear],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: 80
-                        )
-                    )
-            }
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(VitaColors.glassBorder, lineWidth: 1)
-        )
+        .vitaGlassCard(cornerRadius: 14)
     }
 
     // MARK: - Helpers

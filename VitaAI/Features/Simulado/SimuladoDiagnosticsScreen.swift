@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // Simulado teal accent (from simulado-mobile-v1.html mockup)
 private let simuladoAccent = Color(red: 120/255, green: 220/255, blue: 240/255)
@@ -34,7 +35,10 @@ struct SimuladoDiagnosticsScreen: View {
         .navigationBarHidden(true)
         .onAppear {
             if vm == nil { vm = SimuladoViewModel(api: container.api, gamificationEvents: container.gamificationEvents, dataManager: container.dataManager) }
-            vm?.loadDiagnostics(period: selectedPeriod)
+            Task {
+                vm?.loadDiagnostics(period: selectedPeriod)
+                SentrySDK.reportFullyDisplayed()
+            }
         }
         .trackScreen("SimuladoDiagnostics")
     }

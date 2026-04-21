@@ -1,5 +1,6 @@
 import SwiftUI
 import UserNotifications
+import Sentry
 
 // MARK: - Notification Preferences Keys (AppStorage)
 
@@ -204,6 +205,7 @@ struct NotificationSettingsScreen: View {
         .task {
             await checkSystemPermission()
             await loadPreferencesFromBackend()
+            SentrySDK.reportFullyDisplayed()
         }
         .onAppear {
             animateEntrance()

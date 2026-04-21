@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 /// Entry point for Transcrição feature. Owns the ViewModel, routes between phases.
 ///
@@ -25,7 +26,10 @@ struct TranscricaoScreen: View {
         .onAppear {
             if viewModel == nil {
                 viewModel = TranscricaoViewModel(client: container.transcricaoClient, api: container.api, gamificationEvents: container.gamificationEvents)
-                Task { await viewModel?.loadRecordings() }
+                Task {
+                    await viewModel?.loadRecordings()
+                    SentrySDK.reportFullyDisplayed()
+                }
             }
         }
         .onDisappear {

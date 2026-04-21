@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import Sentry
 
 // MARK: - ProvasScreen
 // Mirrors Android: ui/screens/provas/ProvasScreen.kt
@@ -32,7 +33,10 @@ struct ProvasScreen: View {
             if viewModel == nil {
                 let vm = ProvasViewModel(api: container.api)
                 viewModel = vm
-                Task { await vm.loadAll() }
+                Task {
+                    await vm.loadAll()
+                    SentrySDK.reportFullyDisplayed()
+                }
             }
         }
         .navigationBarHidden(true)

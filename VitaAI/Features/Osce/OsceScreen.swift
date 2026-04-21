@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - OsceScreen — entry point
 
@@ -23,7 +24,10 @@ struct OsceScreen: View {
             if viewModel == nil {
                 let vm = OsceViewModel(api: container.api, sseClient: container.osceSseClient, gamificationEvents: container.gamificationEvents)
                 viewModel = vm
-                vm.loadSpecialties()
+                Task {
+                    vm.loadSpecialties()
+                    SentrySDK.reportFullyDisplayed()
+                }
             }
         }
         .trackScreen("OSCE")

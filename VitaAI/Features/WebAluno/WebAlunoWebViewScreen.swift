@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import Sentry
 
 // MARK: - Constants
 
@@ -75,6 +76,7 @@ struct WebAlunoWebViewScreen: View {
             }
         }
         .navigationBarHidden(true)
+        .onAppear { SentrySDK.reportFullyDisplayed() }
         .trackScreen("WebAlunoWebView")
     }
 

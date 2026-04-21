@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import Sentry
 
 // MARK: - VitaChatScreen — Overlay between top bar and tab bar
 
@@ -52,6 +53,8 @@ struct VitaChatScreen: View {
                     isInputFocused = true
                 }
             }
+            // Chat is interactive immediately — no async fetch needed before first render.
+            SentrySDK.reportFullyDisplayed()
         }
         .fullScreenCover(isPresented: $showVoiceMode) {
             VoiceModeScreen(

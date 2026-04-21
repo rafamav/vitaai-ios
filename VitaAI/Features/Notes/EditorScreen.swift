@@ -1,5 +1,6 @@
 import SwiftUI
 import PencilKit
+import Sentry
 
 // MARK: - EditorScreen
 // Full-screen canvas editor with floating toolbar and top bar overlay.
@@ -88,6 +89,7 @@ struct EditorScreen: View {
                let drawing = try? PKDrawing(data: data) {
                 currentDrawing = drawing
             }
+            SentrySDK.reportFullyDisplayed()
         }
         .onChange(of: viewModel.currentPageIndex) { _ in
             // Force canvas re-init on page change so it loads correct PKDrawing

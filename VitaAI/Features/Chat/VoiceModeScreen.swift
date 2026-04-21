@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - VoiceModeScreen
 // Full-screen voice mode UI — iOS equivalent of Android's VoiceModeScreen.kt.
@@ -90,7 +91,10 @@ struct VoiceModeScreen: View {
             }
         }
         .preferredColorScheme(.dark)
-        .task { await viewModel.onAppear() }
+        .task {
+            await viewModel.onAppear()
+            SentrySDK.reportFullyDisplayed()
+        }
         .onDisappear { viewModel.onDisappear() }
         // sensoryFeedback removed (iOS 17+)
         .trackScreen("VoiceMode")

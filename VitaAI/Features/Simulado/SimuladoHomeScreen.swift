@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - Simulado colors — themed blue (StudyShellTheme.simulados)
 private enum SimuladoColors {
@@ -46,7 +47,10 @@ struct SimuladoHomeScreen: View {
         }
         .onAppear {
             if vm == nil { vm = SimuladoViewModel(api: container.api, gamificationEvents: container.gamificationEvents, dataManager: container.dataManager) }
-            vm?.loadAttempts()
+            Task {
+                vm?.loadAttempts()
+                SentrySDK.reportFullyDisplayed()
+            }
         }
         .trackScreen("SimuladoHome")
     }

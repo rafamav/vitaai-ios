@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - SimuladoConfigScreen — matches simulado-config-v1.html mockup exactly
 
@@ -19,7 +20,10 @@ struct SimuladoConfigScreen: View {
         }
         .onAppear {
             if vm == nil { vm = SimuladoViewModel(api: container.api, gamificationEvents: container.gamificationEvents, dataManager: container.dataManager) }
-            vm?.loadConfigData()
+            Task {
+                vm?.loadConfigData()
+                SentrySDK.reportFullyDisplayed()
+            }
         }
         .navigationBarHidden(true)
         .trackScreen("SimuladoConfig")

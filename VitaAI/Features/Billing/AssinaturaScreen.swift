@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - AssinaturaScreen
 // Matches assinatura-mobile-v1.html mockup.
@@ -48,6 +49,7 @@ struct AssinaturaScreen: View {
         .sheet(isPresented: $showPaywall) {
             VitaPaywallScreen(onDismiss: { showPaywall = false })
         }
+        .onAppear { SentrySDK.reportFullyDisplayed() }
         .trackScreen("Assinatura")
     }
 

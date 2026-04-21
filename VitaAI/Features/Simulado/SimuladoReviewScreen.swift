@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // Simulado teal accent (from simulado-mobile-v1.html mockup)
 private let simuladoAccent = Color(red: 120/255, green: 220/255, blue: 240/255)
@@ -30,8 +31,11 @@ struct SimuladoReviewScreen: View {
         .onAppear {
             if vm == nil { vm = SimuladoViewModel(api: container.api, gamificationEvents: container.gamificationEvents, dataManager: container.dataManager) }
             guard let vm else { return }
-            if vm.state.currentAttemptId != attemptId {
-                vm.loadSession(attemptId)
+            Task {
+                if vm.state.currentAttemptId != attemptId {
+                    vm.loadSession(attemptId)
+                }
+                SentrySDK.reportFullyDisplayed()
             }
         }
         .trackScreen("SimuladoReview", extra: ["attempt_id": attemptId])

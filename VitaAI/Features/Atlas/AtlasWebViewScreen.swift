@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import Sentry
 
 // MARK: - Atlas 3D WebView Screen
 // Loads /atlas-embed — full 3D anatomy with 4500+ PT-BR translated structures.
@@ -68,6 +69,8 @@ struct AtlasWebViewScreen: View {
         .task {
             sessionToken = await container.tokenStore.token
             tokenReady = true
+            // Token fetch unblocks the WebView render — report here, not on page load.
+            SentrySDK.reportFullyDisplayed()
             print("[AtlasWebView] token ready: \(sessionToken != nil ? "SET" : "NIL"), url: \(atlasURL)")
         }
         .trackScreen("Atlas3D")

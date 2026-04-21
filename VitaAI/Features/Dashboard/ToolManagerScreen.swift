@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - Tool Entry Model
 
@@ -190,6 +191,7 @@ struct ToolManagerScreen: View {
         .navigationBarHidden(true)
         .onAppear {
             selectedIds = loadSelectedToolIds(userEmail: container.authManager.userEmail)
+            SentrySDK.reportFullyDisplayed()
         }
         .trackScreen("ToolManager")
     }

@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - Login Screen
 // Drag interaction: Vita starts BIG at bottom (close to camera),
@@ -227,6 +228,7 @@ struct LoginScreen: View {
         .onChange(of: authManager.isLoading) { _, newValue in
             if !newValue { loadingProvider = .none }
         }
+        .onAppear { SentrySDK.reportFullyDisplayed() }
         .trackScreen("Login")
     }
 }

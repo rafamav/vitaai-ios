@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - FaculdadeDisciplinasScreen
 //
@@ -40,6 +41,7 @@ struct FaculdadeDisciplinasScreen: View {
             .padding(.top, 8)
         }
         .refreshable { await appData.forceRefresh() }
+        .onAppear { SentrySDK.reportFullyDisplayed() }
         .trackScreen("FaculdadeDisciplinas")
     }
 

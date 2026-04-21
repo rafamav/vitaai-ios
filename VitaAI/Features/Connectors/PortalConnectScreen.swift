@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - PortalConnectScreen
 // Unified connect screen for ALL portal types. Replaces 4 separate screens:
@@ -35,7 +36,10 @@ struct PortalConnectScreen: View {
             if vm == nil {
                 let viewModel = PortalConnectViewModel(portalType: portalType, api: container.api, defaultInstanceUrl: defaultInstanceUrl)
                 vm = viewModel
-                Task { await viewModel.loadStatus() }
+                Task {
+                    await viewModel.loadStatus()
+                    SentrySDK.reportFullyDisplayed()
+                }
             }
         }
         // Google OAuth: reload status when returning from Safari

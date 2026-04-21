@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // Gold accent → VitaColors references
 private let quizGold     = VitaColors.glassInnerLight   // rgba(200,155,70)
@@ -88,8 +89,11 @@ struct SimuladoSessionScreen: View {
         .onAppear {
             if vm == nil { vm = SimuladoViewModel(api: container.api, gamificationEvents: container.gamificationEvents, dataManager: container.dataManager) }
             guard let vm else { return }
-            if vm.state.currentAttemptId != attemptId || vm.state.questions.isEmpty {
-                vm.loadSession(attemptId)
+            Task {
+                if vm.state.currentAttemptId != attemptId || vm.state.questions.isEmpty {
+                    vm.loadSession(attemptId)
+                }
+                SentrySDK.reportFullyDisplayed()
             }
             startTimer()
         }

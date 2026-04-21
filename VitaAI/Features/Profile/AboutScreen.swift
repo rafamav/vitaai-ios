@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 struct AboutScreen: View {
     @Environment(\.dismiss) private var dismiss
@@ -192,6 +193,7 @@ struct AboutScreen: View {
                 legalOpacity = 1
                 legalOffset = 0
             }
+            SentrySDK.reportFullyDisplayed()
         }
         .trackScreen("About")
     }

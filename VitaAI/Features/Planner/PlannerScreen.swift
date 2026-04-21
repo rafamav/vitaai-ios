@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - PlannerScreen
 // Daily study planner. Shows tasks for today, completion progress, streak.
@@ -26,7 +27,10 @@ struct PlannerScreen: View {
         .onAppear {
             if viewModel == nil {
                 viewModel = PlannerViewModel(api: container.api)
-                Task { await viewModel?.load() }
+                Task {
+                    await viewModel?.load()
+                    SentrySDK.reportFullyDisplayed()
+                }
             }
         }
         .trackScreen("Planner")

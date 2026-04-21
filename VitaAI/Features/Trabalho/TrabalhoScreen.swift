@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - TrabalhoScreen
 
@@ -25,7 +26,10 @@ struct TrabalhoScreen: View {
         .onAppear {
             if viewModel == nil {
                 viewModel = TrabalhoViewModel(api: container.api, dataManager: container.dataManager)
-                Task { await viewModel?.load() }
+                Task {
+                    await viewModel?.load()
+                    SentrySDK.reportFullyDisplayed()
+                }
             }
         }
         .fullScreenCover(isPresented: $showEditor) {

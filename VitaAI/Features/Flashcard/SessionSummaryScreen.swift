@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - Session Summary accent colors (purple from flashcard-session-v1.html mockup)
 private let summaryAccent = Color(red: 148/255, green: 75/255, blue: 220/255)
@@ -64,7 +65,10 @@ struct SessionSummaryScreen: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear.ignoresSafeArea())
-        .onAppear { animateCounters() }
+        .onAppear {
+            animateCounters()
+            SentrySDK.reportFullyDisplayed()
+        }
         .trackScreen("FlashcardSummary")
     }
 

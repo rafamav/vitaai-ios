@@ -1,6 +1,7 @@
 import SwiftUI
 import StoreKit
 import SafariServices
+import Sentry
 
 // MARK: - VitaPaywallScreen
 // v6 — compact plan rows + detailed features + detail sheets.
@@ -241,6 +242,9 @@ struct VitaPaywallScreen: View {
         .onAppear {
             withAnimation(.easeOut(duration: 0.4)) { headerVisible = true }
             withAnimation(.easeOut(duration: 0.5).delay(0.15)) { cardsVisible = true }
+            VitaPostHogConfig.capture(event: "paywall_shown", properties: [
+                "screen": "VitaPaywall",
+            ])
         }
         .onChange(of: storeKit.isSubscribed) { _, newValue in
             if newValue {
@@ -269,6 +273,7 @@ struct VitaPaywallScreen: View {
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.85), value: selectedFeature?.id)
+        .onAppear { SentrySDK.reportFullyDisplayed() }
         .trackScreen("VitaPaywall")
     }
 

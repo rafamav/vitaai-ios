@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - ConfiguracoesScreen
 // Matches configurações-mobile-v1.html mockup exactly.
@@ -128,6 +129,7 @@ struct ConfiguracoesScreen: View {
             }
         }
         .background(Color.clear)
+        .onAppear { SentrySDK.reportFullyDisplayed() }
         .trackScreen("Configuracoes")
     }
 

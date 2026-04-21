@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - AppearanceScreen
 // Matches aparência-mobile-v1.html mockup.
@@ -50,6 +51,7 @@ struct AppearanceScreen: View {
         }
         .background(VitaColors.surface.ignoresSafeArea())
         .navigationBarHidden(true)
+        .onAppear { SentrySDK.reportFullyDisplayed() }
         .trackScreen("Appearance")
     }
 

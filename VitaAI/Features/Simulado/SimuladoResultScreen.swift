@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - SimuladoResultScreen
 
@@ -28,8 +29,11 @@ struct SimuladoResultScreen: View {
         .onAppear {
             if vm == nil { vm = SimuladoViewModel(api: container.api, gamificationEvents: container.gamificationEvents, dataManager: container.dataManager) }
             guard let vm else { return }
-            if vm.state.currentAttemptId != attemptId {
-                vm.loadSession(attemptId)
+            Task {
+                if vm.state.currentAttemptId != attemptId {
+                    vm.loadSession(attemptId)
+                }
+                SentrySDK.reportFullyDisplayed()
             }
         }
         .trackScreen("SimuladoResult", extra: ["attempt_id": attemptId])

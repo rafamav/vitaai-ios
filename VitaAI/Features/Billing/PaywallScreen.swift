@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - Pro features list
 // Mirrors Android VitaPaywallScreen.kt proFeatures list
@@ -46,6 +47,7 @@ struct PaywallScreen: View {
                 Task {
                     await vm.loadStatus()
                     runEntranceAnimations()
+                    SentrySDK.reportFullyDisplayed()
                 }
             }
         }

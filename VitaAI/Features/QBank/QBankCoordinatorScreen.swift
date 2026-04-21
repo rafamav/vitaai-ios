@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 /// Top-level coordinator that owns the single QBankViewModel instance and routes
 /// between the home / config / session / result sub-screens based on vm.state.activeScreen.
@@ -30,8 +31,11 @@ struct QBankCoordinatorScreen: View {
         .onAppear {
             if vm == nil {
                 vm = QBankViewModel(api: container.api, gamificationEvents: container.gamificationEvents, dataManager: container.dataManager)
-                vm?.loadHomeData()
-                // Filters are loaded on-demand when user navigates to disciplines/config
+                Task {
+                    vm?.loadHomeData()
+                    // Filters are loaded on-demand when user navigates to disciplines/config
+                    SentrySDK.reportFullyDisplayed()
+                }
             }
         }
         .navigationBarHidden(true)
