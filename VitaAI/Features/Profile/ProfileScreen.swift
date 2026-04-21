@@ -274,7 +274,7 @@ struct ProfileScreen: View {
                 }
             }
             .frame(height: 6)
-        }
+        } }
     }
 
     // MARK: - Section label
