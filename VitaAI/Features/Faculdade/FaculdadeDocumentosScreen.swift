@@ -12,7 +12,7 @@ struct FaculdadeDocumentosScreen: View {
     let onBack: () -> Void
     @Environment(\.appContainer) private var container
     @Environment(Router.self) private var router
-    @Environment(AppDataManager.self) private var appData
+    @Environment(\.appData) private var appData
 
     @State private var docs: [VitaDocument] = []
     @State private var isLoading = true
