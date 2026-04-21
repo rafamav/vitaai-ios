@@ -230,18 +230,15 @@ struct TrabalhoDetailScreen: View {
 
                     VitaGlassCard {
                         VStack(alignment: .leading, spacing: 10) {
-                            if let clean = cleanDescription {
-                                Text(clean)
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(Color.white.opacity(0.82))
-                                    .fixedSize(horizontal: false, vertical: true)
-                            } else if let desc = item.description, !desc.isEmpty {
-                                Text(desc)
-                                    .font(.system(size: 14))
-                                    .foregroundStyle(Color.white.opacity(0.82))
-                                    .fixedSize(horizontal: false, vertical: true)
-                            } else if let html = item.descriptionHtml {
-                                Text(stripHtml(html))
+                            // Canvas sends description as raw HTML with inline
+                            // styles + data-* attrs. Strip on every branch.
+                            let raw = cleanDescription
+                                ?? item.descriptionHtml
+                                ?? item.description
+                                ?? ""
+                            let cleaned = stripHtml(raw)
+                            if !cleaned.isEmpty {
+                                Text(cleaned)
                                     .font(.system(size: 14))
                                     .foregroundStyle(Color.white.opacity(0.82))
                                     .fixedSize(horizontal: false, vertical: true)
@@ -475,11 +472,34 @@ struct TrabalhoDetailScreen: View {
     }
 
     private func stripHtml(_ html: String) -> String {
-        html.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
-            .replacingOccurrences(of: "&nbsp;", with: " ")
-            .replacingOccurrences(of: "&amp;", with: "&")
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        // Preserve paragraph/line breaks before stripping tags.
+        var s = html.replacingOccurrences(of: "(?i)<\\s*br\\s*/?>", with: "\n", options: .regularExpression)
+        s = s.replacingOccurrences(of: "(?i)</\\s*p\\s*>", with: "\n\n", options: .regularExpression)
+        s = s.replacingOccurrences(of: "(?i)</\\s*li\\s*>", with: "\n", options: .regularExpression)
+        s = s.replacingOccurrences(of: "(?i)<\\s*li[^>]*>", with: "• ", options: .regularExpression)
+        // Drop all tags (any attributes: data-start, style="...", class="..." etc).
+        s = s.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        // Decode common entities.
+        let entities: [String: String] = [
+            "&nbsp;": " ", "&amp;": "&", "&quot;": "\"", "&apos;": "'",
+            "&#39;": "'", "&lt;": "<", "&gt;": ">", "&aacute;": "á",
+            "&eacute;": "é", "&iacute;": "í", "&oacute;": "ó", "&uacute;": "ú",
+            "&Aacute;": "Á", "&Eacute;": "É", "&ccedil;": "ç", "&Ccedil;": "Ç",
+            "&atilde;": "ã", "&otilde;": "õ", "&ntilde;": "ñ", "&hellip;": "…",
+            "&ldquo;": "\u{201C}", "&rdquo;": "\u{201D}", "&mdash;": "—", "&ndash;": "–",
+        ]
+        for (k, v) in entities { s = s.replacingOccurrences(of: k, with: v) }
+        // Numeric entities &#1234; → char.
+        s = s.replacingOccurrences(
+            of: "&#([0-9]+);",
+            with: "",
+            options: .regularExpression
+        )
+        // Collapse runs of spaces/tabs (but keep newlines).
+        s = s.replacingOccurrences(of: "[\\t ]+", with: " ", options: .regularExpression)
+        // Collapse 3+ newlines to 2.
+        s = s.replacingOccurrences(of: "\n{3,}", with: "\n\n", options: .regularExpression)
+        return s.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func sourceLabel(_ item: TrabalhoItem) -> String {
