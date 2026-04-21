@@ -217,15 +217,33 @@ struct FlashcardsListScreen: View {
                 .padding(.horizontal, 16)
             }
         .refreshable {
-            await container.studyOverviewStore.refresh()
+            async let overviewRefresh: Void = container.studyOverviewStore.refresh()
+            async let dataRefresh: Void = loadData()
+            _ = await (overviewRefresh, dataRefresh)
             hydrateHeroFromStore()
-            await loadData()
         }
         .task {
-            await appData.loadIfNeeded()
-            await container.studyOverviewStore.loadIfNeeded()
+            // Progressive render: kick off all independent network work in
+            // parallel and paint as each finishes. Before this change, the
+            // task ran serially:
+            //   appData.loadIfNeeded (6 paralell requests, ~2-3s)
+            //     → studyOverview (~0.5s)
+            //       → loadData (~0.5s)
+            // Worst case Rafael saw was ~15s because of backend contention
+            // (same endpoint hit 3× by different screens in parallel). Now:
+            // hero hydrates as soon as studyOverview returns, disciplines
+            // render as soon as loadData returns. appData cache may still
+            // be warming but currentDecks already shows.
+            async let overviewTask: Void = container.studyOverviewStore.loadIfNeeded()
+            async let appDataTask: Void = appData.loadIfNeeded()
+            async let decksTask: Void = loadData()
+
+            await overviewTask
             hydrateHeroFromStore()
-            await loadData()
+
+            // Wait for the other two so the accordion has enrolledDisciplines
+            // and the filtered currentDecks list.
+            _ = await (appDataTask, decksTask)
             ScreenLoadContext.finish(for: "FlashcardsList")
         }
         .trackScreen("FlashcardsList")

@@ -57,16 +57,6 @@ enum FolderPalette {
     static func color(forIndex i: Int) -> Color { colors[i % colors.count] }
 }
 
-// MARK: - FlashcardDeckDisplayEntry
-
-struct FlashcardDeckDisplayEntry: Identifiable {
-    var id: String; var name: String; var cardCount: Int; var masteredCount: Int; var courseName: String
-    var progress: Double {
-        guard cardCount > 0 else { return 0 }
-        return Double(masteredCount) / Double(cardCount)
-    }
-}
-
 // MARK: - EstudosViewModel
 
 @MainActor
@@ -77,7 +67,6 @@ final class EstudosViewModel {
     var canvasConnected: Bool = true
     var subjects: [AcademicSubject] = []
     var dashboardSubjects: [DashboardSubject] = []
-    var flashcardDisplayDecks: [FlashcardDeckDisplayEntry] = []
     var files: [CanvasFile] = []
     var downloadingFileId: String? = nil
     var downloadedFilePaths: [String: URL] = [:]
@@ -145,11 +134,10 @@ final class EstudosViewModel {
             async let progressTask  = api.getProgress()
             async let subjectsTask  = api.getSubjects()
             async let filesTask     = api.getFiles(courseId: selectedCourseId)
-            async let decksTask     = api.getFlashcardDecks(dueOnly: false)
             async let activityTask  = api.getActivityFeed(limit: 5)
             async let dashboardTask = api.getDashboard()
-            let (progressResp, subjectsResp, filesResp, rawDecks) =
-                try await (progressTask, subjectsTask, filesTask, decksTask)
+            let (progressResp, subjectsResp, filesResp) =
+                try await (progressTask, subjectsTask, filesTask)
             if let r = try? await activityTask { recentActivity = r }
             if let dash = try? await dashboardTask { applyDashboard(dash) }
             flashcardsDue = progressResp.flashcardsDue
@@ -157,18 +145,13 @@ final class EstudosViewModel {
             avgAccuracy   = progressResp.avgAccuracy
             if !subjectsResp.subjects.isEmpty { subjects = subjectsResp.subjects; canvasConnected = true }
             if !filesResp.files.isEmpty { files = filesResp.files }
-            if !rawDecks.isEmpty {
-                flashcardDisplayDecks = rawDecks.map { deck in
-                    FlashcardDeckDisplayEntry(
-                        id: deck.id, name: deck.title,
-                        cardCount: deck.cards.count,
-                        masteredCount: deck.cards.filter { $0.repetitions > 0 }.count,
-                        courseName: subjects.first(where: { $0.id == deck.subjectId })?.name ?? ""
-                    )
-                }
-            }
+            // rawDecks fetch removed 2026-04-21 — it was paired with
+            // flashcardDisplayDecks (dead state, no View reads it) and the
+            // 5.6MB payload was duplicated with FlashcardsListScreen's own
+            // call. Local recommendations now fall back to the flashcardsDue
+            // counter from progress.
             if studyRecommendations.isEmpty {
-                buildLocalRecommendations(flashcardsDue: progressResp.flashcardsDue, decks: rawDecks)
+                buildLocalRecommendations(flashcardsDue: progressResp.flashcardsDue, decks: [])
             }
         } catch {
             print("[EstudosViewModel] API error: \(error)")
