@@ -127,7 +127,7 @@ struct ConfiguracoesScreen: View {
                 Spacer().frame(height: 120)
             }
         }
-        .background(VitaColors.surface.ignoresSafeArea())
+        .background(Color.clear)
         .trackScreen("Configuracoes")
     }
 
