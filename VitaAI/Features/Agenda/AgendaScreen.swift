@@ -1,4 +1,5 @@
 import SwiftUI
+import Sentry
 
 // MARK: - AgendaScreen
 //
@@ -25,6 +26,7 @@ struct AgendaScreen: View {
         }
         .background(Color.clear)
         .refreshable { await appData.forceRefresh() }
+        .task { SentrySDK.reportFullyDisplayed() }
         .trackScreen("Agenda")
     }
 }

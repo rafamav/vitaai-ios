@@ -33,12 +33,17 @@ enum VitaPostHogConfig {
     static func initialize() {
         let config = PostHog.PostHogConfig(apiKey: apiKey, host: host)
 
-        // Session replay
+        // Session replay — screenshotMode OBRIGATÓRIO em SwiftUI
+        // (sem isso views aparecem mascaradas integral no replay, útil=0).
+        // Ref: agent-brain observability canon §3.6 "Session Replay iOS SwiftUI".
         config.sessionReplay = true
+        config.sessionReplayConfig.screenshotMode = true
         config.sessionReplayConfig.maskAllTextInputs = true
         config.sessionReplayConfig.maskAllImages = false
+        config.sessionReplayConfig.captureNetworkTelemetry = true
 
-        // Capture application lifecycle events (app open, background, etc.)
+        // LGPD — estudantes BR. IP é resolvido server-side pelo PostHog
+        // (US/EU ingest). Desligado em project settings UI, não no SDK iOS.
         config.captureApplicationLifecycleEvents = true
 
         // Capture screen views automatically
@@ -90,7 +95,46 @@ enum VitaPostHogConfig {
 
     // MARK: - Feature Flags
 
-    /// Checks if a feature flag is enabled.
+    /// Canonical feature flags for VitaAI. Defined in PostHog dashboard.
+    /// Ref: agent-brain observability canon §3.6 "Top-5 feature flags".
+    enum Flag: String {
+        /// Kill switch for PDF scanner (iOS Vision API). Flip to false if
+        /// Vision latency spikes or Apple changes the API.
+        case pdfScannerEnabled = "pdf_scanner_enabled"
+
+        /// AI coach model selector. Multivariate:
+        ///   - `haiku-max` → Claude Haiku via OAuth Max (default)
+        ///   - `sonnet-max` → Claude Sonnet via OAuth Max (premium test)
+        ///   - `local-vllm` → Qwen3.5-35B-A3B self-hosted
+        /// NUNCA adicionar Anthropic API key — só OAuth Max.
+        case aiCoachModel = "ai_coach_model"
+
+        /// Portal extractor version selector for safe rollout:
+        ///   - `v1-legacy` → hardcoded parsers (deprecated)
+        ///   - `v2-fingerprint` → fingerprint-based parseWithMap
+        ///   - `v3-teacher` → Haiku teacher generates fingerprints
+        case portalExtractorVersion = "portal_extractor_version"
+
+        /// Pricing plan variant for A/B (BRL):
+        ///   - `49-99-149` (control)
+        ///   - `39-79-119` (aggressive)
+        case pricingPlanVariant = "pricing_plan_variant"
+
+        /// Onboarding v2 — dogfood before 100% rollout. 10% initially.
+        case newOnboardingV2 = "new_onboarding_v2"
+    }
+
+    /// Checks if a typed feature flag is enabled.
+    static func isEnabled(_ flag: Flag) -> Bool {
+        PostHogSDK.shared.isFeatureEnabled(flag.rawValue)
+    }
+
+    /// Gets a multivariate flag's string payload (for `aiCoachModel`, etc.).
+    static func variant(_ flag: Flag) -> String? {
+        PostHogSDK.shared.getFeatureFlag(flag.rawValue) as? String
+    }
+
+    /// Raw flag check (legacy — prefer `isEnabled(_:)` with Flag enum).
     static func isFeatureEnabled(_ flag: String) -> Bool {
         PostHogSDK.shared.isFeatureEnabled(flag)
     }
