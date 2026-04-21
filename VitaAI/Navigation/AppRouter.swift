@@ -655,7 +655,7 @@ struct MainTabView: View {
                 initialSubjectId: subjectId,
                 onBack: { router.goBack() },
                 onOpenDeck: { deckId in router.navigate(to: .flashcardSession(deckId: deckId)) },
-                onOpenTopics: { deckId, deckTitle in router.navigate(to: .flashcardTopics(deckId: deckId, deckTitle: deckTitle)) }
+                onOpenTopics: nil  // Anki pattern: tap deck → session directly, no topics screen
             )
         case .disciplineDetail(let disciplineId, let disciplineName):
             DisciplineDetailScreen(

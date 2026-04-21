@@ -25,6 +25,9 @@ struct FlashcardsListScreen: View {
     @State private var isGenerating = false
     @State private var showLibrary = false
     @State private var searchText = ""
+    /// Anki-style accordion: which discipline groups are expanded.
+    /// Starts empty (all collapsed) so the screen fits; user taps to expand.
+    @State private var expandedDisciplines: Set<String> = []
     // Mirror the study overview snapshot into @State so SwiftUI re-renders
     // the Hero the moment the store finishes loading. Reading the nested
     // @Observable store straight off @Environment(\.appContainer) does not
@@ -478,57 +481,183 @@ struct FlashcardsListScreen: View {
         )
     }
 
-    // MARK: - My Disciplines (vertical list, full names + card count)
+    // MARK: - My Disciplines (Anki-style accordion grouped by disciplineSlug)
+    //
+    // Mockup-refactor 2026-04-20 night: Rafael hated the flat list of decks
+    // ("farmacologia sistema nervoso autonomo" showing as a standalone card
+    // with no parent discipline context). Anki-style grouping:
+    //   [▸ farmacologia  26 decks · 695 cards · 695 due]
+    //     └ Sistema Nervoso Autônomo        25 cards
+    //     └ Toxicologia                     8 cards
+    //     ...
+    // Tap the group header toggles expand. Tap a deck row opens the session
+    // directly (onOpenDeck, not onOpenTopics — that intermediate screen
+    // was removed in AppRouter for the same reason).
+
+    private struct DisciplineGroup: Identifiable {
+        let slug: String
+        let canonicalName: String
+        let icon: String
+        let decks: [FlashcardDeckEntry]
+        var id: String { slug }
+        var totalCards: Int { decks.reduce(0) { $0 + $1.cardCount } }
+        var totalDue: Int { decks.reduce(0) { $0 + ($1.dueCount ?? 0) } }
+    }
+
+    /// Group filteredCurrentDecks by disciplineSlug. One section per slug,
+    /// pulling canonicalName + icon from AppDataManager.enrolledDisciplines
+    /// (the same SOT Dashboard uses) so naming and iconography match.
+    private var disciplineGroups: [DisciplineGroup] {
+        let enrolledBySlug = Dictionary(
+            grouping: container.dataManager.enrolledDisciplines,
+            by: { $0.disciplineSlug ?? "" }
+        )
+        let grouped = Dictionary(grouping: filteredCurrentDecks, by: { $0.disciplineSlug ?? "" })
+        return grouped
+            .map { slug, decks -> DisciplineGroup in
+                let enrolled = enrolledBySlug[slug]?.first
+                let name = enrolled?.canonicalName?.isEmpty == false
+                    ? (enrolled?.canonicalName ?? slug)
+                    : (enrolled?.name ?? slug.replacingOccurrences(of: "-", with: " ").capitalized)
+                let icon = enrolled?.icon ?? "\(slug).webp"
+                let sorted = decks.sorted { $0.title < $1.title }
+                return DisciplineGroup(slug: slug, canonicalName: name, icon: icon, decks: sorted)
+            }
+            .sorted { $0.totalDue > $1.totalDue }  // most due first
+    }
 
     private var myDisciplinesList: some View {
-        VStack(spacing: 6) {
-            ForEach(filteredCurrentDecks) { deck in
-                Button(action: { navigateToDeck(deck) }) {
-                    HStack(spacing: 12) {
-                        Image(discIconFor(deck.title))
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 32, height: 32)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-
-                        Text(deck.title)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.90))
-                            .lineLimit(2)
-
-                        Spacer()
-
-                        Text("\(deck.cardCount)")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(StudyShellTheme.flashcards.primaryLight)
-                        + Text(" cards")
-                            .font(.system(size: 11))
-                            .foregroundStyle(VitaColors.textWarm.opacity(0.40))
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        VitaColors.surfaceCard.opacity(0.85),
-                                        VitaColors.surfaceElevated.opacity(0.80)
-                                    ],
-                                    startPoint: .top, endPoint: .bottom
-                                )
-                            )
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(StudyShellTheme.flashcards.primaryMuted.opacity(0.60), lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.30), radius: 11, x: 0, y: 4)
-                }
-                .buttonStyle(.plain)
+        VStack(spacing: 8) {
+            ForEach(disciplineGroups) { group in
+                disciplineGroupCard(group)
             }
         }
+    }
+
+    @ViewBuilder
+    private func disciplineGroupCard(_ group: DisciplineGroup) -> some View {
+        let isOpen = expandedDisciplines.contains(group.slug)
+        VStack(spacing: 0) {
+            // HEADER — tap to expand/collapse
+            Button(action: {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    if isOpen { expandedDisciplines.remove(group.slug) }
+                    else { expandedDisciplines.insert(group.slug) }
+                }
+            }) {
+                HStack(spacing: 12) {
+                    Image(iconAssetName(for: group))
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 32, height: 32)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(group.canonicalName)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.92))
+                            .lineLimit(1)
+                        Text("\(group.decks.count) decks · \(group.totalCards) cards")
+                            .font(.system(size: 11))
+                            .foregroundStyle(VitaColors.textWarm.opacity(0.42))
+                    }
+
+                    Spacer()
+
+                    if group.totalDue > 0 {
+                        Text("\(group.totalDue)")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(StudyShellTheme.flashcards.primaryLight)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule().fill(StudyShellTheme.flashcards.primary.opacity(0.18))
+                            )
+                    }
+
+                    Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(VitaColors.textWarm.opacity(0.45))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
+
+            // DECKS — visible only when expanded
+            if isOpen {
+                VStack(spacing: 1) {
+                    ForEach(group.decks) { deck in
+                        Button(action: { onOpenDeck(deck.id) }) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "rectangle.on.rectangle")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(VitaColors.textWarm.opacity(0.35))
+                                    .frame(width: 20)
+
+                                Text(deck.title)
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(Color.white.opacity(0.82))
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+
+                                Spacer(minLength: 8)
+
+                                if let due = deck.dueCount, due > 0 {
+                                    Text("\(due)")
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundStyle(StudyShellTheme.flashcards.primaryLight)
+                                } else {
+                                    Text("\(deck.cardCount)")
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(VitaColors.textWarm.opacity(0.45))
+                                }
+                            }
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 9)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        if deck.id != group.decks.last?.id {
+                            Divider()
+                                .background(Color.white.opacity(0.04))
+                                .padding(.leading, 48)
+                        }
+                    }
+                }
+                .padding(.bottom, 6)
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            VitaColors.surfaceCard.opacity(0.85),
+                            VitaColors.surfaceElevated.opacity(0.80)
+                        ],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(StudyShellTheme.flashcards.primaryMuted.opacity(0.55), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.28), radius: 10, x: 0, y: 4)
+    }
+
+    /// Resolve group icon → asset name with bundled fallback. Many slugs have
+    /// an explicit asset (farmacologia.webp) but humanidades/mfc-1 etc may not.
+    private func iconAssetName(for group: DisciplineGroup) -> String {
+        if UIImage(named: group.icon) != nil { return group.icon }
+        let bare = group.icon.replacingOccurrences(of: ".webp", with: "")
+        if UIImage(named: bare) != nil { return bare }
+        let fromSlug = "\(group.slug)"
+        if UIImage(named: fromSlug) != nil { return fromSlug }
+        return "asset-book-purple"
     }
 
     private func navigateToDeck(_ deck: FlashcardDeckEntry) {
