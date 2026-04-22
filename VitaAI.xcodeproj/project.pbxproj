@@ -242,6 +242,7 @@
 		B4A0012A2CFF5100CE370485 /* CreateCheckoutSession200Response.swift in Sources */ = {isa = PBXBuildFile; fileRef = 505DF51B5393856BAA326D17 /* CreateCheckoutSession200Response.swift */; };
 		B505B41DE4A819A819EAB4F8 /* DashboardResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBDF8108D737C29A91D7BAA9 /* DashboardResponse.swift */; };
 		B686750D047AF3E85B1FBCAA /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A45516BBF7E16BFB9410B27 /* AppRouter.swift */; };
+		C5203E6217374F488ACFEE86 /* NavVisibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57A789EA348C4B2F9383B818 /* NavVisibility.swift */; };
 		B7545C352B063EC286B9E005 /* VitaPaywallScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 384C2C8ACFCA9B5A9F79BB8F /* VitaPaywallScreen.swift */; };
 		B985632F939BA9B9F5168C3E /* VitaShimmer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B97080B4329AB9C409C8FD0 /* VitaShimmer.swift */; };
 		B9B38B983D00E9900D33E00B /* DoneStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CFD863579290BBEF37373EC /* DoneStep.swift */; };
@@ -454,6 +455,7 @@
 		58B636EDE3D2FC8F4C739405 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		592B63FA996C5A6E62A174DE /* VitaSubTabBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitaSubTabBar.swift; sourceTree = "<group>"; };
 		5A45516BBF7E16BFB9410B27 /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
+		57A789EA348C4B2F9383B818 /* NavVisibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavVisibility.swift; sourceTree = "<group>"; };
 		5D545B4D23872BE2BD3194EF /* FaculdadeMateriasScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaculdadeMateriasScreen.swift; sourceTree = "<group>"; };
 		5D6F3E04E70C2FFA771693FE /* TrabalhoEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrabalhoEditorView.swift; sourceTree = "<group>"; };
 		5EE115A0772689E4DA94BD33 /* QBankResultContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QBankResultContent.swift; sourceTree = "<group>"; };
@@ -1341,6 +1343,7 @@
 			isa = PBXGroup;
 			children = (
 				5A45516BBF7E16BFB9410B27 /* AppRouter.swift */,
+				57A789EA348C4B2F9383B818 /* NavVisibility.swift */,
 				709C4F8D8EC0B0BE357490A1 /* ImmersivePreferenceKey.swift */,
 				80ED0B424F1E28E60CE3578A /* Route.swift */,
 				E405E8F265D5EC67BC3497E8 /* Route+Breadcrumb.swift */,
@@ -1618,6 +1621,7 @@
 				E3820B470FDC3E8E3BAABCBB /* AppContainer.swift in Sources */,
 				4F21088B6C55430D68905FE1 /* AppDataManager.swift in Sources */,
 				B686750D047AF3E85B1FBCAA /* AppRouter.swift in Sources */,
+				C5203E6217374F488ACFEE86 /* NavVisibility.swift in Sources */,
 				36E9C4E0AB2724D60B8B51CC /* AppearanceScreen.swift in Sources */,
 				0780E271D8611FDE00449801 /* AssinaturaScreen.swift in Sources */,
 				410E3DEDD87C6AF7AEEE36DA /* AtlasWebViewScreen.swift in Sources */,

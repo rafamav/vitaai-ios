@@ -200,13 +200,17 @@ struct MainTabView: View {
     /// True when a descendant screen (e.g. PdfViewerScreen fullscreen) asks for
     /// the chrome to go away. Hides TopBar, Breadcrumb, TabBar, safe-area inset.
     @State private var isImmersiveMode: Bool = false
+    @State private var navVisibility = NavVisibility()
 
     var body: some View {
         // Shell OUTSIDE NavigationStack
         ZStack {
             // TopBar + Content (respects safe area)
             VStack(spacing: 0) {
-                if !isImmersiveMode {
+                Color.clear.frame(height: 0)
+                    .onChange(of: router.selectedTab) { _, _ in navVisibility.reset() }
+                    .onChange(of: router.path.count) { _, _ in navVisibility.reset() }
+                if !isImmersiveMode && navVisibility.isVisible {
                     VitaTopBar(
                         userName: authManager.userName,
                         userImageURL: authManager.userImage.flatMap(URL.init(string:)),
@@ -236,6 +240,7 @@ struct MainTabView: View {
                 ZStack(alignment: .topTrailing) {
                     NavigationStack(path: $router.path) {
                         activeTabView
+                            .environment(\.navVisibility, navVisibility)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                             .clipped()
                             .overlay(alignment: .topLeading) {

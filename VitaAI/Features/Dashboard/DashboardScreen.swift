@@ -118,6 +118,7 @@ struct DashboardScreen: View {
                 Spacer().frame(height: 120) // Tab bar clearance
             }
         }
+        .trackedScroll()
         .refreshable {
             // Pull-to-refresh must also reload AppDataManager (grades, schedule,
             // enrolled subjects). loadDashboard() alone does NOT touch gradesResponse,
