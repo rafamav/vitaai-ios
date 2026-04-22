@@ -511,7 +511,7 @@ struct VitaMascot: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(Int.random(in: 4000...8000)))
             guard !Task.isCancelled else { break }
-            triggerBounce()
+            if state != .sleeping { triggerBounce() }
         }
     }
 
@@ -520,8 +520,10 @@ struct VitaMascot: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(Int.random(in: 1500...3500)))
             guard !Task.isCancelled else { break }
-            withAnimation(.easeInOut(duration: 0.5)) {
-                eyeLookX = CGFloat.random(in: -size * 0.04...size * 0.04)
+            if state != .sleeping {
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    eyeLookX = CGFloat.random(in: -size * 0.04...size * 0.04)
+                }
             }
 
             try? await Task.sleep(for: .milliseconds(Int.random(in: 800...2000)))
@@ -535,10 +537,12 @@ struct VitaMascot: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(Int.random(in: 2500...5000)))
             guard !Task.isCancelled else { break }
-            blinking = true
-            try? await Task.sleep(for: .milliseconds(100))
-            guard !Task.isCancelled else { break }
-            blinking = false
+            if state != .sleeping {
+                blinking = true
+                try? await Task.sleep(for: .milliseconds(100))
+                guard !Task.isCancelled else { break }
+                blinking = false
+            }
         }
     }
 }
