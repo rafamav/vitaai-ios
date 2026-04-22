@@ -264,9 +264,14 @@ struct VitaOnboarding: View {
                 onConnectIntegration: { provider in
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                     Task {
-                        // Kicks off OAuth; ConnectorsScreen will show the
-                        // result when the user lands on it post-onboarding.
-                        _ = try? await container.api.startIntegrationOAuth(provider)
+                        do {
+                            let data = try await container.api.startIntegrationOAuth(provider)
+                            if let urlStr = data.authUrl, let url = URL(string: urlStr) {
+                                await MainActor.run { UIApplication.shared.open(url) }
+                            }
+                        } catch {
+                            NSLog("[Onboarding] startIntegrationOAuth(%@) failed: %@", provider, error.localizedDescription)
+                        }
                     }
                 }
             )
@@ -546,11 +551,18 @@ struct VitaOnboarding: View {
 
     private func saveOnboarding() async {
         guard let vm = viewModel else { return }
-        await vm.complete()
-        AppConfig.setOnboardingComplete(true)
-        // Onboarding finished — clear the resume marker so a future fresh login
-        // (or an account reset) starts from .sleep again.
-        lastStepRaw = OnboardingStep.sleep.rawValue
+        do {
+            try await vm.complete()
+            AppConfig.setOnboardingComplete(true)
+            // Onboarding finished — clear the resume marker so a future fresh login
+            // (or an account reset) starts from .sleep again.
+            lastStepRaw = OnboardingStep.sleep.rawValue
+        } catch {
+            // Backend rejected or unreachable — surface the error in the VM and
+            // stay on the screen. Never persist local "completed" flag ahead of
+            // server ack (incident 2026-04-22 onboarding loop).
+            vm.completionError = error.localizedDescription
+        }
     }
 
     private func requestNotificationPermission() {

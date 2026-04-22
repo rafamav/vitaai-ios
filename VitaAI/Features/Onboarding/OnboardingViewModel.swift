@@ -9,6 +9,7 @@ final class OnboardingViewModel {
 
     // MARK: - Navigation
     var isSaving = false
+    var completionError: String?
 
     // MARK: - Welcome
     var nickname: String = ""
@@ -152,8 +153,15 @@ final class OnboardingViewModel {
 
     // MARK: - Save
 
-    func complete() async {
+    /// Submits onboarding to backend FIRST. Only on 200 do we persist local state
+    /// and emit the analytics event. If backend rejects, throws — the view stays on
+    /// the onboarding screen so the user can retry. Never declare completion client-side
+    /// ahead of server-acknowledged persistence (incident 2026-04-22 onboarding loop).
+    func complete() async throws {
         isSaving = true
+        completionError = nil
+        defer { isSaving = false }
+
         let subjects = syncedSubjects.map(\.name)
         let data = OnboardingData(
             nickname: nickname.trimmingCharacters(in: .whitespaces),
@@ -163,39 +171,60 @@ final class OnboardingViewModel {
             subjects: subjects,
             subjectDifficulties: subjectDifficulties
         )
+
+        try await postOnboardingToBackend(data: data)
+
+        // Backend acknowledged — safe to commit local + analytics.
+        await tokenStore.saveOnboardingData(data)
         VitaPostHogConfig.capture(event: "onboarding_completed", properties: [
             "university_name": data.universityName,
             "semester": data.semester,
             "disciplines_count": subjects.count,
             "portal_connected": !syncedSubjects.isEmpty,
         ])
-        await tokenStore.saveOnboardingData(data)
-        await postOnboardingToBackend(data: data)
-        isSaving = false
     }
 
     // MARK: - Backend Sync
 
-    private func postOnboardingToBackend(data: OnboardingData) async {
+    private func postOnboardingToBackend(data: OnboardingData) async throws {
         guard let api else {
-            print("[OnboardingVM] No API available to post onboarding data")
-            return
+            throw OnboardingCompletionError.apiUnavailable
         }
+
+        let lms = selectedUniversity?.primaryPortal?.portalType
+        let universityName: String? = {
+            let name = data.universityName.trimmingCharacters(in: .whitespaces)
+            return name.isEmpty ? nil : name
+        }()
 
         let body = OnboardingPostRequest(
             moment: "graduacao",
             studyGoal: "graduacao",
             year: data.semester > 0 ? data.semester : nil,
+            semester: data.semester > 0 ? data.semester : nil,
+            highSchoolYear: nil,
+            examBoard: nil,
             selectedSubjects: data.subjects.isEmpty ? nil : data.subjects,
-            subjectDifficulties: data.subjectDifficulties.isEmpty ? nil : data.subjectDifficulties
+            subjectDifficulties: data.subjectDifficulties.isEmpty ? nil : data.subjectDifficulties,
+            university: universityName,
+            universityLms: lms
         )
 
-        do {
-            try await api.postOnboarding(body)
-        } catch {
-            // HTTPClient already retries 3x with exponential backoff for 5xx/network errors
-            // and handles 401 with token refresh. If we still fail, log it.
-            print("[OnboardingVM] Failed to post onboarding data: \(error.localizedDescription)")
+        // HTTPClient already retries 3x with exponential backoff for 5xx/network
+        // errors and handles 401 with token refresh. Any error here means the
+        // backend actually rejected (e.g. validation) — propagate so the caller
+        // leaves the user on the onboarding screen instead of marking complete.
+        try await api.postOnboarding(body)
+    }
+}
+
+enum OnboardingCompletionError: LocalizedError {
+    case apiUnavailable
+
+    var errorDescription: String? {
+        switch self {
+        case .apiUnavailable:
+            return "Não foi possível contatar o servidor. Tente novamente."
         }
     }
 }

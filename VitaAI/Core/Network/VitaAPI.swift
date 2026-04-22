@@ -422,7 +422,14 @@ actor VitaAPI {
     // MARK: - Onboarding
 
     func postOnboarding(_ body: OnboardingPostRequest) async throws {
-        let _: EmptyResponse = try await client.post("onboarding", body: body)
+        // Use postRaw with camelCase encoder — backend Zod schema expects camelCase
+        // (studyGoal, selectedSubjects...), but default HTTPClient encoder applies
+        // .convertToSnakeCase which turns `studyGoal` into `study_goal` and triggers
+        // reject_validation on the server. Incident: 2026-04-22 onboarding loop.
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .useDefaultKeys
+        let data = try encoder.encode(body)
+        let _: EmptyResponse = try await client.postRaw("onboarding", body: data)
     }
 
     func requestUniversity(name: String, city: String, state: String) async throws {
@@ -727,6 +734,13 @@ actor VitaAPI {
         try await client.get("integrations")
     }
 
+    /// Unified list matching current backend shape `{providers: [...]}`.
+    /// IntegrationsStore reads from here; the older `getIntegrations()` above
+    /// is kept only for the academic/productivity split in ConnectorsViewModel.
+    func listIntegrationProviders() async throws -> IntegrationProvidersListResponse {
+        try await client.get("integrations")
+    }
+
     func startIntegrationOAuth(_ provider: String) async throws -> IntegrationOAuthResponse {
         try await client.get("integrations/\(provider)")
     }
@@ -771,12 +785,21 @@ actor VitaAPI {
 
 // MARK: - Request Types
 
+// Matches openapi.yaml /api/onboarding request body (required: moment, studyGoal).
+// CLAUDE.md iOS: "NUNCA criar models manuais para endpoints que existem no openapi.yaml"
+// — temporário até o codegen cobrir request bodies. Don't add fields without
+// also updating openapi.yaml and backend onboardingSchema (src/lib/validators.ts).
 struct OnboardingPostRequest: Encodable {
     let moment: String
     let studyGoal: String
     var year: Int?
+    var semester: Int?
+    var highSchoolYear: Int?
+    var examBoard: String?
     var selectedSubjects: [String]?
     var subjectDifficulties: [String: String]?
+    var university: String?
+    var universityLms: String?
 }
 
 struct UniversityRequestBody: Encodable {
