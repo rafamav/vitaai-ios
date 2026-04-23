@@ -149,16 +149,41 @@ enum TranscricaoRecordingMode: String, CaseIterable {
 
 struct TranscricaoProcessingToast: View {
     let phase: TranscricaoViewModel.Phase
-    let percent: Int
+    /// Total seconds since the user hit "Stop recording". Used to show a real
+    /// elapsed counter instead of the old "~2 minutos" lie.
+    let elapsedSeconds: Int
+    /// Free-form stage label coming from the backend SSE progress frame.
+    /// We no longer show a fake percentage — the underlying pipeline runs
+    /// sub-second for short clips and "5%" sitting still for minutes was
+    /// pure theater.
     let stage: String
 
     private var label: String {
         switch phase {
-        case .uploading:            return "Enviando áudio..."
-        case .transcribing:         return "Transcrevendo..."
-        case .summarizing:          return "Gerando resumo..."
-        case .generatingFlashcards: return "Criando flashcards..."
-        default:                    return stage.isEmpty ? "Processando..." : stage
+        case .uploading:            return "Enviando áudio…"
+        case .transcribing:         return "Transcrevendo…"
+        case .summarizing:          return "Gerando resumo…"
+        case .generatingFlashcards: return "Criando flashcards…"
+        default:                    return stage.isEmpty ? "Processando…" : stage
+        }
+    }
+
+    private var elapsedLabel: String {
+        let m = elapsedSeconds / 60
+        let s = elapsedSeconds % 60
+        return String(format: "%d:%02d", m, s)
+    }
+
+    /// Four-step status bar — shows where we actually are without lying
+    /// about percentages.
+    private var stepIndex: Int {
+        switch phase {
+        case .uploading:            return 0
+        case .transcribing:         return 1
+        case .summarizing:          return 2
+        case .generatingFlashcards: return 3
+        case .done:                 return 4
+        default:                    return 0
         }
     }
 
@@ -169,47 +194,30 @@ struct TranscricaoProcessingToast: View {
                 .tint(TealColors.accentLight)
                 .scaleEffect(0.85)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(label)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.90))
 
-                HStack(spacing: 6) {
-                    if percent > 0 {
-                        Text("\(percent)%")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(TealColors.accentLight.opacity(0.80))
+                HStack(spacing: 8) {
+                    Text(elapsedLabel)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(TealColors.accentLight.opacity(0.70))
+                    // Segment bar: 4 slots, each lights up as the pipeline
+                    // advances. Beats a fake percent — user sees a real
+                    // transition and never sits at a fixed number.
+                    HStack(spacing: 3) {
+                        ForEach(0..<4, id: \.self) { i in
+                            Capsule()
+                                .fill(i < stepIndex ? TealColors.accent : Color.white.opacity(0.08))
+                                .frame(width: 14, height: 3)
+                                .animation(.easeInOut(duration: 0.25), value: stepIndex)
+                        }
                     }
-                    Text("~2 minutos")
-                        .font(.system(size: 10))
-                        .foregroundStyle(VitaColors.textWarm.opacity(0.25))
                 }
             }
 
             Spacer()
-
-            // Mini progress bar
-            if percent > 0 {
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.white.opacity(0.06))
-                            .frame(height: 3)
-                        Capsule()
-                            .fill(
-                                LinearGradient(
-                                    colors: [TealColors.accent, TealColors.accentLight],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .frame(width: geo.size.width * CGFloat(percent) / 100.0, height: 3)
-                            .animation(.easeOut(duration: 0.5), value: percent)
-                    }
-                    .frame(maxHeight: .infinity, alignment: .center)
-                }
-                .frame(width: 60, height: 16)
-            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)

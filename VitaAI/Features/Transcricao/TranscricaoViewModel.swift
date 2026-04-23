@@ -38,7 +38,10 @@ final class TranscricaoViewModel {
 
     private(set) var phase: Phase = .idle
     private(set) var elapsedSeconds: Int = 0
-    private(set) var progressPercent: Int = 0
+    /// Real wall-clock counter that starts when the user hits "Stop
+    /// recording". Replaces the old hardcoded "~2 minutos" label on the
+    /// processing toast — no more lying about ETAs we can't predict.
+    private(set) var processingSeconds: Int = 0
     private(set) var progressStage: String = ""
     /// Live waveform levels (0.0…1.0), length = `waveformBarCount`.
     /// Oldest sample is at index 0, newest at the end. Updated from the audio
@@ -74,6 +77,22 @@ final class TranscricaoViewModel {
     private var timerTask: Task<Void, Never>?
     private var uploadTask: Task<Void, Never>?
     private var recordingStartDate = Date()
+    /// Ticks `processingSeconds` while the upload/transcribe/persist
+    /// pipeline is running. Cancelled on `.done` / `.error` / `reset()`.
+    private var processingTimerTask: Task<Void, Never>?
+    /// Polls GET /studio/sources/:id once we have the sourceId. The SSE
+    /// stream from /api/ai/transcribe sometimes gets buffered or the
+    /// server closes without URLSession.AsyncBytes emitting EOF — when
+    /// that happens the UI would freeze forever. This poll independently
+    /// observes the DB row and transitions us to `.done` as soon as the
+    /// server marks it `ready`.
+    private var pollingTask: Task<Void, Never>?
+    /// Watchdog — after N seconds with no visible progress we give up on
+    /// the live stream, flip the UI to `.done` (assuming server finished
+    /// server-side) and refresh the list. 60s is well past whisper+LLM
+    /// wall clock for a normal lecture clip; if it's still running the
+    /// user can still check in "Transcrições".
+    private var watchdogTask: Task<Void, Never>?
 
     init(client: TranscricaoClient, api: VitaAPI? = nil, gamificationEvents: GamificationEventManager? = nil) {
         self.client = client
@@ -133,10 +152,85 @@ final class TranscricaoViewModel {
             return
         }
         phase = .uploading
-        progressPercent = 0
         progressStage = ""
+        processingSeconds = 0
+        startProcessingTimer()
+        startProcessingWatchdog()
         uploadTask = Task { [weak self] in
             await self?.processUpload(fileURL: url)
+        }
+    }
+
+    /// 1-Hz counter that drives the "Enviando áudio — 0:07" label on the
+    /// processing toast. Started when upload begins, cancelled on done /
+    /// error / reset. Real seconds — no prediction.
+    private func startProcessingTimer() {
+        processingTimerTask?.cancel()
+        processingTimerTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { break }
+                await MainActor.run { self?.processingSeconds += 1 }
+            }
+        }
+    }
+
+    private func stopProcessingTimer() {
+        processingTimerTask?.cancel()
+        processingTimerTask = nil
+    }
+
+    /// If 60 seconds pass without a terminal SSE event, assume the server
+    /// finished server-side (our backend is resilient to client disconnects)
+    /// and pop the UI out of the processing state. One last loadRecordings
+    /// guarantees the new row shows up under "Transcrições de hoje".
+    private func startProcessingWatchdog() {
+        watchdogTask?.cancel()
+        watchdogTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(60))
+            guard !Task.isCancelled, let self else { return }
+            if self.phase == .uploading || self.phase == .transcribing
+                || self.phase == .summarizing || self.phase == .generatingFlashcards {
+                NSLog("[TranscricaoVM] watchdog fired — forcing done + refresh")
+                self.uploadTask?.cancel()
+                self.pollingTask?.cancel()
+                self.phase = .done
+                self.stopProcessingTimer()
+                await self.loadRecordings()
+            }
+        }
+    }
+
+    /// Independent of the SSE stream, polls the DB row every 2s once we
+    /// know its id. If the server marks it ready before (or after) SSE
+    /// completes we pick that up and transition here. This is what stops
+    /// "transcrevendo forever" dead.
+    private func startPolling(sourceId: String) {
+        pollingTask?.cancel()
+        pollingTask = Task { [weak self] in
+            guard let api = await self?.api else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard !Task.isCancelled else { break }
+                if let detail = try? await api.getStudioSourceDetail(id: sourceId),
+                   detail.status == "ready" {
+                    await MainActor.run {
+                        guard let self else { return }
+                        if self.phase != .done {
+                            NSLog("[TranscricaoVM] polling saw status=ready — transitioning to done")
+                            self.phase = .done
+                            self.transcript = detail.chunks?
+                                .sorted(by: { $0.chunkIndex < $1.chunkIndex })
+                                .map(\.content)
+                                .joined(separator: "\n\n") ?? self.transcript
+                            self.stopProcessingTimer()
+                            self.watchdogTask?.cancel()
+                            Task { await self.loadRecordings() }
+                        }
+                    }
+                    return
+                }
+            }
         }
     }
 
@@ -148,14 +242,20 @@ final class TranscricaoViewModel {
     func reset() {
         timerTask?.cancel()
         uploadTask?.cancel()
+        processingTimerTask?.cancel()
+        pollingTask?.cancel()
+        watchdogTask?.cancel()
         timerTask = nil
         uploadTask = nil
+        processingTimerTask = nil
+        pollingTask = nil
+        watchdogTask = nil
         endAudioCapture()
         if let url = recordingURL { try? FileManager.default.removeItem(at: url) }
         recordingURL = nil
         phase = .idle
         elapsedSeconds = 0
-        progressPercent = 0
+        processingSeconds = 0
         progressStage = ""
         liveTranscript = ""
         transcript = ""
@@ -349,17 +449,28 @@ final class TranscricaoViewModel {
                 discipline: selectedDiscipline
             ) {
                 switch event {
-                case .progress(let stage, let percent):
-                    progressPercent = percent
+                case .progress(let stage, _):
                     progressStage = stage
                     phase = phaseFromStage(stage)
+                case .sourceCreated(let id):
+                    // Start polling now — if the SSE stream stalls or the
+                    // TCP pipe buffers, the poll still observes the DB
+                    // going to status=ready and wakes the UI up.
+                    startPolling(sourceId: id)
                 case .complete(let t, let s, let cards):
                     transcript = t
                     summary = s
                     flashcards = cards
-                    progressPercent = 100
                     phase = .done
                     try? FileManager.default.removeItem(at: fileURL)
+                    stopProcessingTimer()
+                    pollingTask?.cancel()
+                    watchdogTask?.cancel()
+                    // Kick a list refresh so the new recording shows up under
+                    // "Transcrições de hoje" without the user needing to
+                    // navigate away and back. Runs concurrently with the
+                    // gamification ping below.
+                    Task { await self.loadRecordings() }
                     VitaPostHogConfig.capture(event: "transcription_completed", properties: [
                         "word_count": t.split(separator: " ").count,
                         "flashcards_generated": cards.count,
@@ -379,7 +490,17 @@ final class TranscricaoViewModel {
                         }
                     }
                 case .error(let msg):
-                    setError(msg)
+                    // If the server reported an error AFTER whisper already
+                    // persisted the transcript, the poll catches the ready
+                    // row separately and flips us to `.done`. Don't mark
+                    // error if polling already succeeded in parallel.
+                    if phase != .done {
+                        setError(msg)
+                        stopProcessingTimer()
+                    }
+                    // Either way, refresh the list so the user sees whatever
+                    // did land server-side.
+                    Task { await self.loadRecordings() }
                     VitaPostHogConfig.capture(event: "transcription_upload_failed", properties: [
                         "reason": msg,
                     ])

@@ -857,7 +857,7 @@ struct TranscricaoPendingContent: View {
                         Text("Transcrevendo...")
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(Color.white.opacity(0.90))
-                        Text("~2 minutos")
+                        Text("Feche e abra depois — avisamos quando estiver pronto.")
                             .font(.system(size: 10))
                             .foregroundStyle(VitaColors.textWarm.opacity(0.25))
                     }

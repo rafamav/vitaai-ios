@@ -230,6 +230,11 @@ struct StudioQuestion: Decodable, Identifiable {
 
 enum TranscricaoSSEEvent: Sendable {
     case progress(stage: String, percent: Int)
+    /// Emitted as soon as the server seeds / finds the `studio_sources` row
+    /// for this recording. The ViewModel uses this id to start a parallel
+    /// poll against GET /api/studio/sources/:id so if the SSE stream stalls
+    /// we still observe the real persisted state.
+    case sourceCreated(id: String)
     case complete(transcript: String, summary: String, flashcards: [TranscriptionFlashcard])
     case error(message: String)
 }
@@ -305,7 +310,9 @@ actor TranscricaoClient {
                     ) {
                         do {
                             try await self.putToR2(presignedUrl: uploadInfo.presignedPutUrl, data: fileData)
-                            continuation.yield(.progress(stage: "Preparando transcrição...", percent: 5))
+                            // No fake "5% — Preparando..." lie here; just
+                            // hand off to the server and let the real SSE
+                            // stream drive the UI.
                             try await self.streamTranscribeJson(
                                 r2Key: uploadInfo.r2Key,
                                 sourceId: uploadInfo.sourceId,
@@ -546,6 +553,7 @@ actor TranscricaoClient {
             } else if line.isEmpty, !dataLines.isEmpty {
                 let rawJSON = dataLines.joined(separator: "\n")
                 dataLines = []
+                NSLog("[TranscricaoSSE] frame: %@", String(rawJSON.prefix(200)))
                 let parsed = Self.parseFrame(
                     rawJSON: rawJSON,
                     transcript: &accumulatedTranscript,
@@ -554,8 +562,10 @@ actor TranscricaoClient {
                 )
                 switch parsed {
                 case .yield(let event):
+                    NSLog("[TranscricaoSSE] yield: %@", "\(event)")
                     continuation.yield(event)
                 case .finishOK:
+                    NSLog("[TranscricaoSSE] finishOK transcript=%d chars", accumulatedTranscript.count)
                     continuation.yield(.complete(
                         transcript: accumulatedTranscript,
                         summary: accumulatedSummary,
@@ -564,6 +574,7 @@ actor TranscricaoClient {
                     continuation.finish()
                     return
                 case .finishError(let msg):
+                    NSLog("[TranscricaoSSE] finishError: %@", msg)
                     continuation.yield(.error(message: msg))
                     continuation.finish()
                     return
@@ -652,6 +663,9 @@ actor TranscricaoClient {
             }
             return .ignore
         case "source_created":
+            if let id = json["sourceId"] as? String {
+                return .yield(.sourceCreated(id: id))
+            }
             return .ignore
         case "message_stop":
             return .finishOK

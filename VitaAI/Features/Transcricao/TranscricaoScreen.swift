@@ -109,7 +109,7 @@ private struct TranscricaoContent: View {
                             if isProcessing {
                                 TranscricaoProcessingToast(
                                     phase: viewModel.phase,
-                                    percent: viewModel.progressPercent,
+                                    elapsedSeconds: viewModel.processingSeconds,
                                     stage: viewModel.progressStage
                                 )
                                 .padding(.horizontal, 16)
