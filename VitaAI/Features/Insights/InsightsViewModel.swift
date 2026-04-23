@@ -65,15 +65,16 @@ final class InsightsViewModel {
         error = nil
 
         do {
-            // Fire all requests concurrently
+            // 2026-04-23: dropped api.getCourses() — rota legacy Canvas retornava 404
+            // em dev+prod, fazia tela virar "Erro 404" mesmo com /progress e /grades OK.
+            // courseGrades agora é montado de academicSubjects (dataManager cache) + grades.
             async let progressTask = api.getProgress()
             async let gradesTask: [GradeEntry] = api.getGrades(limit: 100)
-            async let coursesTask = api.getCourses()
             async let portalTask = tryFetchPortalGrades()
             async let flashcardStatsTask = tryFetchFlashcardStats()
 
-            let (progress, grades, coursesResp, portalResp, fcStats) = try await (
-                progressTask, gradesTask, coursesTask, portalTask, flashcardStatsTask
+            let (progress, grades, portalResp, fcStats) = try await (
+                progressTask, gradesTask, portalTask, flashcardStatsTask
             )
 
             // Update progress stats
@@ -97,10 +98,12 @@ final class InsightsViewModel {
                 streak: progress.streakDays
             )
 
-            // Build CourseGrades from Canvas courses + grade entries
+            // Build CourseGrades from academicSubjects (appData cache) + grade entries
+            // 2026-04-23: was Canvas courses endpoint → 404. Now uses enrolled subjects.
             let gradesBySubject = Dictionary(grouping: grades, by: \.subjectId)
-            courseGrades = coursesResp.courses.map { course in
-                let subjectGrades = gradesBySubject[course.id] ?? []
+            let enrolled = dataManager?.enrolledDisciplines ?? []
+            courseGrades = enrolled.map { subject in
+                let subjectGrades = gradesBySubject[subject.id] ?? []
                 let avgGrade: Double
                 if subjectGrades.isEmpty {
                     avgGrade = 0.0
@@ -108,10 +111,10 @@ final class InsightsViewModel {
                     avgGrade = subjectGrades.reduce(0.0) { $0 + $1.value } / Double(subjectGrades.count)
                 }
                 return CourseGrade(
-                    id: course.id,
-                    courseName: course.name,
+                    id: subject.id,
+                    courseName: subject.name,
                     grade: avgGrade,
-                    assignments: course.assignmentsCount,
+                    assignments: 0,
                     completed: subjectGrades.count
                 )
             }

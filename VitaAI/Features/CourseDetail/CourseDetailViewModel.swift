@@ -40,14 +40,16 @@ final class CourseDetailViewModel {
         isLoading = true
         error = nil
         do {
-            async let coursesTask     = api.getCourses()
+            // 2026-04-23: api.getCourses() é rota legacy 404 — tentativa silenciosa.
+            // Primary data vem de files + assignments (endpoints ativos).
+            async let coursesTaskOptional: CoursesResponse? = try? await api.getCourses()
             async let filesTask       = api.getFiles(courseId: courseId)
             async let assignmentsTask = api.getAssignments(courseId: courseId)
 
             let (coursesResp, filesResp, assignmentsResp) =
-                try await (coursesTask, filesTask, assignmentsTask)
+                try await (coursesTaskOptional, filesTask, assignmentsTask)
 
-            course      = coursesResp.courses.first { $0.id == courseId }
+            course      = coursesResp?.courses.first { $0.id == courseId }
             files       = filesResp.files
             assignments = assignmentsResp.assignments
         } catch {

@@ -224,7 +224,9 @@ final class DisciplineDetailViewModel {
 
         async let progressTask: ProgressResponse? = try? api.getProgress()
         async let gradesTask: GradesCurrentResponse? = cachedGrades != nil ? cachedGrades : (try? api.getGradesCurrent())
-        async let examsTask: ExamsResponse? = try? api.getExams()
+        // 2026-04-23: api.getExams() removido — rota legacy 404, provas ativas
+        // vivem em academic_evaluations (fetched via progress.upcomingExams já filtrado
+        // por type='exam' após PR #156).
         // summary=true: metadata + totalCards + dueCount only, no cards[] array.
         // Drops payload from ~5.6MB to 182KB and removes one of the biggest
         // contributors to DisciplineDetail TTFD. See
@@ -236,15 +238,15 @@ final class DisciplineDetailViewModel {
         async let agendaTask: AgendaResponse? = agendaFromCache != nil ? agendaFromCache : (try? api.getAgenda())
         async let trabalhosTask: TrabalhosResponse? = try? api.getTrabalhos()
 
-        let (progressResponse, gradesResponse, examsResponse, decks, docs, agenda, trabalhosResp) = await (
+        let (progressResponse, gradesResponse, decks, docs, agenda, trabalhosResp) = await (
             progressTask,
             gradesTask,
-            examsTask,
             decksTask,
             docsTask,
             agendaTask,
             trabalhosTask
         )
+        let examsResponse: ExamsResponse? = nil  // deprecated: data via progress.upcomingExams
 
         if let progressResponse {
             subjectProgress = progressResponse.subjects.first {

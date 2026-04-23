@@ -131,16 +131,11 @@ final class SimuladoViewModel {
     // MARK: - Config
 
     func loadCourses() {
-        Task {
-            state.coursesLoading = true
-            do {
-                let response = try await api.getCourses()
-                state.courses = response.courses
-            } catch {
-                state.courses = []
-            }
-            state.coursesLoading = false
-        }
+        // 2026-04-23: api.getCourses() é rota legacy Canvas 404. Simulado
+        // gera a partir de QBank questions, não de Canvas courses. Skip
+        // chamada pra evitar delay de 9.7s sem benefício.
+        state.courses = []
+        state.coursesLoading = false
     }
 
     func selectCourse(_ course: Course?) {

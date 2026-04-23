@@ -112,19 +112,11 @@ final class OnboardingViewModel {
     func fetchSubjectsFromAPI() async {
         guard let api else { return }
 
-        // Try Canvas courses first
-        do {
-            let coursesResp = try await api.getCourses()
-            if !coursesResp.courses.isEmpty {
-                syncedSubjects = coursesResp.courses.map { SyncedSubject(name: $0.name, source: "canvas") }
-                syncCourses = coursesResp.courses.count
-                return
-            }
-        } catch {
-            print("[Onboarding] Canvas courses fetch failed: \(error)")
-        }
+        // 2026-04-23: removido `api.getCourses()` (rota Canvas legacy retornava
+        // 404 em 9.7s, atrasava onboarding inteiro). Onboarding sempre usa
+        // portal grades agora (funciona pra Canvas E Mannesoft pós-ingest).
 
-        // Fallback: portal grades (subjects come from grade entries)
+        // Portal grades (subjects come from grade entries)
         do {
             let gradesResp = try await api.getGradesCurrent()
             let allSubjects = gradesResp.current + gradesResp.completed
