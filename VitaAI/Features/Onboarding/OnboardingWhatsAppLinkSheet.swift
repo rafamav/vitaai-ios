@@ -95,7 +95,7 @@ struct OnboardingWhatsAppLinkSheet: View {
 
     @ViewBuilder private var connectedState: some View {
         Text("WhatsApp conectado!").font(.title2.bold()).foregroundStyle(.white)
-        Text("A VITA vai te mandar uma mensagem de boas-vindas")
+        Text("Vita vai te mandar uma mensagem de boas-vindas")
             .font(.subheadline).foregroundStyle(.gray)
     }
 }

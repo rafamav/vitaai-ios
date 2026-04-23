@@ -508,8 +508,20 @@ struct VitaOnboarding: View {
                 typeText(first.isEmpty ? String(localized: "onboarding_done_speech") : String(localized: "onboarding_done_speech_name").replacingOccurrences(of: "%@", with: first))
                 Task { await saveOnboarding() }
 
+            case .extras:
+                // Without this the previous step's speech (e.g. "Detectei 2
+                // sistemas" from .connect) stayed on screen because the
+                // default branch below never cleared speechText. The
+                // ExtrasStep used to render its own speech bubble on top,
+                // which produced two bubbles overlapping.
+                mascotState = .happy
+                typeText(String(localized: "onboarding_extras_speech"))
+
             default:
-                break
+                // Defensive: always clear the previous speech when the step
+                // transitions into something that doesn't type its own text,
+                // so stale captions never carry over.
+                speechText = ""
             }
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {

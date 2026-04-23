@@ -102,12 +102,25 @@ final class TranscricaoViewModel {
 
     // MARK: - Public API
 
-    /// Load saved recordings from the API
-    func loadRecordings() async {
+    /// Timestamp of last successful load — used to debounce repeated calls.
+    /// SwiftUI may fire `.task` / `.onAppear` multiple times on sheet dismiss,
+    /// layout changes, or tab switches; this keeps us from re-fetching the
+    /// same list 6× in a row (incident 2026-04-23 — Rafael viu "30s pra
+    /// carregar 18 gravações" porque iOS disparava 6 requests em sequência).
+    private var lastLoadAt: Date = .distantPast
+
+    /// Load saved recordings from the API. Debounced — skips if called
+    /// again within 2s. Pull-to-refresh / post-completion passam `force: true`.
+    func loadRecordings(force: Bool = false) async {
         guard let api else { return }
+        if !force && Date().timeIntervalSince(lastLoadAt) < 2 {
+            NSLog("[TranscricaoVM] loadRecordings debounced (last=%.1fs ago)", Date().timeIntervalSince(lastLoadAt))
+            return
+        }
         recordingsLoading = true
         do {
             recordings = try await api.getTranscricoes()
+            lastLoadAt = Date()
             for r in recordings {
                 NSLog("[TranscricaoVM] Recording: id=%@ title=%@ status=%@ isTranscribed=%d", r.id, r.title, r.status ?? "nil", r.isTranscribed ? 1 : 0)
             }
@@ -196,7 +209,7 @@ final class TranscricaoViewModel {
                 self.pollingTask?.cancel()
                 self.phase = .done
                 self.stopProcessingTimer()
-                await self.loadRecordings()
+                await self.loadRecordings(force: true)
             }
         }
     }
@@ -225,7 +238,7 @@ final class TranscricaoViewModel {
                                 .joined(separator: "\n\n") ?? self.transcript
                             self.stopProcessingTimer()
                             self.watchdogTask?.cancel()
-                            Task { await self.loadRecordings() }
+                            Task { await self.loadRecordings(force: true) }
                         }
                     }
                     return
@@ -469,8 +482,8 @@ final class TranscricaoViewModel {
                     // Kick a list refresh so the new recording shows up under
                     // "Transcrições de hoje" without the user needing to
                     // navigate away and back. Runs concurrently with the
-                    // gamification ping below.
-                    Task { await self.loadRecordings() }
+                    // gamification ping below. `force: true` bypassa debounce.
+                    Task { await self.loadRecordings(force: true) }
                     VitaPostHogConfig.capture(event: "transcription_completed", properties: [
                         "word_count": t.split(separator: " ").count,
                         "flashcards_generated": cards.count,
@@ -499,8 +512,8 @@ final class TranscricaoViewModel {
                         stopProcessingTimer()
                     }
                     // Either way, refresh the list so the user sees whatever
-                    // did land server-side.
-                    Task { await self.loadRecordings() }
+                    // did land server-side. `force: true` bypassa debounce.
+                    Task { await self.loadRecordings(force: true) }
                     VitaPostHogConfig.capture(event: "transcription_upload_failed", properties: [
                         "reason": msg,
                     ])

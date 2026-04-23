@@ -65,12 +65,14 @@ private struct TranscricaoContent: View {
     @State private var selectedFilter: String? = nil
     @State private var selectedRecording: TranscricaoEntry? = nil
 
-    /// Disciplines from academic_subjects via gradesResponse (already loaded by AppDataManager)
+    /// Disciplines currently enrolled — filter chips and the recorder
+    /// picker only show what the user is studying THIS semester. Before
+    /// this we merged `current + completed` which ballooned to hundreds
+    /// of subjects from the student's whole history; Rafael: "ta
+    /// mostrando 342394832984 disciplinas".
     private var disciplines: [String] {
         let current = appData.gradesResponse?.current ?? []
-        let completed = appData.gradesResponse?.completed ?? []
-        let all = current + completed
-        return all.map(\.subjectName).filter { !$0.isEmpty }
+        return current.map(\.subjectName).filter { !$0.isEmpty }
     }
 
     /// Whether the pipeline is actively processing (upload/transcribe/summarize/flashcards)

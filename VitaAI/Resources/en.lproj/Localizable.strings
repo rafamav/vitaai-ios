@@ -350,6 +350,7 @@
 "onboarding_done_speech_name" = "All set, %@! Everything configured. Let's study!";
 "onboarding_subjects_speech" = "Tell me how hard each subject is and I'll build your personalized study plan.";
 "onboarding_notifications_speech" = "Can I notify you when exams are coming and flashcards are due?";
+"onboarding_extras_speech" = "Vita also lives outside your campus. Connect what makes sense — all optional.";
 "onboarding_trial_speech" = "All set! Try Vita Pro free for 7 days, no commitment.";
 
 /* Onboarding buttons */

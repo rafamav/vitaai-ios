@@ -54,17 +54,21 @@ struct TranscricaoRecorderArea: View {
                     .frame(height: 36)
                     .padding(.top, 8)
 
-                // Discipline + language pickers (always enabled, never during record)
-                HStack(spacing: 8) {
+                // Discipline + language pickers stacked vertically so each
+                // one has the full row width — avoids "Auto..." truncation
+                // when the discipline name is long.
+                VStack(alignment: .leading, spacing: 6) {
                     TranscricaoDisciplinePicker(
                         selected: $selectedDiscipline,
                         disciplines: disciplines,
                         disabled: isRecording
                     )
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     TranscricaoLanguagePicker(
                         selected: $selectedLanguage,
                         disabled: isRecording
                     )
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding(.top, 6)
 

@@ -350,6 +350,7 @@
 "onboarding_done_speech_name" = "¡Listo, %@! Todo configurado. ¡A estudiar!";
 "onboarding_subjects_speech" = "Dime la dificultad de cada materia y armo tu plan de estudio personalizado.";
 "onboarding_notifications_speech" = "Puedo avisarte cuando se acerquen examenes y flashcards pendientes?";
+"onboarding_extras_speech" = "Vita tambien vive fuera del campus. Conecta lo que tenga sentido — todo opcional.";
 "onboarding_trial_speech" = "Todo listo! Prueba Vita Pro gratis por 7 dias, sin compromiso.";
 
 /* Onboarding buttons */

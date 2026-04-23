@@ -12,11 +12,10 @@ struct ExtrasStep: View {
     let onConnectIntegration: (String) -> Void
 
     var body: some View {
+        // Speech bubble is rendered by the parent VitaOnboarding shell
+        // (via typeText on step transition). Duplicating it here was the
+        // root cause of "two bubbles stacked" (incident 2026-04-23).
         VStack(alignment: .leading, spacing: 18) {
-            OnboardingSpeechBubble(
-                text: "A VITA também vive fora da faculdade. Conecta o que fizer sentido — tudo opcional."
-            )
-
             VStack(spacing: 10) {
                 extraCard(
                     letter: "W",
