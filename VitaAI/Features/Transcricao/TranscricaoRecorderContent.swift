@@ -1,24 +1,25 @@
 import SwiftUI
 
-// MARK: - Recorder Area (timer + waveform + discipline chips + record button)
-
-// Pre-seeded waveform heights — avoids CGFloat.random causing layout thrash on every render
-private let waveformHeights: [CGFloat] = [8, 18, 28, 14, 34, 10, 24, 32, 12, 22, 30, 8,
-                                          20, 34, 16, 26, 10, 28, 18, 34, 12, 22, 8, 20]
+// MARK: - Recorder Area (timer + waveform + discipline/language pickers + record button)
 
 struct TranscricaoRecorderArea: View {
     let elapsedSeconds: Int
     let isRecording: Bool
+    let isPaused: Bool
+    let audioLevels: [Float]
     @Binding var selectedDiscipline: String
+    @Binding var selectedLanguage: String
     let disciplines: [String]
     let onToggle: () -> Void
+    let onPauseResume: () -> Void
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    @State private var wavePhase: Bool = false
 
     private var recorderButtonWidth: CGFloat {
         horizontalSizeClass == .regular ? 200 : 155
     }
+
+    private var isActive: Bool { isRecording || isPaused }
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -37,110 +38,143 @@ struct TranscricaoRecorderArea: View {
                     .shadow(color: isRecording ? VitaColors.accent.opacity(0.4) : .clear, radius: 24)
 
                 // Status label
-                Text(isRecording ? "Gravando..." : "Pronto para gravar")
+                Text(statusLabel)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(
-                        isRecording
+                        isActive
                             ? VitaColors.accentLight.opacity(0.70)
                             : Color.white.opacity(0.25)
                     )
                     .padding(.top, 2)
 
-                // Waveform bars — fixed heights, animated via phase toggle
-                HStack(spacing: 1.5) {
-                    ForEach(0..<24, id: \.self) { i in
-                        let baseH = waveformHeights[i]
-                        let altH  = waveformHeights[(i + 12) % 24]
-                        let h: CGFloat = isRecording ? (wavePhase ? baseH : altH) : 6
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(
-                                isRecording
-                                    ? LinearGradient(
-                                        colors: [VitaColors.accent.opacity(0.5), VitaColors.accentLight.opacity(0.85)],
-                                        startPoint: .bottom,
-                                        endPoint: .top
-                                      )
-                                    : LinearGradient(
-                                        colors: [VitaColors.accent.opacity(0.10)],
-                                        startPoint: .bottom,
-                                        endPoint: .top
-                                      )
-                            )
-                            .frame(width: 2.5, height: h)
-                            .animation(.easeInOut(duration: 0.35).delay(Double(i) * 0.02), value: wavePhase)
-                            .animation(.easeInOut(duration: 0.35), value: isRecording)
-                    }
-                }
-                .frame(height: 36)
-                .padding(.top, 8)
-                .onAppear {
-                    guard isRecording else { return }
-                    withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
-                        wavePhase.toggle()
-                    }
-                }
-                .onChange(of: isRecording) { _, recording in
-                    if recording {
-                        withAnimation(.easeInOut(duration: 0.4).repeatForever(autoreverses: true)) {
-                            wavePhase.toggle()
-                        }
-                    }
-                }
+                // Live waveform — driven by the ViewModel's audioLevels.
+                // When idle or paused, bars drop to a subtle baseline so the
+                // user knows nothing's being captured.
+                LiveWaveformBars(levels: audioLevels, isActive: isRecording)
+                    .frame(height: 36)
+                    .padding(.top, 8)
 
-                // Discipline chips below waveform
-                TranscricaoDisciplineChips(
-                    disciplines: ["Auto-detectar"] + disciplines,
-                    selected: $selectedDiscipline,
-                    disabled: isRecording
-                )
-                .padding(.top, 4)
+                // Discipline + language pickers (always enabled, never during record)
+                HStack(spacing: 8) {
+                    TranscricaoDisciplinePicker(
+                        selected: $selectedDiscipline,
+                        disciplines: disciplines,
+                        disabled: isRecording
+                    )
+                    TranscricaoLanguagePicker(
+                        selected: $selectedLanguage,
+                        disabled: isRecording
+                    )
+                }
+                .padding(.top, 6)
 
-                // Stop button (only visible when recording)
-                if isRecording {
-                    Button(action: onToggle) {
-                        Text("Parar gravação")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(VitaColors.accentHover.opacity(0.85))
+                // Pause/Resume + Stop buttons while recording or paused
+                if isActive {
+                    HStack(spacing: 8) {
+                        TranscricaoPauseResumeButton(isPaused: isPaused, onTap: onPauseResume)
+
+                        Button(action: onToggle) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "stop.fill")
+                                    .font(.system(size: 10, weight: .bold))
+                                Text("Parar")
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
+                            .foregroundStyle(VitaColors.accentHover.opacity(0.90))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 34)
-                            .background(VitaColors.accent.opacity(0.10))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(VitaColors.accent.opacity(0.18), lineWidth: 1)
+                            .background(
+                                LinearGradient(
+                                    colors: [VitaColors.accent.opacity(0.18), VitaColors.accent.opacity(0.10)],
+                                    startPoint: .top, endPoint: .bottom
+                                )
                             )
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(VitaColors.accent.opacity(0.30), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                     .padding(.top, 8)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
             }
 
-            // Right side: recorder image button
-            Button(action: {
-                if !isRecording { onToggle() }
-            }) {
+            // Right side: Vita mascot as the record button itself.
+            // Tap ALWAYS toggles — waking to record, tapping again to stop.
+            // Matches the "toque para acordar" pattern from onboarding.
+            Button(action: onToggle) {
                 VStack(spacing: 4) {
-                    VitaTypingMascot(isRecording: isRecording, size: recorderButtonWidth)
+                    VitaTypingMascot(isRecording: isActive, size: recorderButtonWidth)
 
-                    Text(isRecording ? "Gravando..." : "Toque para gravar")
+                    Text(mascotLabel)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(
-                            isRecording
+                            isActive
                                 ? VitaColors.accentLight.opacity(0.70)
                                 : Color.white.opacity(0.22)
                         )
                 }
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(isActive ? "Parar gravação" : "Iniciar gravação")
         }
         .padding(.bottom, 10)
     }
+
+    private var statusLabel: String {
+        if isPaused { return "Pausado" }
+        if isRecording { return "Gravando…" }
+        return "Pronto para gravar"
+    }
+
+    private var mascotLabel: String {
+        if isPaused { return "Toque para parar" }
+        if isRecording { return "Toque para parar" }
+        return "Toque para gravar"
+    }
 }
 
-// MARK: - Discipline Chips
+// MARK: - Live Waveform Bars
+//
+// Reads the ViewModel's audioLevels (length = TranscricaoViewModel.waveformBarCount)
+// and renders real-time bars. When idle/paused, bars drop to a subtle baseline.
 
-struct TranscricaoDisciplineChips: View {
+struct LiveWaveformBars: View {
+    let levels: [Float]
+    let isActive: Bool
+
+    private let minHeight: CGFloat = 4
+    private let maxHeight: CGFloat = 34
+
+    var body: some View {
+        HStack(spacing: 1.5) {
+            ForEach(Array(levels.enumerated()), id: \.offset) { _, level in
+                let h: CGFloat = isActive
+                    ? max(minHeight, minHeight + CGFloat(level) * (maxHeight - minHeight))
+                    : minHeight + 2
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(
+                        isActive
+                            ? LinearGradient(
+                                colors: [VitaColors.accent.opacity(0.55), VitaColors.accentLight.opacity(0.90)],
+                                startPoint: .bottom, endPoint: .top
+                              )
+                            : LinearGradient(
+                                colors: [VitaColors.accent.opacity(0.10)],
+                                startPoint: .bottom, endPoint: .top
+                              )
+                    )
+                    .frame(width: 2.5, height: h)
+                    .animation(.easeOut(duration: 0.12), value: h)
+            }
+        }
+    }
+}
+
+// MARK: - (legacy discipline chips — kept for recordings list filter, renamed)
+
+private struct LegacyChips: View {
     let disciplines: [String]
     @Binding var selected: String
     let disabled: Bool
@@ -515,60 +549,4 @@ struct TealGlassRecordingCard: View {
     }
 }
 
-// MARK: - Discipline Name Abbreviation
-
-/// Shortens long discipline names for chips.
-/// Strategy: title-case, drop prepositions, abbreviate to fit ≤16 chars.
-/// "FARMACOLOGIA MÉDICA I" → "Farmacologia I"
-/// "MEDICINA DE FAMÍLIA E COMUNIDADE" → "Med. Família"
-/// "PRÁTICAS MÉDICAS EM ATENÇÃO BÁSICA" → "Prát. Médicas"
-private func abbreviateDiscipline(_ name: String) -> String {
-    let prepositions: Set<String> = ["de", "do", "da", "dos", "das", "em", "e", "a", "o", "na", "no", "para"]
-
-    // Title-case words, skipping prepositions
-    let words: [String] = name.lowercased().split(separator: " ").compactMap { segment in
-        let w = String(segment)
-        // Drop prepositions entirely for abbreviation
-        if prepositions.contains(w) { return nil }
-        // Keep roman numerals uppercase
-        if w.allSatisfy({ "ivxlcdm".contains($0) }) && !w.isEmpty {
-            return w.uppercased()
-        }
-        return w.prefix(1).uppercased() + w.dropFirst()
-    }
-
-    // If the joined result is short enough, return as-is
-    let full = words.joined(separator: " ")
-    if full.count <= 16 { return full }
-
-    // Keep first word (possibly abbreviated) + second word abbreviated
-    guard let first = words.first else { return full }
-
-    if words.count == 1 {
-        // Single long word — truncate
-        return String(first.prefix(14)) + "."
-    }
-
-    // Try: first word + remaining as initials/short
-    var result = first
-    if result.count > 10 {
-        // Abbreviate first word too
-        result = String(first.prefix(4)) + "."
-    }
-
-    for i in 1..<words.count {
-        let w = words[i]
-        let candidate = result + " " + w
-        if candidate.count <= 16 {
-            result = candidate
-        } else {
-            // Roman numeral — always append
-            if w.count <= 3 && w.allSatisfy({ "IVX".contains($0) }) {
-                result += " " + w
-            }
-            break
-        }
-    }
-
-    return result
-}
+// `abbreviateDiscipline` moved to TranscricaoControls.swift (shared with pickers).

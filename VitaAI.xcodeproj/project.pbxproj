@@ -264,6 +264,7 @@
 		C52494A58E7D648228BB0136 /* QBankShared.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18071D7DB89A34DE11E9EE5E /* QBankShared.swift */; };
 		C69655D848D9D73894AB57E5 /* RatingButtons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 443BC23869204129FA12AD43 /* RatingButtons.swift */; };
 		C7D54158E4BD8D03FC9E5CAB /* TranscricaoRecorderContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = C06A39AB6561313018C22261 /* TranscricaoRecorderContent.swift */; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* TranscricaoControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* TranscricaoControls.swift */; };
 		C953601D99886606AE8D3BBE /* VitaColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB3CAA9D7ADA613A3FDC5EBD /* VitaColors.swift */; };
 		C9A5EB24F32CC606981DBF10 /* StudyOverviewTranscricoes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3277C8F9B81F4549160015AA /* StudyOverviewTranscricoes.swift */; };
 		CA1746035639EFED3B1F97E2 /* ConnectorCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2373B8651D45CEF182E7E602 /* ConnectorCard.swift */; };
@@ -580,6 +581,7 @@
 		BFD6AFE54F4B84099E4031E3 /* MindMapStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MindMapStore.swift; sourceTree = "<group>"; };
 		C0387CC7FD36268CA8C03B06 /* OsceSseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OsceSseClient.swift; sourceTree = "<group>"; };
 		C06A39AB6561313018C22261 /* TranscricaoRecorderContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscricaoRecorderContent.swift; sourceTree = "<group>"; };
+		B2C3D4E5F6A7B8C9D0E1F2A3 /* TranscricaoControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscricaoControls.swift; sourceTree = "<group>"; };
 		C0ACCC75B6BF005D29AF766F /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		C0FA504A01F65E8D393C782C /* TrabalhoDetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrabalhoDetailScreen.swift; sourceTree = "<group>"; };
 		C1ACF21598F20E4035C39378 /* SyncProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncProgress.swift; sourceTree = "<group>"; };
@@ -1133,6 +1135,7 @@
 				6FAA707AA80C46FF82D6CF91 /* VitaTypingMascot.swift */,
 				195A69CD6776A957B920D6E0 /* TranscricaoProfessorSignals.swift */,
 				C06A39AB6561313018C22261 /* TranscricaoRecorderContent.swift */,
+				B2C3D4E5F6A7B8C9D0E1F2A3 /* TranscricaoControls.swift */,
 				87EA1E56084FA3D11CAD0F7E /* TranscricaoScreen.swift */,
 				7BD3F3D91DE3FE5D24710650 /* TranscricaoShared.swift */,
 				44EAF7F741D5CD9DCC447A01 /* TranscricaoViewModel.swift */,
@@ -1861,6 +1864,7 @@
 				4D8E29251018433D88921241 /* VitaTypingMascot.swift in Sources */,
 				ED940D904DE51599BECDDBF3 /* TranscricaoProfessorSignals.swift in Sources */,
 				C7D54158E4BD8D03FC9E5CAB /* TranscricaoRecorderContent.swift in Sources */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* TranscricaoControls.swift in Sources */,
 				9498CF9FCCC1FF64AD017D5A /* TranscricaoScreen.swift in Sources */,
 				269EC1EAF179BEE70B65C0FC /* TranscricaoShared.swift in Sources */,
 				80FFA5B7EFB7E479E6E33150 /* TranscricaoViewModel.swift in Sources */,

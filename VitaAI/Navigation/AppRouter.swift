@@ -314,13 +314,13 @@ struct MainTabView: View {
                 VitaMenuPopout(
                     userName: authManager.userName,
                     userImageURL: authManager.userImage.flatMap(URL.init(string:)),
-                    onProfile: { router.navigate(to: .profile) },
+                    onProfile: { router.navigateFromMenu(to: .profile) },
                     onNotifications: { showMenuPopout = false; showNotifPopout = true },
-                    onAgenda: { router.navigate(to: .agenda) },
-                    onConfiguracoes: { router.navigate(to: .configuracoes) },
-                    onAppearance: { router.navigate(to: .appearance) },
-                    onConnections: { router.navigate(to: .connections) },
-                    onPaywall: { router.navigate(to: .paywall) },
+                    onAgenda: { router.navigateFromMenu(to: .agenda) },
+                    onConfiguracoes: { router.navigateFromMenu(to: .configuracoes) },
+                    onAppearance: { router.navigateFromMenu(to: .appearance) },
+                    onConnections: { router.navigateFromMenu(to: .connections) },
+                    onPaywall: { router.navigateFromMenu(to: .paywall) },
                     onLogout: { Task { await authManager.logout() } },
                     onDismiss: { showMenuPopout = false }
                 )
@@ -403,14 +403,48 @@ struct MainTabView: View {
         switch router.selectedTab {
         case .home:
             DashboardScreen(
-                onNavigateToFlashcards: { router.navigate(to: .flashcardHome()) },
-                onNavigateToSimulados: { router.navigate(to: .simuladoHome) },
+                // Breadcrumb hierarchy: Flashcards/Simulados/QBank/Transcrição/Atlas
+                // belong under Estudos — switch tab so the crumb reads
+                // "Home > Estudos > Flashcards" instead of "Home > Flashcards".
+                onNavigateToFlashcards: {
+                    router.selectedTab = .estudos
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        router.navigate(to: .flashcardHome())
+                    }
+                },
+                onNavigateToSimulados: {
+                    router.selectedTab = .estudos
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        router.navigate(to: .simuladoHome)
+                    }
+                },
                 onNavigateToPdfs: { router.selectedTab = .estudos },
-                onNavigateToMaterials: { router.navigate(to: .qbank) },
-                onNavigateToTranscricao: { router.navigate(to: .transcricao) },
-                onNavigateToAtlas3D: { router.navigate(to: .atlas3D) },
+                onNavigateToMaterials: {
+                    router.selectedTab = .estudos
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        router.navigate(to: .qbank)
+                    }
+                },
+                onNavigateToTranscricao: {
+                    router.selectedTab = .estudos
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        router.navigate(to: .transcricao)
+                    }
+                },
+                onNavigateToAtlas3D: {
+                    router.selectedTab = .estudos
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        router.navigate(to: .atlas3D)
+                    }
+                },
                 onNavigateToDisciplineDetail: { id, name in router.navigateToDiscipline(id: id, name: name) },
-                onNavigateToTrabalhos: { router.navigate(to: .trabalhos) },
+                // Trabalhos lives under Faculdade (provas/agenda/trabalhos group).
+                onNavigateToTrabalhos: {
+                    router.selectedTab = .faculdade
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        router.navigate(to: .trabalhos)
+                    }
+                },
                 onSubtitleLoaded: { subtitle in dashboardSubtitle = subtitle }
             )
         case .estudos:

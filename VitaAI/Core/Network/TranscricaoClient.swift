@@ -257,10 +257,24 @@ actor TranscricaoClient {
         self.onUnauthorized = handler
     }
 
-    // MARK: - Upload + Stream
+    // MARK: - Upload + Stream (R2 direct upload)
 
-    /// Uploads audio file and returns an SSE stream with progress/completion events.
-    func uploadAndStream(fileURL: URL) -> AsyncThrowingStream<TranscricaoSSEEvent, Error> {
+    /// Uploads audio via 3-step R2 flow + returns an SSE stream with progress
+    /// and completion events.
+    ///
+    /// Flow (gold-standard, avoids buffering the file on the app server):
+    ///   1. `POST /api/audio/upload-url` → `{r2Key, sourceId, presignedPutUrl}`
+    ///   2. `PUT  <presignedPutUrl>` with the m4a body — goes direct to CF edge
+    ///   3. `POST /api/ai/transcribe` with JSON `{r2Key, sourceId, language, discipline}`
+    ///      returns SSE progress → transcript → summary → flashcards
+    ///
+    /// If step 1 or 2 fails, falls back to the legacy multipart POST so older
+    /// backends (and non-R2 dev envs) keep working.
+    func uploadAndStream(
+        fileURL: URL,
+        language: String = "pt",
+        discipline: String? = nil
+    ) -> AsyncThrowingStream<TranscricaoSSEEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
@@ -268,111 +282,270 @@ actor TranscricaoClient {
                         continuation.finish(throwing: APIError.noData)
                         return
                     }
+                    let fileName = fileURL.lastPathComponent
 
-                    let boundary = "VitaBoundary-\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
-                    var body = Data()
-                    body.append(formPart(boundary: boundary, name: "audio", filename: "audio.m4a",
-                                         contentType: "audio/m4a", data: fileData))
-                    body.append("--\(boundary)--\r\n".utf8Data)
-
-                    guard let url = URL(string: AppConfig.apiBaseURL + "/ai/transcribe") else {
-                        continuation.finish(throwing: APIError.invalidURL)
-                        return
-                    }
-
-                    var didAttemptRefresh = false
-                    var lastError: Error = APIError.unknown
-
-                    for attempt in 0..<Self.maxRetries {
-                        if attempt > 0 {
-                            let delay = UInt64(pow(2.0, Double(attempt - 1)) * 1_000_000_000)
-                            try await Task.sleep(nanoseconds: delay)
-                        }
-
-                        var request = URLRequest(url: url)
-                        request.httpMethod = "POST"
-                        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-                        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-                        request.httpBody = body
-                        request.timeoutInterval = 180
-
-                        if let token = await self.tokenStore.token {
-                            request.setValue("__Secure-better-auth.session_token=\(token)", forHTTPHeaderField: "Cookie")
-                        }
-
-                        let bytes: URLSession.AsyncBytes
-                        let response: URLResponse
+                    // Try R2 flow first
+                    if let uploadInfo = try? await self.requestUploadUrl(
+                        fileName: fileName,
+                        discipline: discipline,
+                        language: language,
+                        fileSize: fileData.count
+                    ) {
                         do {
-                            (bytes, response) = try await self.session.bytes(for: request)
+                            try await self.putToR2(presignedUrl: uploadInfo.presignedPutUrl, data: fileData)
+                            continuation.yield(.progress(stage: "Preparando transcrição...", percent: 5))
+                            try await self.streamTranscribeJson(
+                                r2Key: uploadInfo.r2Key,
+                                sourceId: uploadInfo.sourceId,
+                                language: language,
+                                discipline: discipline,
+                                continuation: continuation
+                            )
+                            return
                         } catch {
-                            lastError = APIError.networkError(error)
-                            continue
+                            // R2 PUT or transcribe call failed — fall through to multipart fallback
+                            NSLog("[TranscricaoClient] R2 flow failed, falling back to multipart: %@", "\(error)")
                         }
-
-                        guard let httpResponse = response as? HTTPURLResponse else {
-                            lastError = APIError.unknown
-                            continue
-                        }
-
-                        if httpResponse.statusCode == 401 {
-                            if !didAttemptRefresh {
-                                didAttemptRefresh = true
-                                if await self.tokenRefresher.refreshSession() {
-                                    continue
-                                }
-                            }
-                            if let handler = self.onUnauthorized { await handler() }
-                            continuation.finish(throwing: APIError.unauthorized)
-                            return
-                        }
-
-                        guard (200...299).contains(httpResponse.statusCode) else {
-                            if (500...599).contains(httpResponse.statusCode) {
-                                lastError = APIError.serverError(httpResponse.statusCode)
-                                continue
-                            }
-                            continuation.finish(throwing: APIError.serverError(httpResponse.statusCode))
-                            return
-                        }
-
-                        // Connected — stream events (no retry mid-stream)
-                        var eventType = ""
-                        var dataLines: [String] = []
-
-                        for try await line in bytes.lines {
-                            if line.hasPrefix("event:") {
-                                eventType = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
-                            } else if line.hasPrefix("data:") {
-                                let content = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
-                                dataLines.append(content)
-                            } else if line.isEmpty, !dataLines.isEmpty {
-                                let rawJSON = dataLines.joined(separator: "\n")
-                                dataLines = []
-                                if let event = Self.parse(type: eventType, data: rawJSON) {
-                                    continuation.yield(event)
-                                    switch event {
-                                    case .complete, .error:
-                                        continuation.finish()
-                                        return
-                                    default:
-                                        break
-                                    }
-                                }
-                                eventType = ""
-                            }
-                        }
-
-                        continuation.finish()
-                        return
                     }
 
-                    // All retries exhausted
-                    continuation.finish(throwing: lastError)
+                    // Legacy multipart fallback (older backend, R2 not configured, etc.)
+                    try await self.streamTranscribeMultipart(
+                        fileData: fileData,
+                        language: language,
+                        discipline: discipline,
+                        continuation: continuation
+                    )
                 } catch {
                     continuation.finish(throwing: error)
                 }
             }
         }
+    }
+
+    // MARK: - R2 flow helpers
+
+    private struct AudioUploadInfo: Decodable {
+        let sourceId: String
+        let r2Key: String
+        let presignedPutUrl: String
+        let expiresAt: String
+    }
+
+    /// Step 1: ask the server for a pre-signed PUT URL.
+    private func requestUploadUrl(
+        fileName: String,
+        discipline: String?,
+        language: String,
+        fileSize: Int
+    ) async throws -> AudioUploadInfo {
+        guard let url = URL(string: AppConfig.apiBaseURL + "/audio/upload-url") else {
+            throw APIError.invalidURL
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = await self.tokenStore.token {
+            request.setValue("__Secure-better-auth.session_token=\(token)", forHTTPHeaderField: "Cookie")
+        }
+        var body: [String: Any] = [
+            "fileName": fileName,
+            "language": language,
+            "contentType": "audio/m4a",
+            "durationSeconds": 0,
+        ]
+        if let discipline = discipline, !discipline.isEmpty, discipline != "Auto-detectar" {
+            body["discipline"] = discipline
+        }
+        body["fileSize"] = fileSize
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        request.timeoutInterval = 30
+
+        let (data, response) = try await self.session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw APIError.serverError(code)
+        }
+        return try JSONDecoder().decode(AudioUploadInfo.self, from: data)
+    }
+
+    /// Step 2: PUT the m4a bytes straight to R2. Uses the plain URLSession
+    /// (not the auth'd session) because the presigned URL carries the auth
+    /// in its query string and CF would reject extra headers.
+    private func putToR2(presignedUrl: String, data: Data) async throws {
+        guard let url = URL(string: presignedUrl) else { throw APIError.invalidURL }
+        var request = URLRequest(url: url)
+        request.httpMethod = "PUT"
+        request.setValue("audio/m4a", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 300
+        let putSession = URLSession(configuration: .default)
+        let (_, response) = try await putSession.upload(for: request, from: data)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw APIError.serverError(code)
+        }
+    }
+
+    /// Step 3: trigger the Whisper+LLM pipeline with the R2 key.
+    private func streamTranscribeJson(
+        r2Key: String,
+        sourceId: String,
+        language: String,
+        discipline: String?,
+        continuation: AsyncThrowingStream<TranscricaoSSEEvent, Error>.Continuation
+    ) async throws {
+        guard let url = URL(string: AppConfig.apiBaseURL + "/ai/transcribe") else {
+            throw APIError.invalidURL
+        }
+        var body: [String: Any] = [
+            "r2Key": r2Key,
+            "sourceId": sourceId,
+            "language": language,
+        ]
+        if let discipline = discipline, !discipline.isEmpty, discipline != "Auto-detectar" {
+            body["discipline"] = discipline
+        }
+        let jsonBody = try JSONSerialization.data(withJSONObject: body)
+
+        var didAttemptRefresh = false
+        for attempt in 0..<Self.maxRetries {
+            if attempt > 0 {
+                let delay = UInt64(pow(2.0, Double(attempt - 1)) * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: delay)
+            }
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+            request.httpBody = jsonBody
+            request.timeoutInterval = 300
+            if let token = await self.tokenStore.token {
+                request.setValue("__Secure-better-auth.session_token=\(token)", forHTTPHeaderField: "Cookie")
+            }
+
+            let bytes: URLSession.AsyncBytes
+            let response: URLResponse
+            do {
+                (bytes, response) = try await self.session.bytes(for: request)
+            } catch {
+                if attempt == Self.maxRetries - 1 { throw APIError.networkError(error) }
+                continue
+            }
+            guard let http = response as? HTTPURLResponse else { throw APIError.unknown }
+
+            if http.statusCode == 401 {
+                if !didAttemptRefresh {
+                    didAttemptRefresh = true
+                    if await self.tokenRefresher.refreshSession() { continue }
+                }
+                if let handler = self.onUnauthorized { await handler() }
+                throw APIError.unauthorized
+            }
+            if !(200...299).contains(http.statusCode) {
+                if (500...599).contains(http.statusCode) && attempt < Self.maxRetries - 1 { continue }
+                throw APIError.serverError(http.statusCode)
+            }
+
+            try await self.consumeSSE(bytes: bytes, continuation: continuation)
+            return
+        }
+        throw APIError.unknown
+    }
+
+    /// Legacy multipart path — kept for older backends and local dev without R2.
+    private func streamTranscribeMultipart(
+        fileData: Data,
+        language: String,
+        discipline: String?,
+        continuation: AsyncThrowingStream<TranscricaoSSEEvent, Error>.Continuation
+    ) async throws {
+        let boundary = "VitaBoundary-\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
+        var body = Data()
+        body.append(formPart(boundary: boundary, name: "audio", filename: "audio.m4a",
+                             contentType: "audio/m4a", data: fileData))
+        body.append(formTextPart(boundary: boundary, name: "language", value: language))
+        if let discipline = discipline, !discipline.isEmpty, discipline != "Auto-detectar" {
+            body.append(formTextPart(boundary: boundary, name: "discipline", value: discipline))
+        }
+        body.append("--\(boundary)--\r\n".utf8Data)
+
+        guard let url = URL(string: AppConfig.apiBaseURL + "/ai/transcribe") else {
+            throw APIError.invalidURL
+        }
+        var didAttemptRefresh = false
+        for attempt in 0..<Self.maxRetries {
+            if attempt > 0 {
+                let delay = UInt64(pow(2.0, Double(attempt - 1)) * 1_000_000_000)
+                try? await Task.sleep(nanoseconds: delay)
+            }
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+            request.httpBody = body
+            request.timeoutInterval = 300
+            if let token = await self.tokenStore.token {
+                request.setValue("__Secure-better-auth.session_token=\(token)", forHTTPHeaderField: "Cookie")
+            }
+
+            let bytes: URLSession.AsyncBytes
+            let response: URLResponse
+            do {
+                (bytes, response) = try await self.session.bytes(for: request)
+            } catch {
+                if attempt == Self.maxRetries - 1 { throw APIError.networkError(error) }
+                continue
+            }
+            guard let http = response as? HTTPURLResponse else { throw APIError.unknown }
+
+            if http.statusCode == 401 {
+                if !didAttemptRefresh {
+                    didAttemptRefresh = true
+                    if await self.tokenRefresher.refreshSession() { continue }
+                }
+                if let handler = self.onUnauthorized { await handler() }
+                throw APIError.unauthorized
+            }
+            if !(200...299).contains(http.statusCode) {
+                if (500...599).contains(http.statusCode) && attempt < Self.maxRetries - 1 { continue }
+                throw APIError.serverError(http.statusCode)
+            }
+
+            try await self.consumeSSE(bytes: bytes, continuation: continuation)
+            return
+        }
+        throw APIError.unknown
+    }
+
+    /// Shared SSE consumer — reads `event:` / `data:` pairs and emits parsed events.
+    private func consumeSSE(
+        bytes: URLSession.AsyncBytes,
+        continuation: AsyncThrowingStream<TranscricaoSSEEvent, Error>.Continuation
+    ) async throws {
+        var eventType = ""
+        var dataLines: [String] = []
+        for try await line in bytes.lines {
+            if line.hasPrefix("event:") {
+                eventType = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+            } else if line.hasPrefix("data:") {
+                let content = String(line.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                dataLines.append(content)
+            } else if line.isEmpty, !dataLines.isEmpty {
+                let rawJSON = dataLines.joined(separator: "\n")
+                dataLines = []
+                if let event = Self.parse(type: eventType, data: rawJSON) {
+                    continuation.yield(event)
+                    switch event {
+                    case .complete, .error:
+                        continuation.finish()
+                        return
+                    default:
+                        break
+                    }
+                }
+                eventType = ""
+            }
+        }
+        continuation.finish()
     }
 
     // MARK: - Multipart Builder
@@ -384,6 +557,15 @@ actor TranscricaoClient {
         part.append("Content-Disposition: form-data; name=\"\(name)\"; filename=\"\(filename)\"\r\n".utf8Data)
         part.append("Content-Type: \(contentType)\r\n\r\n".utf8Data)
         part.append(data)
+        part.append("\r\n".utf8Data)
+        return part
+    }
+
+    private func formTextPart(boundary: String, name: String, value: String) -> Data {
+        var part = Data()
+        part.append("--\(boundary)\r\n".utf8Data)
+        part.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".utf8Data)
+        part.append(value.utf8Data)
         part.append("\r\n".utf8Data)
         return part
     }

@@ -51,6 +51,10 @@ struct OrbMascot: View {
     // Staff/snake removed entirely on 2026-04-18 — Rafael called it ugly and
     // wanted the orb to stand on its own. Param kept for source compat (no-op).
     var showStaff: Bool = false
+    // When false, the orb's periodic "bounce" is suppressed. Useful for
+    // screens where the bounce competes with the user's task — e.g. the
+    // Transcrição recorder where the orb needs to look focused, not excited.
+    var bounceEnabled: Bool = true
 
     @State private var floatY: CGFloat = 0
     @State private var glowIntensity: Double = 0.3
@@ -487,7 +491,9 @@ struct OrbMascot: View {
             await withTaskGroup(of: Void.self) { group in
                 group.addTask { await self.eyeLookLoop() }
                 group.addTask { await self.blinkLoop() }
-                group.addTask { await self.bounceLoop() }
+                if self.bounceEnabled {
+                    group.addTask { await self.bounceLoop() }
+                }
                 group.addTask { await self.headTiltLoop() }
                 group.addTask { await self.idleDriftLoop() }
                 group.addTask { await self.magicPulseLoop() }

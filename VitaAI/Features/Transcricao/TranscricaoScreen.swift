@@ -49,7 +49,8 @@ private struct TranscricaoContent: View {
 
     @Environment(\.appData) private var appData
     @State private var selectedMode: TranscricaoRecordingMode = .offline
-    @State private var selectedDiscipline: String = "Auto-detectar"
+    // `selectedDiscipline` lives on the ViewModel so it flows into the upload
+    // payload (R2 metadata + backend) without a second piece of state.
     @State private var selectedFilter: String? = nil
     @State private var selectedRecording: TranscricaoEntry? = nil
 
@@ -113,15 +114,31 @@ private struct TranscricaoContent: View {
                                     .opacity(isProcessing ? 0.5 : 1.0)
 
                                 TranscricaoRecorderArea(
-                                    elapsedSeconds: viewModel.phase == .recording ? viewModel.elapsedSeconds : 0,
+                                    elapsedSeconds: (viewModel.phase == .recording || viewModel.phase == .paused) ? viewModel.elapsedSeconds : 0,
                                     isRecording: viewModel.phase == .recording,
-                                    selectedDiscipline: $selectedDiscipline,
+                                    isPaused: viewModel.phase == .paused,
+                                    audioLevels: viewModel.audioLevels,
+                                    selectedDiscipline: Binding(
+                                        get: { viewModel.selectedDiscipline },
+                                        set: { viewModel.selectedDiscipline = $0 }
+                                    ),
+                                    selectedLanguage: Binding(
+                                        get: { viewModel.selectedLanguage },
+                                        set: { viewModel.selectedLanguage = $0 }
+                                    ),
                                     disciplines: disciplines,
                                     onToggle: {
-                                        if viewModel.phase == .recording {
+                                        if viewModel.phase == .recording || viewModel.phase == .paused {
                                             viewModel.stopRecording()
                                         } else {
                                             Task { await viewModel.startRecording() }
+                                        }
+                                    },
+                                    onPauseResume: {
+                                        if viewModel.phase == .recording {
+                                            viewModel.pauseRecording()
+                                        } else if viewModel.phase == .paused {
+                                            viewModel.resumeRecording()
                                         }
                                     }
                                 )

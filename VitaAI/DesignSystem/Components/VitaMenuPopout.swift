@@ -77,9 +77,9 @@ struct VitaMenuPopout: View {
             menuDivider
 
             // Navigation items
-            menuItem(icon: "person.crop.circle", label: "Perfil", identifier: "menu_perfil") {
-                dismiss(); onProfile()
-            }
+            // "Perfil" intentionally omitted — the avatar header above already
+            // taps into onProfile() and the "Ver perfil" subtitle makes it
+            // clear. Having it twice was redundant (Rafael, 2026-04-22).
             menuItem(icon: "bell", label: "Notificações", identifier: "menu_notificacoes") {
                 dismiss(); onNotifications()
             }

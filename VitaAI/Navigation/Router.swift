@@ -25,8 +25,24 @@ final class Router {
     }
 
     func navigate(to route: Route) {
+        // Dedup: no-op if the current top of the stack is the same route.
+        // Prevents breadcrumb spam like "Home > Perfil > Perfil > Perfil"
+        // when the same menu item or destination is tapped repeatedly.
+        if routeStack.last == route { return }
         path.append(route)
         routeStack.append(route)
+    }
+
+    /// Navigate from the global menu popout (Perfil, Configurações, Conectores, …).
+    /// These destinations are conceptually modal — unrelated to whatever tab or
+    /// sub-page the user was on. Reset the stack to home root first so the
+    /// breadcrumb reads `Home > Perfil` instead of `Home > Flashcards > Perfil`.
+    func navigateFromMenu(to route: Route) {
+        popToRoot()
+        selectedTab = .home
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [self] in
+            navigate(to: route)
+        }
     }
 
     func goBack() {
