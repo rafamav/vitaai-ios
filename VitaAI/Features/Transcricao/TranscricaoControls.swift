@@ -27,33 +27,26 @@ struct TranscricaoDisciplinePicker: View {
         Button {
             isOpen = true
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 5) {
                 Image(systemName: "book.closed.fill")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(VitaColors.accent)
-                    .frame(width: 16)
-                Text(selected.isEmpty ? autoLabel : selected)
+                Text(isAuto ? "Auto" : selected)
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.75))
+                    .foregroundStyle(Color.white.opacity(0.80))
                     .lineLimit(1)
-                    .truncationMode(.tail)
-                Spacer()
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .medium))
+                    .font(.system(size: 8, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.30))
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                Capsule()
                     .fill(Color.white.opacity(0.03))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(VitaColors.accent.opacity(0.18), lineWidth: 0.5)
-                    )
+                    .overlay(Capsule().stroke(VitaColors.accent.opacity(0.18), lineWidth: 0.5))
             )
-            .contentShape(Rectangle())
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .disabled(disabled)
@@ -260,30 +253,24 @@ struct TranscricaoLanguagePicker: View {
                 }
             }
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 5) {
                 Text(current.flag)
-                    .font(.system(size: 13))
-                    .frame(width: 16)
-                Text(current.label)
+                    .font(.system(size: 12))
+                Text(current.code.uppercased())
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.75))
-                Spacer()
+                    .foregroundStyle(Color.white.opacity(0.80))
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .medium))
+                    .font(.system(size: 8, weight: .medium))
                     .foregroundStyle(Color.white.opacity(0.30))
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
             .background(
-                RoundedRectangle(cornerRadius: 8)
+                Capsule()
                     .fill(Color.white.opacity(0.03))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(VitaColors.accent.opacity(0.18), lineWidth: 0.5)
-                    )
+                    .overlay(Capsule().stroke(VitaColors.accent.opacity(0.18), lineWidth: 0.5))
             )
-            .contentShape(Rectangle())
+            .contentShape(Capsule())
         }
         .disabled(disabled)
         .opacity(disabled ? 0.5 : 1)

@@ -100,8 +100,9 @@ struct TranscricaoRecorderArea: View {
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
-            // 3 botões empilhados: Disciplina / Idioma / Modo (Cloud vs Só local).
-            VStack(spacing: 6) {
+            // 3 chips compactos lado a lado (Rafael 2026-04-24): Disciplina /
+            // Idioma / Modo. Auto-sized, centralizados, não competem com o orb.
+            HStack(spacing: 8) {
                     TranscricaoDisciplinePicker(
                         selected: $selectedDiscipline,
                         disciplines: disciplines,
@@ -131,36 +132,30 @@ struct TranscricaoRecorderArea: View {
                             }
                         }
                     } label: {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 5) {
                             Image(systemName: transcribeWithAI ? "cloud.fill" : "iphone")
-                                .font(.system(size: 11, weight: .medium))
+                                .font(.system(size: 10, weight: .medium))
                                 .foregroundStyle(VitaColors.accent)
-                                .frame(width: 16)
-                            Text(transcribeWithAI ? "VITACloud" : "Só no dispositivo")
+                            Text(transcribeWithAI ? "Cloud" : "Local")
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(Color.white.opacity(0.75))
-                                .lineLimit(1)
-                            Spacer()
+                                .foregroundStyle(Color.white.opacity(0.80))
                             Image(systemName: "chevron.down")
-                                .font(.system(size: 9, weight: .medium))
+                                .font(.system(size: 8, weight: .medium))
                                 .foregroundStyle(Color.white.opacity(0.30))
                         }
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 6)
                         .background(
-                            RoundedRectangle(cornerRadius: 8)
+                            Capsule()
                                 .fill(Color.white.opacity(0.03))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .stroke(VitaColors.accent.opacity(0.18), lineWidth: 0.5)
-                                )
+                                .overlay(Capsule().stroke(VitaColors.accent.opacity(0.18), lineWidth: 0.5))
                         )
-                        .contentShape(Rectangle())
+                        .contentShape(Capsule())
                     }
                     .disabled(isRecording)
                     .opacity(isRecording ? 0.5 : 1)
             }
+            .frame(maxWidth: .infinity)
         }
         .frame(maxWidth: .infinity)
         .padding(.bottom, 4)
