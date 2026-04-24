@@ -362,32 +362,38 @@ struct TranscricaoRecordingsListSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header with count
-            HStack {
+        VStack(alignment: .leading, spacing: 10) {
+            // Header: "GRAVAÇÕES · 48" inline (contador ao lado do título, não
+            // capsule separada — visual mais denso e elegante).
+            HStack(spacing: 6) {
                 Text("GRAVAÇÕES")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(VitaColors.textWarm.opacity(0.55))
                     .tracking(0.5)
 
                 if !recordings.isEmpty {
-                    Text("\(recordings.count)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(VitaColors.accent.opacity(0.80))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(VitaColors.accent.opacity(0.12))
-                        .clipShape(Capsule())
+                    Text("· \(recordings.count)")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(VitaColors.textWarm.opacity(0.35))
+                        .tracking(0.5)
                 }
 
                 Spacer()
+
+                // Dica visual de que chips à direita scrollam (quando
+                // há mais de 3 chips, não cabe todos na viewport).
+                if filterChips.count > 3 {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(VitaColors.textWarm.opacity(0.30))
+                }
             }
             .padding(.horizontal, 16)
 
-            // Filter chips — mesma tipografia do header (13 bold uppercased).
+            // Filter chips com fade gradient à direita.
             if !filterChips.isEmpty {
                 TranscricaoFilterChips(chips: filterChips, selected: $selectedFilter)
-                    .padding(.horizontal, 16)
+                    .padding(.leading, 16)
             }
 
             if isLoading {
@@ -460,9 +466,10 @@ struct TranscricaoFilterChips: View {
     @Binding var selected: String?
 
     var body: some View {
+        // Fade gradient à direita indica que há mais chips além da viewport.
+        // Usado em iOS nativo (App Store categories, Music, etc).
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                // "Todas" chip — clears filter
                 chipButton(label: "Todas", isSelected: selected == nil) {
                     withAnimation(.easeInOut(duration: 0.15)) { selected = nil }
                 }
@@ -475,7 +482,18 @@ struct TranscricaoFilterChips: View {
                     }
                 }
             }
+            .padding(.trailing, 24)
         }
+        .mask(
+            HStack(spacing: 0) {
+                Rectangle().fill(.black)
+                LinearGradient(
+                    colors: [.black, .black.opacity(0)],
+                    startPoint: .leading, endPoint: .trailing
+                )
+                .frame(width: 24)
+            }
+        )
     }
 
     @ViewBuilder
