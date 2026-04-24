@@ -182,6 +182,10 @@ private struct TranscricaoContent: View {
                                         get: { viewModel.selectedLanguage },
                                         set: { viewModel.selectedLanguage = $0 }
                                     ),
+                                    transcribeWithAI: Binding(
+                                        get: { viewModel.transcribeWithAI },
+                                        set: { viewModel.transcribeWithAI = $0 }
+                                    ),
                                     disciplines: disciplines,
                                     onToggle: {
                                         if viewModel.phase == .recording || viewModel.phase == .paused {
@@ -204,53 +208,9 @@ private struct TranscricaoContent: View {
                             .padding(.horizontal, 16)
                             .padding(.top, 10)
 
-                            // Cloud / Local chip segmented — dois botões grandes
-                            // lado a lado, o ativo com accent. Antes era Toggle
-                            // sutil que user não via (Rafael: "onde escolho?").
-                            HStack(spacing: 6) {
-                                ForEach([true, false], id: \.self) { cloudMode in
-                                    let isSelected = viewModel.transcribeWithAI == cloudMode
-                                    Button {
-                                        if viewModel.phase != .recording {
-                                            viewModel.transcribeWithAI = cloudMode
-                                        }
-                                    } label: {
-                                        HStack(spacing: 6) {
-                                            Image(systemName: cloudMode ? "sparkles" : "iphone")
-                                                .font(.system(size: 11, weight: .semibold))
-                                            Text(cloudMode ? "Cloud (Vita)" : "Só local")
-                                                .font(.system(size: 11, weight: .semibold))
-                                        }
-                                        .foregroundStyle(
-                                            isSelected
-                                                ? VitaColors.accentLight
-                                                : Color.white.opacity(0.40)
-                                        )
-                                        .frame(maxWidth: .infinity, minHeight: 30)
-                                        .background(
-                                            isSelected
-                                                ? RoundedRectangle(cornerRadius: 8)
-                                                    .fill(VitaColors.accent.opacity(0.14))
-                                                    .overlay(
-                                                        RoundedRectangle(cornerRadius: 8)
-                                                            .stroke(VitaColors.accent.opacity(0.28), lineWidth: 1)
-                                                    )
-                                                : nil
-                                        )
-                                        .contentShape(Rectangle())
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                            .padding(4)
-                            .background(Color.white.opacity(0.03))
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(VitaColors.accent.opacity(0.08), lineWidth: 1)
-                            )
-                            .padding(.horizontal, 16)
-                            .padding(.top, 8)
+                            // (Chip Cloud/Só local foi pra dentro do recorder card
+                            //  como 3º botão abaixo do idioma — Rafael pediu a
+                            //  reorganização em 2026-04-24.)
 
                             // Live transcript — SEMPRE aparece em modo "Ao Vivo"
                             // enquanto gravando (mesmo vazio, com placeholder

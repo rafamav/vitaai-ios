@@ -9,6 +9,7 @@ struct TranscricaoRecorderArea: View {
     let audioLevels: [Float]
     @Binding var selectedDiscipline: String
     @Binding var selectedLanguage: String
+    @Binding var transcribeWithAI: Bool
     let disciplines: [String]
     let onToggle: () -> Void
     let onPauseResume: () -> Void
@@ -54,8 +55,10 @@ struct TranscricaoRecorderArea: View {
                     .frame(height: 36)
                     .padding(.top, 8)
 
-                // Discipline + language pickers (always enabled, never during record)
-                HStack(spacing: 8) {
+                // 3 botões empilhados (Rafael pediu): Disciplina (auto-detectar),
+                // Idioma, Modo (Cloud vs Só local). Um abaixo do outro, largura
+                // total da coluna esquerda do recorder.
+                VStack(spacing: 6) {
                     TranscricaoDisciplinePicker(
                         selected: $selectedDiscipline,
                         disciplines: disciplines,
@@ -65,6 +68,43 @@ struct TranscricaoRecorderArea: View {
                         selected: $selectedLanguage,
                         disabled: isRecording
                     )
+                    Button {
+                        if !isRecording { transcribeWithAI.toggle() }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: transcribeWithAI ? "sparkles" : "iphone")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text(transcribeWithAI ? "Enviar pra Vita" : "Só no dispositivo")
+                                .font(.system(size: 11, weight: .semibold))
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(Color.white.opacity(0.30))
+                        }
+                        .foregroundStyle(
+                            transcribeWithAI
+                                ? VitaColors.accentLight.opacity(0.85)
+                                : Color.white.opacity(0.65)
+                        )
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(
+                                    transcribeWithAI
+                                        ? VitaColors.accent.opacity(0.10)
+                                        : Color.white.opacity(0.03)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(VitaColors.accent.opacity(0.18), lineWidth: 0.5)
+                                )
+                        )
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isRecording)
                 }
                 .padding(.top, 6)
 

@@ -78,7 +78,7 @@ struct TranscricaoStatusBadge: View {
 
     private var label: String {
         switch status {
-        case .transcribed: return "Pronto"
+        case .transcribed: return "Transcrito"
         case .pending:     return "Processando"
         case .recording:   return "Gravando"
         }
