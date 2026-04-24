@@ -23,7 +23,13 @@ struct FaculdadeDisciplinasScreen: View {
     }
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
+        // Read enrolledDisciplines at the top level so SwiftUI subscribes
+        // to changes. Without this, `displayText(for:)` reads it inside a
+        // sub-helper and @Observable may not propagate the mutation back
+        // to this view's render, leaving renamed cards stuck on old name.
+        let _ = appData.enrolledDisciplines.count
+
+        return ScrollView(showsIndicators: false) {
             VStack(spacing: 12) {
                 let current = appData.gradesResponse?.current ?? []
                 let completed = appData.gradesResponse?.completed ?? []

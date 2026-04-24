@@ -24,6 +24,17 @@ final class AppDataManager {
     /// here instead of fetching `/api/subjects` on their own.
     var enrolledDisciplines: [AcademicSubject] = []
 
+    /// Prefetched secondary data — loaded in background on launch so tapping
+    /// Flashcards/QBank/Simulados/Transcrição/Trabalhos in Estudos opens
+    /// instantly with cache (SWR pattern). Each screen refetches silently on
+    /// appear to pick up changes. Rafael (2026-04-24): "como apps grandes
+    /// fazem isso, carregar enquanto o user ta em outra pagina".
+    var flashcardDecks: [FlashcardDeckEntry] = []
+    var qbankProgress: QBankProgressResponse?
+    var simuladosList: SimuladoListResponse?
+    var transcricoesList: [TranscricaoEntry] = []
+    var trabalhosResponse: TrabalhosResponse?
+
     /// Subjects sorted by VitaScore descending (highest risk first)
     var subjectsByPriority: [DashboardSubject] {
         dashboardSubjects.sorted { ($0.vitaScore ?? 0) > ($1.vitaScore ?? 0) }
@@ -59,18 +70,26 @@ final class AppDataManager {
     }
 
     /// Set or clear a subject's user-ownable display name. Updates local
-    /// cache immediately on success so UI reflects the rename without a
-    /// full refresh. Sync never touches this field (backend + iOS both).
-    /// Pass nil or empty to reset to portal-canonical name.
+    /// cache + refreshes grades so UI reflects the rename immediately.
+    /// Sync never touches this field (backend + iOS both). Pass nil or
+    /// empty to reset to portal-canonical name.
     func renameSubject(id: String, displayName: String?) async {
         let trimmed = displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
         let payload = (trimmed?.isEmpty == true) ? nil : trimmed
         guard let updated = try? await api.renameSubject(id: id, displayName: payload) else {
+            NSLog("[rename] PATCH failed for subject \(id)")
             return
         }
+        // In-place cache patch (cheap, triggers @Observable for any View reading
+        // enrolledDisciplines).
         if let idx = enrolledDisciplines.firstIndex(where: { $0.id == id }) {
             enrolledDisciplines[idx].displayName = updated.displayName
         }
+        // FaculdadeDisciplinasScreen reads gradesResponse (GradeSubject list),
+        // not AcademicSubject directly — force a refresh so any view layer
+        // picks up the change immediately regardless of which collection it
+        // binds to.
+        await refreshEnrolled()
     }
 
     // MARK: - Private
