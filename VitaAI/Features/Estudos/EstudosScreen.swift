@@ -635,12 +635,19 @@ private struct ToolCard: View {
             // accessibilityLabel pra VoiceOver.
             Group {
                 if UIImage(named: imageName) != nil {
+                    // iPhone: scaledToFill (aspect ratio card ≈ imagem, corte imperceptível)
+                    // iPad: scaledToFit (card muito wide vs imagem 1.27:1 — scaledToFill
+                    // cortaria metade da imagem no topo/base). iPad usa fit + bg
+                    // do card accentColor pra não ficar transparente nas bordas.
                     Color.clear
                         .frame(height: cardHeight)
+                        .background(
+                            sizeClass == .regular ? accentColor.opacity(0.15) : Color.clear
+                        )
                         .overlay {
                             Image(imageName)
                                 .resizable()
-                                .scaledToFill()
+                                .aspectRatio(contentMode: sizeClass == .regular ? .fit : .fill)
                         }
                         .clipped()
                         .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -667,18 +674,22 @@ private struct ToolCard: View {
 
 private struct AtlasTallCard: View {
     let onTap: () -> Void
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
         Button(action: onTap) {
-            // 2026-04-23: removido overlay de Text("Atlas 3D") + scrim —
-            // imagem `tool-atlas3d` já traz o rótulo desenhado.
             Group {
                 if UIImage(named: "tool-atlas3d") != nil {
+                    // iPad usa scaledToFit pra evitar crop (imagem atlas3d tall,
+                    // mas card iPad é MAIS alto que o iPhone e pode cortar).
                     Color.clear
+                        .background(
+                            sizeClass == .regular ? VitaColors.accent.opacity(0.10) : Color.clear
+                        )
                         .overlay {
                             Image("tool-atlas3d")
                                 .resizable()
-                                .scaledToFill()
+                                .aspectRatio(contentMode: sizeClass == .regular ? .fit : .fill)
                         }
                         .clipped()
                         .clipShape(RoundedRectangle(cornerRadius: 14))
