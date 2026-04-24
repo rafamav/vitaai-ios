@@ -23,42 +23,86 @@ struct TranscricaoRecorderArea: View {
     private var isActive: Bool { isRecording || isPaused }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            // Left side: timer + status + waveform + discipline chips + stop btn
-            VStack(alignment: .leading, spacing: 0) {
-                // Timer
-                Text(formatTranscricaoElapsed(elapsedSeconds))
-                    .font(.system(size: 36, weight: .bold, design: .default))
-                    .tracking(-1.5)
-                    .monospacedDigit()
-                    .foregroundStyle(
-                        isRecording
-                            ? VitaColors.accentLight.opacity(0.95)
-                            : Color.white.opacity(0.22)
-                    )
-                    .shadow(color: isRecording ? VitaColors.accent.opacity(0.4) : .clear, radius: 24)
+        VStack(spacing: 14) {
+            // Timer gigante no topo, centralizado.
+            Text(formatTranscricaoElapsed(elapsedSeconds))
+                .font(.system(size: 54, weight: .bold, design: .default))
+                .tracking(-2)
+                .monospacedDigit()
+                .foregroundStyle(
+                    isRecording
+                        ? VitaColors.accentLight.opacity(0.95)
+                        : Color.white.opacity(0.22)
+                )
+                .shadow(color: isRecording ? VitaColors.accent.opacity(0.4) : .clear, radius: 32)
 
-                // Status label
-                Text(statusLabel)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(
-                        isActive
-                            ? VitaColors.accentLight.opacity(0.70)
-                            : Color.white.opacity(0.25)
-                    )
-                    .padding(.top, 2)
+            // Status label abaixo do timer.
+            Text(statusLabel)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(
+                    isActive
+                        ? VitaColors.accentLight.opacity(0.70)
+                        : Color.white.opacity(0.35)
+                )
 
-                // Live waveform — driven by the ViewModel's audioLevels.
-                // When idle or paused, bars drop to a subtle baseline so the
-                // user knows nothing's being captured.
+            // Orb/mascote CENTRAL como botão de gravar principal (Rafael/
+            // ChatGPT review: "gravar não tava predominante, orb central
+            // faz mais sentido que lateral").
+            Button(action: onToggle) {
+                VStack(spacing: 6) {
+                    VitaTypingMascot(isRecording: isActive, size: recorderButtonWidth)
+
+                    Text(mascotLabel)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(
+                            isActive
+                                ? VitaColors.accentLight.opacity(0.70)
+                                : Color.white.opacity(0.30)
+                        )
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isActive ? "Parar gravação" : "Iniciar gravação")
+
+            // Waveform ao vivo — só aparece quando gravando.
+            if isRecording || isPaused {
                 LiveWaveformBars(levels: audioLevels, isActive: isRecording)
                     .frame(height: 36)
-                    .padding(.top, 8)
+                    .transition(.opacity)
+            }
 
-                // 3 botões empilhados (Rafael pediu): Disciplina (auto-detectar),
-                // Idioma, Modo (Cloud vs Só local). Um abaixo do outro, largura
-                // total da coluna esquerda do recorder.
-                VStack(spacing: 6) {
+            // Pause/Resume + Stop buttons enquanto gravando/pausado.
+            if isActive {
+                HStack(spacing: 8) {
+                    TranscricaoPauseResumeButton(isPaused: isPaused, onTap: onPauseResume)
+
+                    Button(action: onToggle) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "stop.fill")
+                                .font(.system(size: 10, weight: .bold))
+                            Text("Parar")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundStyle(VitaColors.accentHover.opacity(0.90))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity)
+                        .background(
+                            LinearGradient(
+                                colors: [VitaColors.accent.opacity(0.18), VitaColors.accent.opacity(0.10)],
+                                startPoint: .top, endPoint: .bottom
+                            )
+                        )
+                        .clipShape(Capsule())
+                        .overlay(Capsule().stroke(VitaColors.accent.opacity(0.30), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+
+            // 3 botões empilhados: Disciplina / Idioma / Modo (Cloud vs Só local).
+            VStack(spacing: 6) {
                     TranscricaoDisciplinePicker(
                         selected: $selectedDiscipline,
                         disciplines: disciplines,
@@ -117,61 +161,10 @@ struct TranscricaoRecorderArea: View {
                     }
                     .disabled(isRecording)
                     .opacity(isRecording ? 0.5 : 1)
-                }
-                .padding(.top, 6)
-
-                // Pause/Resume + Stop buttons while recording or paused
-                if isActive {
-                    HStack(spacing: 8) {
-                        TranscricaoPauseResumeButton(isPaused: isPaused, onTap: onPauseResume)
-
-                        Button(action: onToggle) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "stop.fill")
-                                    .font(.system(size: 10, weight: .bold))
-                                Text("Parar")
-                                    .font(.system(size: 11, weight: .semibold))
-                            }
-                            .foregroundStyle(VitaColors.accentHover.opacity(0.90))
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
-                            .frame(maxWidth: .infinity)
-                            .background(
-                                LinearGradient(
-                                    colors: [VitaColors.accent.opacity(0.18), VitaColors.accent.opacity(0.10)],
-                                    startPoint: .top, endPoint: .bottom
-                                )
-                            )
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(VitaColors.accent.opacity(0.30), lineWidth: 1))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.top, 8)
-                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-                }
             }
-
-            // Right side: Vita mascot as the record button itself.
-            // Tap ALWAYS toggles — waking to record, tapping again to stop.
-            // Matches the "toque para acordar" pattern from onboarding.
-            Button(action: onToggle) {
-                VStack(spacing: 4) {
-                    VitaTypingMascot(isRecording: isActive, size: recorderButtonWidth)
-
-                    Text(mascotLabel)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(
-                            isActive
-                                ? VitaColors.accentLight.opacity(0.70)
-                                : Color.white.opacity(0.22)
-                        )
-                }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(isActive ? "Parar gravação" : "Iniciar gravação")
         }
-        .padding(.bottom, 10)
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, 4)
     }
 
     private var statusLabel: String {
