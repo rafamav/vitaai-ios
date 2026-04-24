@@ -494,8 +494,7 @@ private struct EstudosContent: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(RoundedRectangle(cornerRadius: 12).fill(cardBg))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(glassBorder, lineWidth: 0.5))
+        .glassCard(cornerRadius: 12)
     }
 
     private func trabalhoDaysLabel(_ days: Int) -> String {
@@ -561,8 +560,7 @@ private struct EstudosContent: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-        .background(RoundedRectangle(cornerRadius: 12).fill(cardBg))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(glassBorder, lineWidth: 0.5))
+        .glassCard(cornerRadius: 12)
     }
 
     private func activityIcon(for action: String) -> String {
@@ -611,8 +609,7 @@ private struct EstudosContent: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(cardBg))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(glassBorder, lineWidth: 0.5))
+        .glassCard(cornerRadius: 12)
     }
 }
 

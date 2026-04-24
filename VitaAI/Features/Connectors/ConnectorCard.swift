@@ -81,9 +81,7 @@ struct ConnectorCard: View {
                     }
             }
         }
-        .background(cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(borderColor, lineWidth: 1))
+        .glassCard(cornerRadius: 16)
     }
 
     // MARK: - Letter Icon

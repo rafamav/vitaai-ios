@@ -21,9 +21,9 @@ struct VitaGlassCard<Content: View>: View {
 
     // MARK: - Mockup-exact colors (from CSS rgba values)
 
-    // Layer 1 base
-    private let baseStart = Color(red: 12/255, green: 9/255, blue: 7/255).opacity(0.94)
-    private let baseEnd   = Color(red: 14/255, green: 11/255, blue: 8/255).opacity(0.90)
+    // Layer 1 base — D4 "carved" gradient (obsidiana quente top → preto quente base)
+    private let baseStart = Color(red: 30/255, green: 22/255, blue: 15/255).opacity(0.92)
+    private let baseEnd   = Color(red: 14/255, green: 10/255, blue: 7/255).opacity(0.92)
 
     // Layer 2 inner glow
     private let glowGold120  = Color(red: 1.0, green: 200/255, blue: 120/255) // rgba(255,200,120)
@@ -91,12 +91,12 @@ struct VitaGlassCard<Content: View>: View {
                     }
                     .allowsHitTesting(false)
 
-                    // ── Layer 2b: Inset top highlight (simulates inset 0 1px 0 rgba(255,255,255,0.04)) ──
+                    // ── Layer 2b: Inset top highlight (D4 bevel — gold 18%) ──
                     VStack(spacing: 0) {
                         Capsule()
                             .fill(
                                 LinearGradient(
-                                    colors: [.clear, Color.white.opacity(0.04), .clear],
+                                    colors: [.clear, Color(red: 255/255, green: 230/255, blue: 180/255).opacity(0.18), .clear],
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
@@ -105,9 +105,9 @@ struct VitaGlassCard<Content: View>: View {
                             .padding(.horizontal, 20)
                             .padding(.top, 1)
                         Spacer()
-                        // Inset bottom shadow (simulates inset 0 -1px 0 rgba(0,0,0,0.15))
+                        // Inset bottom shadow — dark bevel pra carved effect
                         Capsule()
-                            .fill(Color.black.opacity(0.15))
+                            .fill(Color.black.opacity(0.5))
                             .frame(height: 1)
                             .padding(.horizontal, 20)
                             .padding(.bottom, 1)
@@ -118,29 +118,17 @@ struct VitaGlassCard<Content: View>: View {
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
             // ── Layer 3: Conic gold border (1px angular gradient stroke) ──
             // CSS: conic-gradient(from 200deg, ...)  mask-composite: exclude; padding: 1px
+            // ── Layer 3: D4 border gold solid 22% (visível mas elegante) ──
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .stroke(
-                        AngularGradient(
-                            gradient: Gradient(stops: [
-                                .init(color: conicGold120.opacity(0.14), location: 0.0),    // 0%
-                                .init(color: conicGold100.opacity(0.04), location: 0.25),   // 25%
-                                .init(color: conicGold120.opacity(0.08), location: 0.40),   // 40%
-                                .init(color: conicGold100.opacity(0.02), location: 0.60),   // 60%
-                                .init(color: conicGold120.opacity(0.10), location: 0.80),   // 80%
-                                .init(color: conicGold120.opacity(0.14), location: 1.0),    // 100%
-                            ]),
-                            center: .center,
-                            startAngle: .degrees(200),
-                            endAngle: .degrees(200 + 360)
-                        ),
+                        Color(red: 200/255, green: 160/255, blue: 80/255).opacity(0.22),
                         lineWidth: 1
                     )
             )
-            // ── Shadows ──
-            // CSS: box-shadow: 0 20px 50px rgba(0,0,0,0.50), 0 6px 16px rgba(0,0,0,0.35)
-            .shadow(color: .black.opacity(0.50), radius: 25, x: 0, y: 20)
-            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 6)
+            // ── Shadows D4 — card "sentado" na tela ──
+            .shadow(color: .black.opacity(0.50), radius: 16, x: 0, y: 6)
+            .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 1)
     }
 
     // MARK: - Radial gradient helper (matches CSS radial-gradient circle)
@@ -185,7 +173,12 @@ extension View {
         }
     }
 
-    /// Lightweight glass background (base + border only, no Canvas overhead)
+    /// Lightweight glass card — matches mockup D4 "CARVED":
+    ///   background: linear-gradient(180deg, rgba(30,22,15,0.92) → rgba(14,10,7,0.92))
+    ///   border: 1px rgba(200,160,80,0.22)
+    ///   box-shadow: inset top highlight rgba(255,230,180,0.18),
+    ///               inset bottom shadow rgba(0,0,0,0.5),
+    ///               drop 0 6px 16px rgba(0,0,0,0.5)
     func glassCard(cornerRadius: CGFloat = 18) -> some View {
         self
             .background {
@@ -193,35 +186,42 @@ extension View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color(red: 12/255, green: 9/255, blue: 7/255).opacity(0.94),
-                                Color(red: 14/255, green: 11/255, blue: 8/255).opacity(0.90)
+                                Color(red: 30/255, green: 22/255, blue: 15/255).opacity(0.92),
+                                Color(red: 14/255, green: 10/255, blue: 7/255).opacity(0.92)
                             ],
-                            startPoint: UnitPoint(x: 0.46, y: 0.0),
-                            endPoint: UnitPoint(x: 0.54, y: 1.0)
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
                     )
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            // Inset top highlight — linha clara que simula luz de cima (bevel)
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .stroke(
-                        AngularGradient(
-                            gradient: Gradient(stops: [
-                                .init(color: Color(red: 1.0, green: 200/255, blue: 120/255).opacity(0.14), location: 0.0),
-                                .init(color: Color(red: 1.0, green: 180/255, blue: 100/255).opacity(0.04), location: 0.25),
-                                .init(color: Color(red: 1.0, green: 200/255, blue: 120/255).opacity(0.08), location: 0.40),
-                                .init(color: Color(red: 1.0, green: 180/255, blue: 100/255).opacity(0.02), location: 0.60),
-                                .init(color: Color(red: 1.0, green: 200/255, blue: 120/255).opacity(0.10), location: 0.80),
-                                .init(color: Color(red: 1.0, green: 200/255, blue: 120/255).opacity(0.14), location: 1.0),
-                            ]),
-                            center: .center,
-                            startAngle: .degrees(200),
-                            endAngle: .degrees(200 + 360)
+                        LinearGradient(
+                            colors: [
+                                Color(red: 255/255, green: 230/255, blue: 180/255).opacity(0.18),
+                                Color(red: 255/255, green: 230/255, blue: 180/255).opacity(0.04),
+                                .clear
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
                         ),
                         lineWidth: 1
                     )
+                    .blendMode(.plusLighter)
             )
-            .shadow(color: .black.opacity(0.50), radius: 25, x: 0, y: 20)
-            .shadow(color: .black.opacity(0.35), radius: 8, x: 0, y: 6)
+            // Border gold solid 22% — visível mas não gritante
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(
+                        Color(red: 200/255, green: 160/255, blue: 80/255).opacity(0.22),
+                        lineWidth: 1
+                    )
+            )
+            // Drop shadows — mais fortes pra card "sentar"
+            .shadow(color: .black.opacity(0.50), radius: 16, x: 0, y: 6)
+            .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 1)
     }
 }
