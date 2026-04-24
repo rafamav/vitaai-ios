@@ -68,8 +68,25 @@ struct TranscricaoRecorderArea: View {
                         selected: $selectedLanguage,
                         disabled: isRecording
                     )
-                    Button {
-                        if !isRecording { transcribeWithAI.toggle() }
+                    Menu {
+                        Button {
+                            if !isRecording { transcribeWithAI = true }
+                        } label: {
+                            if transcribeWithAI {
+                                Label("VITACloud", systemImage: "checkmark")
+                            } else {
+                                Label("VITACloud", systemImage: "cloud.fill")
+                            }
+                        }
+                        Button {
+                            if !isRecording { transcribeWithAI = false }
+                        } label: {
+                            if !transcribeWithAI {
+                                Label("Só no dispositivo", systemImage: "checkmark")
+                            } else {
+                                Label("Só no dispositivo", systemImage: "iphone")
+                            }
+                        }
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: transcribeWithAI ? "cloud.fill" : "iphone")
@@ -81,7 +98,7 @@ struct TranscricaoRecorderArea: View {
                                 .foregroundStyle(Color.white.opacity(0.75))
                                 .lineLimit(1)
                             Spacer()
-                            Image(systemName: "chevron.up.chevron.down")
+                            Image(systemName: "chevron.down")
                                 .font(.system(size: 9, weight: .medium))
                                 .foregroundStyle(Color.white.opacity(0.30))
                         }
@@ -98,8 +115,8 @@ struct TranscricaoRecorderArea: View {
                         )
                         .contentShape(Rectangle())
                     }
-                    .buttonStyle(.plain)
                     .disabled(isRecording)
+                    .opacity(isRecording ? 0.5 : 1)
                 }
                 .padding(.top, 6)
 
