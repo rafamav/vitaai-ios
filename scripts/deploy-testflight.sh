@@ -56,6 +56,52 @@ echo ""
 security unlock-keychain -p "" ~/Library/Keychains/login.keychain-db 2>/dev/null || true
 
 # -------------------------------------------------------------------------
+# PRE-FLIGHT GATES — gotchas que bloqueiam silenciosamente no TestFlight
+# -------------------------------------------------------------------------
+# Cada gate é um "NUNCA MAIS" incident-encoded. Adicione aqui TODO bloqueio
+# novo que levou manual intervention no App Store Connect.
+#
+# Current gates:
+#  G1. ITSAppUsesNonExemptEncryption=false  → se ausente, Apple retém build
+#      aguardando resposta manual de "export compliance" no ASC.
+#      Incident: 2026-04-24 build #91 ficou invisível no TestFlight por 30min
+#      até PATCH manual via API.
+#  G2. Purpose strings: Health, Microphone, Speech. Se faltar, upload rejeita.
+#  G3. CFBundleShortVersionString set. Sem, cai pra 1.0 silencioso.
+# -------------------------------------------------------------------------
+echo ""
+echo "[0/4] PRE-FLIGHT gates..."
+
+# G1 — Export compliance
+if ! /usr/libexec/PlistBuddy -c "Print :ITSAppUsesNonExemptEncryption" "$INFO_PLIST" 2>/dev/null | grep -qE "^(false|0)$"; then
+  echo "       ❌ G1: ITSAppUsesNonExemptEncryption missing or true in $INFO_PLIST"
+  echo "       → Apple irá RETER o build em TestFlight aguardando export compliance manual."
+  echo "       Adicione ao Info.plist (dentro do <dict> raiz):"
+  echo "         <key>ITSAppUsesNonExemptEncryption</key>"
+  echo "         <false/>"
+  echo "       Abortando deploy."
+  exit 1
+fi
+echo "       ✅ G1: export compliance (ITSAppUsesNonExemptEncryption=false)"
+
+# G2 — Purpose strings (pre-commit já checa, mas paranoia)
+for key in NSMicrophoneUsageDescription NSSpeechRecognitionUsageDescription NSHealthShareUsageDescription; do
+  if ! /usr/libexec/PlistBuddy -c "Print :$key" "$INFO_PLIST" >/dev/null 2>&1; then
+    echo "       ❌ G2: purpose string $key missing"
+    exit 1
+  fi
+done
+echo "       ✅ G2: purpose strings (Mic, Speech, Health)"
+
+# G3 — Version string
+if ! /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$INFO_PLIST" >/dev/null 2>&1; then
+  echo "       ❌ G3: CFBundleShortVersionString missing"
+  exit 1
+fi
+echo "       ✅ G3: version string set"
+echo "       All pre-flight gates passed."
+
+# -------------------------------------------------------------------------
 # STEP 1: Build number — ASC-as-source-of-truth, rollback on failure
 # -------------------------------------------------------------------------
 echo ""
@@ -159,40 +205,73 @@ DEPLOY_SUCCESS=1
 # STEP 4: Auto-resolve export compliance + report final state
 # -------------------------------------------------------------------------
 echo ""
-echo "[4/4] Waiting for ASC to process build $NEW_BUILD (up to 3min)..."
+echo "[4/4] Waiting for ASC to process build $NEW_BUILD (up to 10min)..."
 python3 - <<PYEOF
 import jwt, time, json, urllib.request, ssl, sys
 with open("${ASC_KEY_FILE}", "r") as f: pk = f.read()
-token = jwt.encode({"iss": "${ASC_ISSUER_ID}", "iat": int(time.time()), "exp": int(time.time()) + 1800, "aud": "appstoreconnect-v1"}, pk, algorithm="ES256", headers={"kid": "${ASC_KEY_ID}"})
+
+def fresh_token():
+    """Recria JWT a cada chamada — evita 401 quando polling passa de 20min cumulative."""
+    return jwt.encode(
+        {"iss": "${ASC_ISSUER_ID}", "iat": int(time.time()), "exp": int(time.time()) + 900, "aud": "appstoreconnect-v1"},
+        pk, algorithm="ES256", headers={"kid": "${ASC_KEY_ID}"}
+    )
+
+def patch_compliance(build_id):
+    """Seta usesNonExemptEncryption=false. Idempotente."""
+    body = json.dumps({"data": {"type": "builds", "id": build_id, "attributes": {"usesNonExemptEncryption": False}}}).encode()
+    req = urllib.request.Request(
+        f"https://api.appstoreconnect.apple.com/v1/builds/{build_id}",
+        data=body, method="PATCH",
+        headers={"Authorization": f"Bearer {fresh_token()}", "Content-Type": "application/json"}
+    )
+    urllib.request.urlopen(req, context=ctx)
+
 ctx = ssl.create_default_context()
 url = "https://api.appstoreconnect.apple.com/v1/builds?filter%5Bapp%5D=${ASC_APP_ID}&filter%5Bversion%5D=${NEW_BUILD}&filter%5BpreReleaseVersion.platform%5D=IOS"
 
-for i in range(36):  # 36 * 5s = 180s max
+# 10min total — Apple às vezes demora 5+ min mesmo com VALID
+for i in range(120):
     try:
-        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+        req = urllib.request.Request(url, headers={"Authorization": f"Bearer {fresh_token()}", "Content-Type": "application/json"})
         resp = urllib.request.urlopen(req, context=ctx)
         data = json.loads(resp.read())
         if data.get("data"):
             b = data["data"][0]
             state = b["attributes"]["processingState"]
             if state == "VALID":
-                # set compliance flag automatically
-                body = json.dumps({"data": {"type": "builds", "id": b["id"], "attributes": {"usesNonExemptEncryption": False}}}).encode()
-                req2 = urllib.request.Request(f"https://api.appstoreconnect.apple.com/v1/builds/{b['id']}", data=body, method="PATCH",
-                    headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
-                urllib.request.urlopen(req2, context=ctx)
-                print(f"       VALID — compliance set, build live in TestFlight")
+                # Auto-PATCH compliance (idempotent: safe to run even if já setado)
+                patch_compliance(b["id"])
+                print(f"       ✅ VALID — export compliance set automatically, build #{b['attributes']['version']} LIVE in TestFlight")
                 sys.exit(0)
             elif state in ("FAILED", "INVALID"):
-                print(f"       ASC rejected build: state={state}")
+                print(f"       ❌ ASC rejected build: state={state}")
                 sys.exit(1)
-            print(f"       ASC state: {state} ({(i+1)*5}s elapsed)", flush=True)
+            if i % 6 == 0:  # log a cada 30s pra não spammar
+                print(f"       ASC state: {state} ({(i+1)*5}s elapsed)", flush=True)
         else:
-            print(f"       Build not indexed yet ({(i+1)*5}s)", flush=True)
+            if i % 6 == 0:
+                print(f"       Build not indexed yet ({(i+1)*5}s)", flush=True)
     except Exception as e:
-        print(f"       Poll error ({(i+1)*5}s): {str(e)[:80]}", flush=True)
+        if i % 6 == 0:
+            print(f"       Poll error ({(i+1)*5}s): {str(e)[:80]}", flush=True)
     time.sleep(5)
-print("       Still processing after 3min — check TestFlight manually. Build was uploaded OK.")
+
+# Fallback: se polling timeouts mas build subiu, tentar PATCH blind via filter
+print("       ⚠️  Polling timeout 10min. Tentando PATCH blind pela API...")
+try:
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {fresh_token()}", "Content-Type": "application/json"})
+    resp = urllib.request.urlopen(req, context=ctx)
+    data = json.loads(resp.read())
+    if data.get("data"):
+        b = data["data"][0]
+        patch_compliance(b["id"])
+        print(f"       ✅ Blind PATCH ok — build {b['attributes']['version']} state={b['attributes']['processingState']}")
+    else:
+        print(f"       ❌ Build #${NEW_BUILD} não apareceu na API. Deploy real subiu ok? Verificar manualmente no ASC.")
+except Exception as e:
+    print(f"       ❌ Blind PATCH falhou: {e}")
+    print(f"       → Setar compliance manual no https://appstoreconnect.apple.com/apps/${ASC_APP_ID}/testflight/ios")
 PYEOF
 
 echo ""
