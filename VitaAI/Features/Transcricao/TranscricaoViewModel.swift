@@ -83,6 +83,11 @@ final class TranscricaoViewModel {
     private var recordingURL: URL?
     private var timerTask: Task<Void, Never>?
     private var recordingStartDate = Date()
+    /// Preferred live streaming client (WhisperLiveKit via WS). Ativado quando
+    /// `AppConfig.whisperLiveWSURL` não tá vazio (DEBUG sempre, prod depende
+    /// de ter proxy público autenticado). Quando nil, cai no
+    /// SFSpeechRecognizer local (fallback).
+    private var liveStreamClient: WhisperLiveClient?
 
     init(client: TranscricaoClient, api: VitaAPI? = nil, gamificationEvents: GamificationEventManager? = nil) {
         self.client = client
@@ -498,20 +503,47 @@ final class TranscricaoViewModel {
         let outputFile = try AVAudioFile(forWriting: outputURL, settings: fileSettings)
         activeOutputFile = outputFile
 
-        // SFSpeechRecognizer for live partial transcript
+        // SFSpeechRecognizer for live partial transcript (fallback quando
+        // WhisperLiveKit WS não está configurado; em DEBUG sempre conecta
+        // no nosso whisper-live que usa large-v3-turbo, melhor qualidade).
         let request = SFSpeechAudioBufferRecognitionRequest()
         request.shouldReportPartialResults = true
         request.requiresOnDeviceRecognition = false
         recognitionRequest = request
 
-        // Single tap: write samples to disk, feed speech recognizer, AND
-        // compute waveform power for the live bars. Pushing levels back via a
-        // weak MainActor hop keeps the realtime audio thread lock-free.
+        // WhisperLiveKit WS client — preferred path. Se AppConfig.whisperLiveWSURL
+        // estiver vazio (prod sem proxy público hoje), o init retorna nil e a
+        // gente cai só no SFSpeechRecognizer.
+        let wsClient = WhisperLiveClient()
+        if let wsClient {
+            wsClient.onPartial = { [weak self] text in
+                self?.liveTranscript = text
+            }
+            wsClient.onFinal = { [weak self] text in
+                self?.liveTranscript = text
+            }
+            wsClient.onError = { msg in
+                NSLog("[TranscricaoVM] whisper-live WS error: %@", msg)
+            }
+            wsClient.connect()
+            liveStreamClient = wsClient
+            NSLog("[TranscricaoVM] WhisperLiveKit WS conectado")
+        } else {
+            NSLog("[TranscricaoVM] WhisperLiveKit URL vazia — fallback SFSpeechRecognizer")
+            liveStreamClient = nil
+        }
+
+        // Single tap: write samples to disk, feed speech recognizer, feed
+        // whisper-live WS, and compute waveform power for the live bars.
+        let clientRef = liveStreamClient
         inputNode.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [outputFile, request, weak self] buffer, _ in
             try? outputFile.write(from: buffer)
             request.append(buffer)
             let level = Self.averageLevel(buffer)
-            Task { @MainActor [weak self] in self?.appendAudioLevel(level) }
+            Task { @MainActor [weak self] in
+                self?.appendAudioLevel(level)
+                clientRef?.sendAudio(buffer: buffer)
+            }
         }
 
         try engine.start()
@@ -564,6 +596,8 @@ final class TranscricaoViewModel {
         activeOutputFile = nil
         recognitionRequest = nil
         recognitionTask = nil
+        liveStreamClient?.close()
+        liveStreamClient = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 

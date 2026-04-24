@@ -24,9 +24,16 @@ enum AppConfig {
     #if DEBUG
     private static let defaultAPIBaseURL = "http://monstro.tail7e98e6.ts.net:3110/api"
     private static let defaultAuthBaseURL = "http://monstro.tail7e98e6.ts.net:3110"
+    /// WebSocket streaming endpoint pro WhisperLiveKit rodando no monstro
+    /// (porta 8795 via socat bridge → vita-whisper:8000). Consome PCM s16le
+    /// 16kHz mono e devolve transcript parcial em tempo real.
+    private static let defaultWhisperLiveURL = "ws://monstro.tail7e98e6.ts.net:8795/asr"
     #else
     private static let defaultAPIBaseURL = "https://vita-ai.cloud/api"
     private static let defaultAuthBaseURL = "https://vita-ai.cloud"
+    /// Prod ainda não expõe WS público do whisper (precisa proxy autenticado).
+    /// Deixa vazio — iOS degrada pro fallback SFSpeechRecognizer nativo.
+    private static let defaultWhisperLiveURL = ""
     #endif
 
     struct InjectedSession {
@@ -107,6 +114,15 @@ enum AppConfig {
         #endif
         cfgLogger.notice("[APICFG.apiBaseURL] DEFAULT path used: \(defaultAPIBaseURL, privacy: .public) (compile branch=\(branch, privacy: .public))")
         return defaultAPIBaseURL
+    }
+
+    /// Endpoint WebSocket do WhisperLiveKit. Vazia em RELEASE até termos
+    /// proxy autenticado em prod — quando vazio, VM cai no SFSpeechRecognizer.
+    static var whisperLiveWSURL: String {
+        if let override = overrideValue(envKey: "VITA_WHISPER_LIVE_URL", defaultsKey: "vita_whisper_live_url") {
+            return override
+        }
+        return defaultWhisperLiveURL
     }
 
     static var authBaseURL: String {
