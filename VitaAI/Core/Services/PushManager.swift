@@ -35,6 +35,12 @@ final class PushManager: NSObject, ObservableObject {
     /// Requests notification authorization from the system and registers for remote notifications.
     /// Safe to call multiple times — will only prompt if `.notDetermined`.
     func requestPermission() async {
+        // Simulator can't receive APNs pushes anyway; skip the prompt so every
+        // fresh boot doesn't interrupt the user with a dialog we can't honor.
+        #if targetEnvironment(simulator)
+        authorizationStatus = .authorized
+        return
+        #else
         let center = UNUserNotificationCenter.current()
         let settings = await center.notificationSettings()
         authorizationStatus = settings.authorizationStatus
@@ -61,6 +67,7 @@ final class PushManager: NSObject, ObservableObject {
         @unknown default:
             break
         }
+        #endif
     }
 
     // MARK: - Token Handling
