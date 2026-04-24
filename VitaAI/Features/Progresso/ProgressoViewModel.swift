@@ -51,9 +51,16 @@ final class ProgressoViewModel {
 
         var anySuccess = false
 
-        // Load progress data (independent — partial success is OK)
+        // Fire all 5 independent requests in parallel — was serial (3-4s), now max(endpoint)
+        async let progressResult = api.getProgress()
+        async let statsResult = api.getGamificationStats()
+        async let leaderboardResult = api.getLeaderboard(period: leaderboardPeriod, limit: 10)
+        async let achievementsResult = api.getAchievements()
+        async let activityResult = api.getActivityFeed(limit: 8, offset: 0)
+
+        // Progress
         do {
-            let progress = try await api.getProgress()
+            let progress = try await progressResult
             totalStudyHours = progress.totalStudyHours
             avgAccuracy = progress.avgAccuracy
             totalQuestions = progress.totalAnswered
@@ -70,7 +77,7 @@ final class ProgressoViewModel {
 
         // Load XP/level from gamification stats endpoint (server is source of truth)
         do {
-            let stats = try await api.getGamificationStats()
+            let stats = try await statsResult
             // streakDays from stats takes priority over progress endpoint if available
             if stats.streakDays > 0 { streakDays = stats.streakDays }
             longestStreak = streakDays
@@ -116,20 +123,24 @@ final class ProgressoViewModel {
             }
         }
 
-        // Load leaderboard
-        await loadLeaderboard(period: leaderboardPeriod)
-        if !leaderboard.isEmpty { anySuccess = true }
-
-        // Load achievements + recent activity (independent, partial success OK)
+        // Leaderboard (parallel fetch joined here)
         do {
-            badges = try await api.getAchievements()
+            leaderboard = try await leaderboardResult
+            if !leaderboard.isEmpty { anySuccess = true }
+        } catch {
+            print("[PROGRESSO] getLeaderboard failed: \(error)")
+        }
+
+        // Achievements + activity feed (parallel fetches joined here)
+        do {
+            badges = try await achievementsResult
             if !badges.isEmpty { anySuccess = true }
         } catch {
             print("[PROGRESSO] getAchievements failed: \(error)")
         }
 
         do {
-            activity = try await api.getActivityFeed(limit: 8, offset: 0)
+            activity = try await activityResult
             if !activity.isEmpty { anySuccess = true }
         } catch {
             print("[PROGRESSO] getActivityFeed failed: \(error)")
