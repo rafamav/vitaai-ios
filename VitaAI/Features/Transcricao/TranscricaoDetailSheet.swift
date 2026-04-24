@@ -35,6 +35,7 @@ struct TranscricaoDetailSheet: View {
     @State private var actionError: String?
     @State private var isFavorite: Bool = false
     @State private var currentDisciplineSlug: String? = nil
+    @State private var currentFolderId: String? = nil
 
     init(recording: TranscricaoEntry,
          onRenamed: ((String) -> Void)? = nil,
@@ -283,9 +284,10 @@ struct TranscricaoDetailSheet: View {
         .sheet(isPresented: $showMoveSheet) {
             TranscricaoMovePickerSheet(
                 currentSlug: currentDisciplineSlug,
-                onPick: { slug in
+                currentFolderId: currentFolderId,
+                onPick: { folderId, slug in
                     showMoveSheet = false
-                    Task { await moveToDiscipline(slug: slug) }
+                    Task { await moveToTarget(folderId: folderId, slug: slug) }
                 }
             )
         }
@@ -351,16 +353,21 @@ struct TranscricaoDetailSheet: View {
         actionBusy = false
     }
 
-    private func moveToDiscipline(slug: String?) async {
+    /// Aplica folderId OU disciplineSlug (ou nada = "Sem pasta"). Mutual
+    /// exclusive — passar um zera o outro.
+    private func moveToTarget(folderId: String?, slug: String?) async {
         actionBusy = true
         actionError = nil
         do {
             try await container.api.updateStudioSource(
                 id: recording.id,
                 disciplineSlug: slug,
-                clearDiscipline: slug == nil
+                clearDiscipline: slug == nil,
+                folderId: folderId,
+                clearFolder: folderId == nil
             )
             currentDisciplineSlug = slug
+            currentFolderId = folderId
         } catch {
             actionError = "Falha ao mover"
             Task {
@@ -585,9 +592,10 @@ struct TranscricaoDetailSheet: View {
             sourceDetail = detail
             outputs = outputsResp.outputs
 
-            // Sync favorite + discipline state from metadata (PATCH updates).
+            // Sync favorite + folder/discipline state from metadata (PATCH updates).
             isFavorite = detail.metadata?.favorite ?? false
             currentDisciplineSlug = detail.metadata?.disciplineSlug
+            currentFolderId = detail.metadata?.folderId
 
             // Extract all words from segments for karaoke
             if let segments = detail.metadata?.segments {

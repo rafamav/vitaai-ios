@@ -194,19 +194,22 @@ actor VitaAPI {
         try await client.patch("studio/sources/\(id)", body: RenameStudioSourceBody(title: title))
     }
 
-    /// PATCH /api/studio/sources/:id — update folder/favorite.
-    /// `disciplineSlug: nil` = não muda; passe "" se quiser REMOVER a pasta
-    /// (envia null no JSON).
+    /// PATCH /api/studio/sources/:id — update folder/favorite/disciplineSlug.
+    /// `clearDiscipline`/`clearFolder = true` envia null no JSON pra remover.
     func updateStudioSource(
         id: String,
         disciplineSlug: String? = nil,
         clearDiscipline: Bool = false,
+        folderId: String? = nil,
+        clearFolder: Bool = false,
         favorite: Bool? = nil
     ) async throws {
         struct Body: Encodable {
             let disciplineSlug: String?
+            let folderId: String?
             let favorite: Bool?
             var hasClearDiscipline: Bool
+            var hasClearFolder: Bool
             func encode(to encoder: Encoder) throws {
                 var c = encoder.container(keyedBy: CK.self)
                 if hasClearDiscipline {
@@ -214,16 +217,53 @@ actor VitaAPI {
                 } else if let s = disciplineSlug {
                     try c.encode(s, forKey: .disciplineSlug)
                 }
+                if hasClearFolder {
+                    try c.encodeNil(forKey: .folderId)
+                } else if let s = folderId {
+                    try c.encode(s, forKey: .folderId)
+                }
                 if let f = favorite { try c.encode(f, forKey: .favorite) }
             }
-            enum CK: String, CodingKey { case disciplineSlug, favorite }
+            enum CK: String, CodingKey { case disciplineSlug, folderId, favorite }
         }
         let body = Body(
             disciplineSlug: disciplineSlug,
+            folderId: folderId,
             favorite: favorite,
-            hasClearDiscipline: clearDiscipline
+            hasClearDiscipline: clearDiscipline,
+            hasClearFolder: clearFolder
         )
         try await client.patch("studio/sources/\(id)", body: body)
+    }
+
+    // MARK: - Studio Folders (user-created folders)
+
+    struct StudioFolder: Decodable, Identifiable {
+        let id: String
+        let name: String
+        let color: String?
+        let icon: String?
+    }
+
+    private struct StudioFoldersResponse: Decodable { let folders: [StudioFolder] }
+    private struct StudioFolderResponse: Decodable { let folder: StudioFolder }
+
+    func listStudioFolders() async throws -> [StudioFolder] {
+        let resp: StudioFoldersResponse = try await client.get("studio/folders")
+        return resp.folders
+    }
+
+    func createStudioFolder(name: String, color: String? = nil, icon: String? = nil) async throws -> StudioFolder {
+        struct Body: Encodable { let name: String; let color: String?; let icon: String? }
+        let resp: StudioFolderResponse = try await client.post(
+            "studio/folders",
+            body: Body(name: name, color: color, icon: icon)
+        )
+        return resp.folder
+    }
+
+    func deleteStudioFolder(id: String) async throws {
+        try await client.delete("studio/folders/\(id)")
     }
 
     func deleteStudioSource(id: String) async throws {

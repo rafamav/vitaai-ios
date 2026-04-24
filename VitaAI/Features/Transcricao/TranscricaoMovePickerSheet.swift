@@ -1,16 +1,32 @@
 import SwiftUI
 
-/// Sheet pra mover uma gravação pra uma disciplina do aluno (ou remover).
+/// Sheet pra mover uma gravação pra uma pasta custom do user ou pra uma
+/// disciplina do portal. User cria pastas próprias via "+ Nova pasta".
 ///
-/// Fonte: `academic_subjects` via `appData.gradesResponse` (mesmo que o chip
-/// picker do recorder). Persiste via PATCH `/api/studio/sources/:id` em
-/// `metadata.disciplineSlug`. Sem disciplina = rascunho solto.
+/// Dados:
+///   - Disciplinas: `appData.gradesResponse` (academic_subjects, auto do portal).
+///   - Pastas custom: GET /api/studio/folders (studio_folders table).
+///
+/// Persistência (via `VitaAPI.updateStudioSource`):
+///   - Pasta custom selecionada: `folderId`.
+///   - Disciplina selecionada: `disciplineSlug`.
+///   - "Sem pasta": `clearFolder=true` + `clearDiscipline=true`.
 struct TranscricaoMovePickerSheet: View {
     let currentSlug: String?
-    let onPick: (String?) -> Void
+    let currentFolderId: String?
+    /// Callback recebe `(folderId, disciplineSlug)`. Nil em ambos = "sem pasta".
+    let onPick: (_ folderId: String?, _ disciplineSlug: String?) -> Void
 
+    @Environment(\.appContainer) private var container
     @Environment(\.appData) private var appData
     @Environment(\.dismiss) private var dismiss
+
+    @State private var folders: [VitaAPI.StudioFolder] = []
+    @State private var foldersLoading = true
+    @State private var showCreateDialog = false
+    @State private var newFolderName: String = ""
+    @State private var creatingFolder = false
+    @State private var errorMessage: String?
 
     private var subjects: [(slug: String, name: String)] {
         let current = appData.gradesResponse?.current ?? []
@@ -18,9 +34,6 @@ struct TranscricaoMovePickerSheet: View {
         return (current + completed)
             .compactMap { s in
                 guard !s.subjectName.isEmpty else { return nil }
-                // grades endpoint usa `id` como slug/id da disciplina — o
-                // backend aceita qualquer string consistente aqui; usaremos
-                // o próprio subjectName slugificado como chave.
                 let slug = s.subjectName
                     .lowercased()
                     .folding(options: .diacriticInsensitive, locale: .init(identifier: "pt_BR"))
@@ -33,47 +46,70 @@ struct TranscricaoMovePickerSheet: View {
     var body: some View {
         NavigationStack {
             List {
+                // "Sem pasta" — reset both folderId + disciplineSlug.
                 Section {
                     Button {
-                        onPick(nil)
+                        onPick(nil, nil)
                         dismiss()
                     } label: {
-                        HStack {
-                            Image(systemName: "tray")
-                                .foregroundStyle(Color.white.opacity(0.55))
-                            Text("Sem disciplina (rascunho)")
-                                .foregroundStyle(Color.white.opacity(0.90))
-                            Spacer()
-                            if currentSlug == nil {
-                                Image(systemName: "checkmark")
-                                    .foregroundStyle(VitaColors.accentLight)
+                        rowLabel(
+                            icon: "tray",
+                            text: "Sem pasta",
+                            selected: currentFolderId == nil && currentSlug == nil,
+                            iconColor: Color.white.opacity(0.55)
+                        )
+                    }
+                }
+
+                Section("Minhas pastas") {
+                    if foldersLoading {
+                        HStack { ProgressView(); Text("Carregando…").font(.system(size: 12)).foregroundStyle(Color.white.opacity(0.45)) }
+                    } else if folders.isEmpty {
+                        Text("Nenhuma pasta criada ainda.")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.white.opacity(0.45))
+                    } else {
+                        ForEach(folders) { f in
+                            Button {
+                                onPick(f.id, nil)
+                                dismiss()
+                            } label: {
+                                rowLabel(
+                                    icon: f.icon ?? "folder.fill",
+                                    text: f.name,
+                                    selected: currentFolderId == f.id,
+                                    iconColor: VitaColors.accent
+                                )
                             }
+                        }
+                    }
+
+                    Button {
+                        newFolderName = ""
+                        showCreateDialog = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "plus.circle")
+                                .foregroundStyle(VitaColors.accentLight)
+                            Text("Nova pasta…")
+                                .foregroundStyle(VitaColors.accentLight)
                         }
                     }
                 }
 
-                Section("Minhas disciplinas") {
-                    if subjects.isEmpty {
-                        Text("Nenhuma disciplina ativa.")
-                            .font(.system(size: 12))
-                            .foregroundStyle(Color.white.opacity(0.45))
-                    } else {
+                if !subjects.isEmpty {
+                    Section("Disciplinas (do portal)") {
                         ForEach(subjects, id: \.slug) { s in
                             Button {
-                                onPick(s.slug)
+                                onPick(nil, s.slug)
                                 dismiss()
                             } label: {
-                                HStack {
-                                    Image(systemName: "folder")
-                                        .foregroundStyle(VitaColors.accent)
-                                    Text(s.name)
-                                        .foregroundStyle(Color.white.opacity(0.90))
-                                    Spacer()
-                                    if currentSlug == s.slug {
-                                        Image(systemName: "checkmark")
-                                            .foregroundStyle(VitaColors.accentLight)
-                                    }
-                                }
+                                rowLabel(
+                                    icon: "graduationcap",
+                                    text: s.name,
+                                    selected: currentSlug == s.slug,
+                                    iconColor: Color.white.opacity(0.55)
+                                )
                             }
                         }
                     }
@@ -82,7 +118,7 @@ struct TranscricaoMovePickerSheet: View {
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
             .background(Color(red: 0.04, green: 0.03, blue: 0.02))
-            .navigationTitle("Mover pra disciplina")
+            .navigationTitle("Mover pra pasta")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -90,8 +126,57 @@ struct TranscricaoMovePickerSheet: View {
                         .foregroundStyle(VitaColors.accentLight)
                 }
             }
+            .alert("Nova pasta", isPresented: $showCreateDialog) {
+                TextField("Nome da pasta", text: $newFolderName)
+                Button("Cancelar", role: .cancel) {}
+                Button("Criar") { Task { await createFolder() } }
+                    .disabled(newFolderName.trimmingCharacters(in: .whitespaces).isEmpty)
+            } message: {
+                Text("Organize suas gravações em pastas.")
+            }
         }
         .presentationDetents([.medium, .large])
         .presentationBackground(.ultraThinMaterial)
+        .task { await loadFolders() }
+    }
+
+    private func rowLabel(icon: String, text: String, selected: Bool, iconColor: Color) -> some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundStyle(iconColor)
+            Text(text)
+                .foregroundStyle(Color.white.opacity(0.90))
+            Spacer()
+            if selected {
+                Image(systemName: "checkmark")
+                    .foregroundStyle(VitaColors.accentLight)
+            }
+        }
+    }
+
+    private func loadFolders() async {
+        foldersLoading = true
+        do {
+            folders = try await container.api.listStudioFolders()
+        } catch {
+            errorMessage = "Falha ao carregar pastas"
+        }
+        foldersLoading = false
+    }
+
+    private func createFolder() async {
+        let trimmed = newFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, !creatingFolder else { return }
+        creatingFolder = true
+        defer { creatingFolder = false }
+        do {
+            let f = try await container.api.createStudioFolder(name: trimmed)
+            folders.insert(f, at: 0)
+            // Seleciona direto a pasta recém-criada.
+            onPick(f.id, nil)
+            dismiss()
+        } catch {
+            errorMessage = "Falha ao criar pasta"
+        }
     }
 }

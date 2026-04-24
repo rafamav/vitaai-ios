@@ -115,14 +115,15 @@ struct StudioSourceMetadata: Decodable {
     /// Short-lived presigned R2 GET URL for the audio file. Backend attaches
     /// it on GET /api/studio/sources/:id so AVPlayer can stream directly.
     let audioUrl: String?
-    /// User-set folder assignment via PATCH. Not related to
-    /// `discipline` (Auto-detect hint stored during upload).
+    /// User-set discipline (portal) via PATCH.
     let disciplineSlug: String?
+    /// User-set custom folder (studio_folders) via PATCH.
+    let folderId: String?
     /// User-toggled favorite flag via PATCH.
     let favorite: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case duration, durationSeconds, fileName, fileSize, whisperModel, segments, audioFileId, audioR2Key, audioUrl, disciplineSlug, favorite
+        case duration, durationSeconds, fileName, fileSize, whisperModel, segments, audioFileId, audioR2Key, audioUrl, disciplineSlug, folderId, favorite
     }
 
     init(from decoder: Decoder) throws {
@@ -135,6 +136,7 @@ struct StudioSourceMetadata: Decodable {
         audioR2Key = try c.decodeIfPresent(String.self, forKey: .audioR2Key)
         audioUrl = try c.decodeIfPresent(String.self, forKey: .audioUrl)
         disciplineSlug = try c.decodeIfPresent(String.self, forKey: .disciplineSlug)
+        folderId = try c.decodeIfPresent(String.self, forKey: .folderId)
         favorite = try c.decodeIfPresent(Bool.self, forKey: .favorite)
 
         // `duration` is the legacy key and may be Double (seconds) or String
@@ -337,6 +339,7 @@ actor TranscricaoClient {
                                     language: language,
                                     discipline: discipline,
                                     durationSeconds: durationSeconds,
+                                    fileSize: fileData.count,
                                     continuation: continuation
                                 )
                                 return
@@ -448,6 +451,7 @@ actor TranscricaoClient {
         language: String,
         discipline: String?,
         durationSeconds: Int,
+        fileSize: Int,
         continuation: AsyncThrowingStream<TranscricaoSSEEvent, Error>.Continuation
     ) async throws {
         guard let url = URL(string: AppConfig.apiBaseURL + "/ai/transcribe/from-live") else {
@@ -463,6 +467,7 @@ actor TranscricaoClient {
             body["discipline"] = discipline
         }
         if durationSeconds > 0 { body["durationSeconds"] = durationSeconds }
+        if fileSize > 0 { body["fileSize"] = fileSize }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
