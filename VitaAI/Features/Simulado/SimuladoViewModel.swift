@@ -176,9 +176,9 @@ final class SimuladoViewModel {
                 await dataManager.silentRefresh()
             }
             let enrolled = dataManager.enrolledDisciplines
-                .sorted { dataManager.vitaScore(for: $0.displayName) > dataManager.vitaScore(for: $1.displayName) }
+                .sorted { dataManager.vitaScore(for: $0.preferredName) > dataManager.vitaScore(for: $1.preferredName) }
             state.disciplines = enrolled.map {
-                SimuladoDiscipline(name: $0.displayName, count: $0.questionCount ?? 0)
+                SimuladoDiscipline(name: $0.preferredName, count: $0.questionCount ?? 0)
             }
             state.disciplinesLoading = false
         }

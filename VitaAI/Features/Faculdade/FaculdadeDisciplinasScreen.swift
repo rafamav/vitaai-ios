@@ -10,9 +10,17 @@ struct FaculdadeDisciplinasScreen: View {
     @Environment(\.appData) private var appData
     @Environment(Router.self) private var router
 
+    // Rename sheet state
+    @State private var renameTarget: RenameTarget?
+
     private var goldPrimary: Color { VitaColors.accentHover }
     private var textWarm: Color { VitaColors.textWarm }
     private var textDim: Color { VitaColors.textWarm.opacity(0.30) }
+
+    private struct RenameTarget: Identifiable {
+        let id: String      // academic_subjects.id
+        let currentName: String
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -43,6 +51,25 @@ struct FaculdadeDisciplinasScreen: View {
         .refreshable { await appData.forceRefresh() }
         .onAppear { SentrySDK.reportFullyDisplayed() }
         .trackScreen("FaculdadeDisciplinas")
+        .sheet(item: $renameTarget) { target in
+            RenameSubjectSheet(
+                subjectId: target.id,
+                currentName: target.currentName,
+                initialDisplayName: appData.enrolledDisciplines
+                    .first(where: { $0.id == target.id })?.displayName
+            )
+            .presentationDetents([.height(260)])
+            .presentationBackground(.ultraThinMaterial)
+            .presentationCornerRadius(28)
+        }
+    }
+
+    // Resolve the best name for a subject row: user edit > catalog > portal.
+    private func displayText(for subject: GradeSubject) -> String {
+        guard let sid = subject.subjectId,
+              let match = appData.enrolledDisciplines.first(where: { $0.id == sid })
+        else { return subject.subjectName }
+        return match.preferredName
     }
 
     // MARK: - Empty state
@@ -89,12 +116,24 @@ struct FaculdadeDisciplinasScreen: View {
                 Button {
                     router.navigate(to: .disciplineDetail(
                         disciplineId: subject.id,
-                        disciplineName: subject.subjectName
+                        disciplineName: displayText(for: subject)
                     ))
                 } label: {
                     disciplineCard(subject)
                 }
                 .buttonStyle(.plain)
+                .contextMenu {
+                    if let sid = subject.subjectId {
+                        Button {
+                            renameTarget = RenameTarget(
+                                id: sid,
+                                currentName: displayText(for: subject)
+                            )
+                        } label: {
+                            Label("Renomear", systemImage: "pencil")
+                        }
+                    }
+                }
             }
         }
     }
@@ -103,7 +142,8 @@ struct FaculdadeDisciplinasScreen: View {
 
     private func disciplineCard(_ subject: GradeSubject) -> some View {
         let color = SubjectColors.colorFor(subject: subject.subjectName)
-        let shortName = subject.subjectName
+        let rendered = displayText(for: subject)
+        let shortName = rendered
             .replacingOccurrences(of: "(?i),.*$", with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespaces)
 

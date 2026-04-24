@@ -58,6 +58,21 @@ final class AppDataManager {
         await refreshAll()
     }
 
+    /// Set or clear a subject's user-ownable display name. Updates local
+    /// cache immediately on success so UI reflects the rename without a
+    /// full refresh. Sync never touches this field (backend + iOS both).
+    /// Pass nil or empty to reset to portal-canonical name.
+    func renameSubject(id: String, displayName: String?) async {
+        let trimmed = displayName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let payload = (trimmed?.isEmpty == true) ? nil : trimmed
+        guard let updated = try? await api.renameSubject(id: id, displayName: payload) else {
+            return
+        }
+        if let idx = enrolledDisciplines.firstIndex(where: { $0.id == id }) {
+            enrolledDisciplines[idx].displayName = updated.displayName
+        }
+    }
+
     // MARK: - Private
 
     /// VitaScore lookup by subject name (case/diacritics insensitive)

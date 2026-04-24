@@ -201,6 +201,12 @@ Sources/VitaAPI/Models/StartOsceAttemptRequest.swift
 Sources/VitaAPI/Models/StudioGenerateRequest.swift
 Sources/VitaAPI/Models/StudioOutput.swift
 Sources/VitaAPI/Models/StudioSource.swift
+Sources/VitaAPI/Models/StudyOverviewFlashcards.swift
+Sources/VitaAPI/Models/StudyOverviewQBank.swift
+Sources/VitaAPI/Models/StudyOverviewResponse.swift
+Sources/VitaAPI/Models/StudyOverviewSimulados.swift
+Sources/VitaAPI/Models/StudyOverviewSubject.swift
+Sources/VitaAPI/Models/StudyOverviewTranscricoes.swift
 Sources/VitaAPI/Models/StudyPlanItem.swift
 Sources/VitaAPI/Models/StudySession.swift
 Sources/VitaAPI/Models/SubmitCoachFeedback200Response.swift
@@ -418,6 +424,12 @@ docs/StartOsceAttemptRequest.md
 docs/StudioGenerateRequest.md
 docs/StudioOutput.md
 docs/StudioSource.md
+docs/StudyOverviewFlashcards.md
+docs/StudyOverviewQBank.md
+docs/StudyOverviewResponse.md
+docs/StudyOverviewSimulados.md
+docs/StudyOverviewSubject.md
+docs/StudyOverviewTranscricoes.md
 docs/StudyPlanItem.md
 docs/StudySession.md
 docs/SubmitCoachFeedback200Response.md

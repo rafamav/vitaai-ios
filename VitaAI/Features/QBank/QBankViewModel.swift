@@ -419,7 +419,7 @@ final class QBankViewModel {
         state.filters.disciplines = subjects.enumerated().map { index, subject in
             QBankDiscipline(
                 id: index + 1,
-                title: subject.displayName,
+                title: subject.preferredName,
                 slug: subject.disciplineSlug,
                 parentId: nil,
                 level: 0,

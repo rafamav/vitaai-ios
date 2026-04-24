@@ -217,6 +217,9 @@ struct SubjectsResponse: Codable {
 struct AcademicSubject: Codable, Identifiable {
     var id: String
     var name: String
+    /// User-ownable display name — set via PATCH /api/subjects/{id} {displayName}.
+    /// Sync never touches this. If nil, UI falls back to canonicalName ?? name.
+    var displayName: String?
     var status: String?
     var source: String?
     var difficulty: String?
@@ -239,9 +242,8 @@ struct AcademicSubject: Codable, Identifiable {
     /// /api/qbank/filters.disciplines[] (deprecated).
     var questionCount: Int?
 
-    /// Prefer the canonical catalog name when present, fall back to the
-    /// portal-sourced subject name.
-    var displayName: String { canonicalName ?? name }
+    /// Preferred name for display — user edit wins over catalog wins over portal.
+    var preferredName: String { displayName ?? canonicalName ?? name }
 }
 
 // MARK: - Server-Driven UI (manual — generated uses different field names)

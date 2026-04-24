@@ -238,6 +238,7 @@
 		ABCF443F15D77668548C5FA6 /* SimuladoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66A4311D514BAEFE6D0D895C /* SimuladoModels.swift */; };
 		AC5B33866A318AEB26C9D89B /* MindMapEntity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BDCF35E780F773E1F5CBC6A /* MindMapEntity.swift */; };
 		AC82F6D41F1DF2AFE11792F0 /* ProfessorProfileSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BB146376AA9EA99FCFF9BDE /* ProfessorProfileSheet.swift */; };
+		AC881C0B692739EB95957C89 /* RenameSubjectSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 407A64F295C1E3F98A7BF4BD /* RenameSubjectSheet.swift */; };
 		ACC7CEB7A16A21B95F14D787 /* SubscriptionStatusProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E9567814921EC4C53B3F70C /* SubscriptionStatusProvider.swift */; };
 		ACF3EC935F310D869BB65B54 /* CanvasAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48A74041D35C4181D7B4508C /* CanvasAPIClient.swift */; };
 		ADCBDD9136BFDD754F815428 /* VitaTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A174ED81362A29DFEC35DCD /* VitaTypography.swift */; };
@@ -425,6 +426,7 @@
 		3F7E09C6A6D9EF6518D7B05F /* NoteSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteSyncManager.swift; sourceTree = "<group>"; };
 		3FC72C759C5834DA94FD4AD5 /* WebAlunoModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAlunoModels.swift; sourceTree = "<group>"; };
 		3FF4ED41ED7BB65304F7B645 /* StudyOverviewStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudyOverviewStore.swift; sourceTree = "<group>"; };
+		407A64F295C1E3F98A7BF4BD /* RenameSubjectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenameSubjectSheet.swift; sourceTree = "<group>"; };
 		409712121A5E2B5A4828C9B8 /* QBankDisciplineContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QBankDisciplineContent.swift; sourceTree = "<group>"; };
 		40A681B65A29A68135987794 /* OsceSessionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OsceSessionView.swift; sourceTree = "<group>"; };
 		4115858B2E1C1E3408712051 /* GlassAuthButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassAuthButton.swift; sourceTree = "<group>"; };
@@ -1439,6 +1441,7 @@
 				5D545B4D23872BE2BD3194EF /* FaculdadeMateriasScreen.swift */,
 				969CC09E6ADAE216B40E2DD3 /* FaculdadeProfessoresScreen.swift */,
 				DA88B383AB1A6C7CDD0DAD1F /* MonthlyCalendarView.swift */,
+				407A64F295C1E3F98A7BF4BD /* RenameSubjectSheet.swift */,
 			);
 			path = Faculdade;
 			sourceTree = "<group>";
@@ -1820,6 +1823,7 @@
 				BA27F6EA1D9730F758DCB46F /* QBankViewModel.swift in Sources */,
 				C69655D848D9D73894AB57E5 /* RatingButtons.swift in Sources */,
 				F67C0AB8BFF4B0824843E223 /* RegisterPushTokenRequest.swift in Sources */,
+				AC881C0B692739EB95957C89 /* RenameSubjectSheet.swift in Sources */,
 				DD54025EF50E0E5227E2CAB4 /* RetentionChartView.swift in Sources */,
 				2793E992735A428B383FF975 /* Route+Breadcrumb.swift in Sources */,
 				00BA6439DC936CB28EB48BAD /* Route.swift in Sources */,

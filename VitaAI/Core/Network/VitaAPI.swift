@@ -635,6 +635,14 @@ actor VitaAPI {
         return try await client.patch("subjects/\(id)", body: Body(difficulty: difficulty))
     }
 
+    /// Set or clear the user-ownable display name for a subject. Empty/nil
+    /// resets to the portal-canonical name (UI falls back to canonicalName ?? name).
+    /// See vitaai-web#170 phase A.
+    func renameSubject(id: String, displayName: String?) async throws -> AcademicSubject {
+        struct Body: Encodable { let displayName: String? }
+        return try await client.patch("subjects/\(id)", body: Body(displayName: displayName))
+    }
+
     // MARK: - Grades
 
     func getGradesCurrent() async throws -> GradesCurrentResponse {
