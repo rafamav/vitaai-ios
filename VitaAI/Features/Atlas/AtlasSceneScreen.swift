@@ -28,14 +28,13 @@ struct AtlasSceneScreen: View {
     @State private var lookup: [String: MeshInfo] = [:]
     @State private var selectedMesh: MeshInfo?
     @State private var resetTrigger = 0
-
-    // Baseline layer — matches `DEFAULT_VISIBLE` in the web viewer.
-    private let layer = "arthrology"
+    @State private var currentLayer: AtlasLayer = .arthrology
 
     var body: some View {
         // No opaque base — the AppRouter's VitaAmbientBackground shows through.
         VStack(spacing: 0) {
             topBar
+            layerBar
 
             ZStack {
                 if let scene {
@@ -54,7 +53,7 @@ struct AtlasSceneScreen: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationBarHidden(true)
-        .task(id: loadAttempt) { await loadLayer() }
+        .task(id: "\(loadAttempt)-\(currentLayer.rawValue)") { await loadLayer() }
         .task { await loadLookupIfNeeded() }
         .sheet(item: $selectedMesh) { info in
             MeshDetailSheet(
@@ -85,6 +84,51 @@ struct AtlasSceneScreen: View {
             return
         }
         atlasLog.notice("[Atlas] tap mesh '\(meshName, privacy: .public)' no lookup hit")
+    }
+
+    // MARK: - Layer bar (system switcher)
+
+    private var layerBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(AtlasLayer.allCases) { layer in
+                    Button {
+                        guard layer != currentLayer else { return }
+                        scene = nil
+                        progress = 0
+                        errorMessage = nil
+                        currentLayer = layer
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: layer.icon)
+                                .font(.system(size: 11, weight: .semibold))
+                            Text(layer.displayName)
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundStyle(currentLayer == layer ? VitaColors.accent : VitaColors.textSecondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(
+                            Capsule()
+                                .fill(currentLayer == layer
+                                      ? VitaColors.accent.opacity(0.15)
+                                      : Color.white.opacity(0.04))
+                        )
+                        .overlay(
+                            Capsule()
+                                .stroke(currentLayer == layer
+                                        ? VitaColors.accent.opacity(0.4)
+                                        : Color.white.opacity(0.06),
+                                        lineWidth: 0.8)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+        }
+        .background(.ultraThinMaterial.opacity(0.65))
     }
 
     // MARK: - Top bar (shell-friendly)
@@ -238,8 +282,9 @@ struct AtlasSceneScreen: View {
     // MARK: - Load pipeline
 
     private func loadLayer() async {
+        let layerName = currentLayer.rawValue
         do {
-            let url = try await fetchOrCacheGLB(layer: layer)
+            let url = try await fetchOrCacheGLB(layer: layerName)
             let built = try await buildScene(from: url)
             await MainActor.run {
                 self.scene = built
@@ -357,6 +402,44 @@ struct AtlasSceneScreen: View {
             case .httpStatus(let code): return "Servidor respondeu \(code) ao baixar o modelo."
             case .noScene: return "O arquivo .glb não tem cena padrão."
             }
+        }
+    }
+}
+
+// MARK: - Atlas layers (anatomical systems)
+
+enum AtlasLayer: String, CaseIterable, Identifiable {
+    case arthrology
+    case myology
+    case neurology
+    case angiology
+    case splanchnology
+    case lymphoid
+    case joints
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .arthrology:    return "Ossos"
+        case .myology:       return "Músculos"
+        case .neurology:     return "Nervos"
+        case .angiology:     return "Vasos"
+        case .splanchnology: return "Órgãos"
+        case .lymphoid:      return "Linfático"
+        case .joints:        return "Articulações"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .arthrology:    return "figure.stand"
+        case .myology:       return "figure.strengthtraining.traditional"
+        case .neurology:     return "brain.head.profile"
+        case .angiology:     return "heart.fill"
+        case .splanchnology: return "lungs.fill"
+        case .lymphoid:      return "drop.fill"
+        case .joints:        return "link"
         }
     }
 }
