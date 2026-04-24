@@ -18,22 +18,19 @@ enum AppConfig {
     static let onboardingKey = "vita_is_onboarded"
     static let legacyOnboardingKey = "vita_onboarding_done"
 
-    // DEBUG builds hit the dev server on monstro via Tailscale (hot-reload backend).
-    // Release builds (TestFlight / App Store) hit production vita-ai.cloud — the
-    // tester's device cannot depend on Rafael's PC being online / Tailscale connected.
+    // Pre-beta (2026-04-24 em diante): TestFlight aponta pra DEV (monstro via Tailscale).
+    // Rafael está testando solo no iPad/iPhone dele, mesmos dados do simulador.
+    // Quando lançar beta público pra testers reais, trocar Release bloc pra vita-ai.cloud
+    // (prod VPS Hostinger).
     #if DEBUG
     private static let defaultAPIBaseURL = "http://monstro.tail7e98e6.ts.net:3110/api"
     private static let defaultAuthBaseURL = "http://monstro.tail7e98e6.ts.net:3110"
-    /// WebSocket streaming endpoint pro WhisperLiveKit rodando no monstro
-    /// (porta 8795 via socat bridge → vita-whisper:8000). Consome PCM s16le
-    /// 16kHz mono e devolve transcript parcial em tempo real.
     private static let defaultWhisperLiveURL = "ws://monstro.tail7e98e6.ts.net:8795/asr"
     #else
-    private static let defaultAPIBaseURL = "https://vita-ai.cloud/api"
-    private static let defaultAuthBaseURL = "https://vita-ai.cloud"
-    /// Prod ainda não expõe WS público do whisper (precisa proxy autenticado).
-    /// Deixa vazio — iOS degrada pro fallback SFSpeechRecognizer nativo.
-    private static let defaultWhisperLiveURL = ""
+    // PRE-BETA: mesma coisa do DEBUG — trocar pra https://vita-ai.cloud ao lançar beta
+    private static let defaultAPIBaseURL = "http://monstro.tail7e98e6.ts.net:3110/api"
+    private static let defaultAuthBaseURL = "http://monstro.tail7e98e6.ts.net:3110"
+    private static let defaultWhisperLiveURL = "ws://monstro.tail7e98e6.ts.net:8795/asr"
     #endif
 
     struct InjectedSession {
