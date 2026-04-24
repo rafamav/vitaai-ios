@@ -504,7 +504,16 @@ final class TranscricaoViewModel {
         audioEngine = engine
 
         // Recognition task — updates live transcript only (does NOT control recording stop)
-        recognitionTask = recognizer?.recognitionTask(with: request) { [weak self] result, _ in
+        if recognizer == nil {
+            NSLog("[TranscricaoVM] SFSpeechRecognizer is nil (unsupported locale?)")
+        } else if recognizer?.isAvailable != true {
+            NSLog("[TranscricaoVM] SFSpeechRecognizer unavailable (no network? device unsupported?)")
+        }
+        recognitionTask = recognizer?.recognitionTask(with: request) { [weak self] result, error in
+            if let error {
+                NSLog("[TranscricaoVM] speech recognition error: %@", "\(error)")
+                return
+            }
             guard let result else { return }
             let text = result.bestTranscription.formattedString
             Task { @MainActor [weak self] in

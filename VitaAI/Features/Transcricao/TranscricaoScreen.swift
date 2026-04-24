@@ -232,11 +232,17 @@ private struct TranscricaoContent: View {
                             .padding(.horizontal, 16)
                             .padding(.top, 8)
 
-                            // Live transcript (if in live mode and recording)
-                            if viewModel.phase == .recording && selectedMode == .live && !viewModel.liveTranscript.isEmpty {
+                            // Live transcript — SEMPRE aparece em modo "Ao Vivo"
+                            // enquanto gravando (mesmo vazio, com placeholder
+                            // "Ouvindo…"). Antes só aparecia quando já tinha
+                            // texto — user ficava sem feedback visual achando
+                            // que o modo live não funcionava. Usa on-device
+                            // SFSpeechRecognizer, zero rede.
+                            if viewModel.phase == .recording && selectedMode == .live {
                                 TranscricaoLiveTranscriptBox(text: viewModel.liveTranscript)
                                     .padding(.horizontal, 16)
                                     .padding(.top, 8)
+                                    .transition(.opacity)
                             }
 
                             // Rascunhos locais + uploads em background — cada

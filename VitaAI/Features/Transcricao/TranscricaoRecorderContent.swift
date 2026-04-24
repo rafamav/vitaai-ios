@@ -233,20 +233,47 @@ struct TranscricaoLiveTranscriptBox: View {
     let text: String
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            Text(text)
-                .font(.system(size: 12))
-                .lineSpacing(4)
-                .foregroundStyle(Color.white.opacity(0.65))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                ZStack {
+                    Circle().fill(VitaColors.accent.opacity(0.20)).frame(width: 10, height: 10)
+                    Circle().fill(VitaColors.accent).frame(width: 6, height: 6)
+                        .opacity(0.85)
+                }
+                Text("AO VIVO")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(0.5)
+                    .foregroundStyle(VitaColors.accentLight)
+                Spacer()
+            }
+
+            ScrollView(showsIndicators: false) {
+                if text.isEmpty {
+                    Text("Ouvindo… fale algo.")
+                        .font(.system(size: 12, weight: .medium))
+                        .italic()
+                        .foregroundStyle(Color.white.opacity(0.35))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text(text)
+                        .font(.system(size: 13))
+                        .lineSpacing(4)
+                        .foregroundStyle(Color.white.opacity(0.85))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .frame(maxHeight: 120)
         }
-        .frame(maxHeight: 120)
-        .background(TealColors.accent.opacity(0.04))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(14)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial)
+                RoundedRectangle(cornerRadius: 12).fill(VitaColors.accent.opacity(0.06))
+            }
+        )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(TealColors.accent.opacity(0.10), lineWidth: 1)
+                .stroke(VitaColors.accent.opacity(0.22), lineWidth: 0.5)
         )
     }
 }
