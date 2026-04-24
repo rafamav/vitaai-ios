@@ -53,8 +53,6 @@ struct ConnectionsScreen: View {
 
     // Design tokens
     private let goldSubtle = VitaColors.accentLight
-    private let borderColor = VitaColors.glassBorder
-    private let cardBg = VitaColors.glassBg
 
     // All known portal types (for "Outros portais" fallback)
     private let allPortalTypes: [PortalTypeInfo] = [
@@ -172,12 +170,9 @@ struct ConnectionsScreen: View {
     private func mainContent(vm: ConnectorsViewModel) -> some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
-                Color.clear.frame(height: 64)
-
                 // Connected count card
                 connectedCountCard(vm: vm)
                     .padding(.horizontal, 14)
-                    .padding(.top, 4)
 
                 // Institucional section
                 institucionalSection(vm: vm)
@@ -237,13 +232,12 @@ struct ConnectionsScreen: View {
 
                 comoFunciona
                     .padding(14)
-                    .background(cardBg)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(borderColor, lineWidth: 1))
+                    .glassCard(cornerRadius: 16)
                     .padding(.horizontal, 14)
 
                 Spacer().frame(height: 120)
             }
+            .padding(.top, 8)
         }
         .refreshable { await vm.loadAll() }
     }
@@ -394,9 +388,7 @@ struct ConnectionsScreen: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
-        .background(cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(borderColor, lineWidth: 1))
+        .glassCard(cornerRadius: 16)
     }
 
     // MARK: - Portal Card (generic)
@@ -945,21 +937,13 @@ struct ConnectionsScreen: View {
             }
         }
         .padding(14)
-        .background(cardBg)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(borderColor, lineWidth: 1))
+        .glassCard(cornerRadius: 16)
     }
 
     // MARK: - Section Label
 
     private func sectionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundColor(goldSubtle.opacity(0.35))
-            .tracking(0.8)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 14)
-            .padding(.bottom, 4)
+        SectionHeader(title: text)
     }
 
     // MARK: - Como Funciona
