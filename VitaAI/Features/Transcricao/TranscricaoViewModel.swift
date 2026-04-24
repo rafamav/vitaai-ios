@@ -48,6 +48,11 @@ final class TranscricaoViewModel {
     /// server will classify from context (future Fase 2) — today it's just
     /// stored as metadata and used by the filter picker.
     var selectedDiscipline: String = "Auto-detectar"
+    /// ID da gravação que ACABOU de virar `ready` no pipeline cloud. Sinaliza
+    /// pra UI abrir o sheet de detalhes automaticamente (pattern Otter: "sua
+    /// gravação tá pronta"). View consome e reseta pra nil. Só dispara se
+    /// user ainda está na tela (observer responde ou não).
+    var justCompletedRecordingId: String? = nil
     /// Quando `true` (default): áudio sobe pro R2 + Whisper + LLM resumo/flashcards.
     /// Quando `false`: áudio fica só no device (Documents/audios/), user pode
     /// promover pra cloud depois via botão "Transcrever agora". Util pra rascunho
@@ -332,6 +337,14 @@ final class TranscricaoViewModel {
             try? TranscricaoLocalStore.shared.delete(id: id)
             loadLocalRecordings()
             await loadRecordings(force: true)
+
+            // Sinaliza pra UI abrir sheet de detalhes automaticamente
+            // (pattern Otter/Airgram "sua gravação tá pronta"). Usa o sourceId
+            // retornado pelo backend — é o mesmo ID do objeto TranscricaoEntry
+            // que vai aparecer em `recordings` após o refresh acima.
+            if let sourceId = sourceIdSeen {
+                await MainActor.run { justCompletedRecordingId = sourceId }
+            }
 
             // Gamification: study session log (mesmo que processUpload antigo fazia).
             let durationMinutes = duration / 60

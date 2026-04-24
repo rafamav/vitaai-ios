@@ -264,7 +264,10 @@ private struct TranscricaoContent: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // Detail sheet when tapping a recording
+        // Detail sheet when tapping a recording.
+        // presentationDetents fixado em .large: precisa mostrar TODAS as ações
+        // (gerar resumo/flashcards/questões/conceitos/mindmap) sem scroll
+        // escondendo opções. drag indicator visível pra user saber que é sheet.
         .sheet(item: $selectedRecording) { rec in
             TranscricaoDetailSheet(
                 recording: rec,
@@ -276,6 +279,18 @@ private struct TranscricaoContent: View {
                     withAnimation { viewModel.removeRecordingLocally(id: rec.id) }
                 }
             )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+        // Auto-abre sheet quando transcrição acabou de processar (ready).
+        // UX pattern Otter/Airgram: "sua gravação tá pronta — toca o que quer
+        // fazer". Evita o user ter que caçar a gravação na lista pra abrir.
+        .onChange(of: viewModel.justCompletedRecordingId) { _, newId in
+            guard let newId else { return }
+            if let rec = viewModel.recordings.first(where: { $0.id == newId }) {
+                selectedRecording = rec
+                viewModel.justCompletedRecordingId = nil
+            }
         }
         // Disciplines loaded from appData.gradesResponse (no separate API call needed)
     }

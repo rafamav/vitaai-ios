@@ -504,6 +504,14 @@ struct TealGlassRecordingCard: View {
         recording.isTranscribed ? .transcribed : .pending
     }
 
+    /// Sempre retorna uma string — se LLM não classificou ou disciplina vazia,
+    /// cai pra "OUTROS" (pasta default, pattern iOS Notes/Arquivos/Lembretes).
+    /// Evita card "órfão" sem contexto visual.
+    private var disciplineDisplay: String {
+        let trimmed = (recording.discipline ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return (trimmed.isEmpty ? "Outros" : trimmed).uppercased()
+    }
+
     var body: some View {
         HStack(spacing: 14) {
             // Mic icon in glass circle
@@ -533,24 +541,19 @@ struct TealGlassRecordingCard: View {
             .opacity(displayStatus == .pending ? 0.5 : 1.0)
 
             // Text block
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
+                // Discipline header (sempre presente, fallback "Outros")
+                // iOS pattern: Notes/Voice Memos mostram pasta/categoria antes do título
+                Text(disciplineDisplay)
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(0.9)
+                    .lineLimit(1)
+                    .foregroundStyle(VitaColors.accent.opacity(0.85))
+
                 Text(recording.title.isEmpty ? "Gravação" : recording.title)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.white.opacity(0.96))
                     .lineLimit(1)
-
-                // Discipline tag (if categorized)
-                if let disc = recording.discipline, !disc.isEmpty, disc != "Geral" {
-                    Text(disc.uppercased())
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(0.8)
-                        .lineLimit(1)
-                        .foregroundStyle(VitaColors.accent.opacity(0.85))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(VitaColors.accent.opacity(0.10))
-                        .clipShape(Capsule())
-                }
 
                 // Metadata row: date · duration · size
                 HStack(spacing: 5) {
