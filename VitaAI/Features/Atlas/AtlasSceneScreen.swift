@@ -31,33 +31,80 @@ struct AtlasSceneScreen: View {
     @State private var resetTrigger = 0
     @State private var currentLayer: AtlasLayer = .arthrology
     @State private var cachedLayers: Set<AtlasLayer> = []
+    @State private var hasTappedAnyMesh = false
+    @State private var sceneMeshCount: Int = 0
+    @State private var showSearch = false
+    @State private var anglePreset: AtlasCameraAngle = .front
+    @State private var angleTrigger = 0
 
     var body: some View {
         // No opaque base — the AppRouter's VitaAmbientBackground shows through.
         VStack(spacing: 0) {
             topBar
-            layerBar
 
             ZStack {
-                if let scene {
-                    AnatomySceneView(
-                        scene: scene,
-                        resetTrigger: resetTrigger,
-                        onMeshTap: { meshName in handleMeshTap(meshName) }
-                    )
-                    .transition(.opacity)
-                } else if let errorMessage {
-                    errorView(errorMessage)
-                } else {
-                    loadingView
+                // Scene fills the viewport
+                Group {
+                    if let scene {
+                        AnatomySceneView(
+                            scene: scene,
+                            resetTrigger: resetTrigger,
+                            angleTrigger: angleTrigger,
+                            anglePreset: anglePreset,
+                            onMeshTap: { meshName in handleMeshTap(meshName) }
+                        )
+                        .transition(.opacity)
+                    } else if let errorMessage {
+                        errorView(errorMessage)
+                    } else {
+                        loadingView
+                    }
+                }
+
+                // Vertical rail (left): all 7 systems visible at once
+                HStack {
+                    layerRail
+                    Spacer()
+                    angleRail
+                }
+
+                // First-time empty hint (only when scene is up + no mesh tapped yet)
+                if scene != nil && !hasTappedAnyMesh {
+                    VStack {
+                        Spacer()
+                        emptyHint
+                            .padding(.bottom, 24)
+                    }
+                    .allowsHitTesting(false)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .navigationBarHidden(true)
+        // Immersive: hide VitaTopBar and tab bar so the 3D viewport owns the screen
+        // (same pattern as PdfViewerScreen). Only our own toolbar + rails remain.
+        .preference(key: ImmersivePreferenceKey.self, value: true)
         .task(id: "\(loadAttempt)-\(currentLayer.rawValue)") { await loadLayer() }
         .task { await loadLookupIfNeeded() }
         .onAppear { refreshCachedLayers() }
+        .sheet(isPresented: $showSearch) {
+            AtlasSearchSheet(
+                lookup: lookup,
+                currentLayer: currentLayer,
+                onPick: { info in
+                    showSearch = false
+                    selectedMesh = info
+                    hasTappedAnyMesh = true
+                    VitaPostHogConfig.capture(event: "atlas_search_picked", properties: [
+                        "layer": currentLayer.rawValue,
+                        "structure": info.pt,
+                    ])
+                }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(.ultraThinMaterial)
+        }
         .sheet(item: $selectedMesh) { info in
             MeshDetailSheet(
                 info: info,
@@ -68,7 +115,11 @@ struct AtlasSceneScreen: View {
                         "system": info.system,
                     ])
                     selectedMesh = nil
-                    onAskVita?(info.pt)
+                    // Forward a richer prompt: name + system + EN fallback so the
+                    // chat LLM can disambiguate (helpful for laterality and rare
+                    // structures missing from anatomy-mesh-lookup.json).
+                    let prompt = buildAskVitaPrompt(info)
+                    onAskVita?(prompt)
                 },
                 onClose: { selectedMesh = nil }
             )
@@ -80,106 +131,255 @@ struct AtlasSceneScreen: View {
     }
 
     private func handleMeshTap(_ meshName: String) {
-        let stripped = meshName
-            .replacingOccurrences(of: #"\.j\.\d+$"#, with: "", options: .regularExpression)
-            .replacingOccurrences(of: #"_\d+$"#, with: "", options: .regularExpression)
-
-        let info: MeshInfo
-        let hit: Bool
-        if let direct = lookup[meshName] {
-            info = direct
-            hit = true
-        } else if let stripped = lookup[stripped] {
-            info = stripped
-            hit = true
-        } else {
-            atlasLog.notice("[Atlas] tap mesh '\(meshName, privacy: .public)' no lookup hit")
-            info = MeshInfo(
-                id: stripped,
-                pt: stripped.replacingOccurrences(of: ".", with: " "),
-                en: stripped,
-                system: currentLayer.rawValue,
-                exam: "low",
-                description: nil,
-                tip: nil,
-                curiosity: "Essa estrutura ainda não tem tradução no catálogo — pergunta pra VITA que ela explica."
-            )
-            hit = false
-        }
-        selectedMesh = info
+        let resolved = resolveMeshLookup(meshName)
+        selectedMesh = resolved.info
+        hasTappedAnyMesh = true
         VitaPostHogConfig.capture(event: "atlas_mesh_tapped", properties: [
             "layer": currentLayer.rawValue,
             "mesh_name": meshName,
-            "has_lookup": hit,
-            "pt_name": info.pt,
-            "exam_priority": info.exam,
+            "has_lookup": resolved.hit,
+            "lateralidade": resolved.lateralidade ?? "none",
+            "pt_name": resolved.info.pt,
         ])
     }
 
-    // MARK: - Layer bar (system switcher)
+    /// Mesh names from GLBs come polluted: `Radial artery_l`, `Femur.j.002`,
+    /// `Carpal bones_03`. Strip those suffixes — first try the original key,
+    /// then progressively cleaner variants — so we land on the lookup entry.
+    /// Track the lateralidade so the sheet can append "(esquerda)/(direita)".
+    private func resolveMeshLookup(_ meshName: String) -> (info: MeshInfo, hit: Bool, lateralidade: String?) {
+        var lateralidade: String?
 
-    private var layerBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(AtlasLayer.allCases) { layer in
-                    Button {
-                        guard layer != currentLayer else { return }
-                        UISelectionFeedbackGenerator().selectionChanged()
-                        VitaPostHogConfig.capture(event: "atlas_layer_selected", properties: [
-                            "from": currentLayer.rawValue,
-                            "to": layer.rawValue,
-                            "from_cached": cachedLayers.contains(currentLayer),
-                            "to_cached": cachedLayers.contains(layer),
-                        ])
-                        scene = nil
-                        progress = 0
-                        errorMessage = nil
-                        selectedMesh = nil  // close any open detail sheet
-                        currentLayer = layer
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: layer.icon)
-                                .font(.system(size: 11, weight: .semibold))
-                            Text(layer.displayName)
-                                .font(.system(size: 12, weight: .semibold))
-                            // Cache status dot: filled if already downloaded, outline otherwise.
-                            Image(systemName: cachedLayers.contains(layer)
-                                  ? "checkmark.circle.fill"
-                                  : "arrow.down.circle")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(cachedLayers.contains(layer)
-                                                 ? VitaColors.dataGreen.opacity(0.85)
-                                                 : VitaColors.textSecondary.opacity(0.5))
-                        }
-                        .foregroundStyle(currentLayer == layer ? VitaColors.accent : VitaColors.textSecondary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(
-                            Capsule()
-                                .fill(currentLayer == layer
-                                      ? VitaColors.accent.opacity(0.15)
-                                      : Color.white.opacity(0.04))
-                        )
-                        .overlay(
-                            Capsule()
-                                .stroke(currentLayer == layer
-                                        ? VitaColors.accent.opacity(0.4)
-                                        : Color.white.opacity(0.06),
-                                        lineWidth: 0.8)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Sistema \(layer.displayName)")
-                    .accessibilityHint(cachedLayers.contains(layer)
-                                       ? "Baixado, troca instantânea"
-                                       : "Vai baixar ao selecionar")
-                    .accessibilityAddTraits(currentLayer == layer ? [.isSelected] : [])
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+        // 1) Direct hit (rare but possible if the GLB matches the lookup key exactly)
+        if let direct = lookup[meshName] {
+            return (direct, true, nil)
         }
-        .background(.ultraThinMaterial.opacity(0.65))
+
+        // 2) Strip GLTFKit2 instance suffixes (.j.NNN, _NNN)
+        var candidate = meshName
+            .replacingOccurrences(of: #"\.j\.\d+$"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"_\d+$"#, with: "", options: .regularExpression)
+        if let hit = lookup[candidate] { return (hit, true, nil) }
+
+        // 3) Strip side markers (_l, _r, _left, _right, _sup, _inf, _med, _lat)
+        let sideMatchers: [(pattern: String, label: String)] = [
+            (#"[_\.\s]+(left|l)$"#,    "esquerda"),
+            (#"[_\.\s]+(right|r)$"#,   "direita"),
+            (#"[_\.\s]+(superior|sup)$"#,  "superior"),
+            (#"[_\.\s]+(inferior|inf)$"#,  "inferior"),
+            (#"[_\.\s]+(medial|med)$"#,    "medial"),
+            (#"[_\.\s]+(lateral|lat)$"#,   "lateral"),
+            (#"[_\.\s]+(anterior|ant)$"#,  "anterior"),
+            (#"[_\.\s]+(posterior|post)$"#, "posterior"),
+        ]
+        for (pattern, label) in sideMatchers {
+            if let range = candidate.range(of: pattern, options: [.regularExpression, .caseInsensitive]) {
+                candidate.removeSubrange(range)
+                lateralidade = label
+                break
+            }
+        }
+        if let hit = lookup[candidate] {
+            let suffixed = lateralidade.map { "\(hit.pt) (\($0))" } ?? hit.pt
+            let enrich = MeshInfo(
+                id: hit.id,
+                pt: suffixed,
+                en: hit.en,
+                system: hit.system,
+                exam: hit.exam,
+                description: hit.description,
+                tip: hit.tip,
+                curiosity: hit.curiosity
+            )
+            return (enrich, true, lateralidade)
+        }
+
+        // 4) Try title-cased variant (lookup keys are usually capitalized)
+        let titleCased = candidate.split(separator: " ").enumerated().map { idx, word -> String in
+            idx == 0 ? word.prefix(1).uppercased() + word.dropFirst() : String(word)
+        }.joined(separator: " ")
+        if let hit = lookup[titleCased] { return (hit, true, lateralidade) }
+
+        // 5) Fallback: surface a clean label, no fake exam priority
+        atlasLog.notice("[Atlas] tap mesh '\(meshName, privacy: .public)' → '\(candidate, privacy: .public)' no lookup hit")
+        let fallback = MeshInfo(
+            id: candidate,
+            pt: prettify(candidate, lateralidade: lateralidade),
+            en: candidate,
+            system: currentLayer.rawValue,
+            exam: "",   // empty = chip hidden
+            description: nil,
+            tip: nil,
+            curiosity: nil
+        )
+        return (fallback, false, lateralidade)
+    }
+
+    /// Compose a self-contained prompt the chat LLM can act on without needing
+    /// to load the Atlas screen state. We keep it conversational; the chat side
+    /// will run RAG / general knowledge over it.
+    private func buildAskVitaPrompt(_ info: MeshInfo) -> String {
+        let systemHint = info.system.isEmpty ? "" : " (sistema: \(info.system))"
+        let enHint = (info.en != info.pt && !info.en.isEmpty) ? " — em inglês: \(info.en)" : ""
+        return "Me explica sobre \(info.pt)\(systemHint)\(enHint). Quero saber: o que é, função, principais relações anatômicas, relevância clínica e se costuma cair em prova de medicina (ENADE, residência, OSCE)."
+    }
+
+    private func prettify(_ raw: String, lateralidade: String?) -> String {
+        let cleaned = raw
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: ".", with: " ")
+            .replacingOccurrences(of: "  ", with: " ")
+            .trimmingCharacters(in: .whitespaces)
+        let cap = cleaned.prefix(1).uppercased() + cleaned.dropFirst()
+        if let lateralidade { return "\(cap) (\(lateralidade))" }
+        return String(cap)
+    }
+
+    // MARK: - Layer rail (vertical system switcher, all 7 visible)
+
+    private var layerRail: some View {
+        VStack(spacing: 8) {
+            ForEach(AtlasLayer.allCases) { layer in
+                layerPill(layer: layer)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 22)
+                .fill(.ultraThinMaterial.opacity(0.7))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22)
+                        .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
+                )
+        )
+        .padding(.leading, 10)
+        .padding(.top, 14)
+    }
+
+    @ViewBuilder
+    private func layerPill(layer: AtlasLayer) -> some View {
+        let active = (currentLayer == layer)
+        let cached = cachedLayers.contains(layer)
+        Button {
+            guard !active else { return }
+            UISelectionFeedbackGenerator().selectionChanged()
+            VitaPostHogConfig.capture(event: "atlas_layer_selected", properties: [
+                "from": currentLayer.rawValue,
+                "to": layer.rawValue,
+                "from_cached": cachedLayers.contains(currentLayer),
+                "to_cached": cached,
+            ])
+            scene = nil
+            progress = 0
+            errorMessage = nil
+            selectedMesh = nil
+            currentLayer = layer
+        } label: {
+            VStack(spacing: 4) {
+                ZStack {
+                    Circle()
+                        .fill(active ? VitaColors.accent.opacity(0.18) : Color.white.opacity(0.04))
+                        .frame(width: 38, height: 38)
+                        .overlay(
+                            Circle()
+                                .stroke(active ? VitaColors.accent.opacity(0.6) : Color.white.opacity(0.08),
+                                        lineWidth: active ? 1.2 : 0.6)
+                        )
+                    Image(systemName: layer.icon)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(active ? VitaColors.accent : VitaColors.textSecondary)
+                    // Cache dot: bottom-right of the icon circle
+                    if cached {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(VitaColors.dataGreen)
+                            .background(Circle().fill(Color.black))
+                            .offset(x: 13, y: 13)
+                    }
+                }
+                Text(layer.displayName)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(active ? VitaColors.accent : VitaColors.textSecondary.opacity(0.85))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+            .frame(width: 56)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Sistema \(layer.displayName)")
+        .accessibilityHint(cached ? "Baixado, troca instantânea" : "Vai baixar ao selecionar")
+        .accessibilityAddTraits(active ? [.isSelected] : [])
+    }
+
+    // MARK: - Camera angle rail (right)
+
+    private var angleRail: some View {
+        VStack(spacing: 6) {
+            ForEach(AtlasCameraAngle.allCases) { angle in
+                Button {
+                    UISelectionFeedbackGenerator().selectionChanged()
+                    anglePreset = angle
+                    angleTrigger += 1
+                } label: {
+                    VStack(spacing: 2) {
+                        Image(systemName: angle.icon)
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(angle.displayName)
+                            .font(.system(size: 8, weight: .semibold))
+                    }
+                    .foregroundStyle(anglePreset == angle ? VitaColors.accent : VitaColors.textSecondary)
+                    .frame(width: 44, height: 38)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(anglePreset == angle
+                                  ? VitaColors.accent.opacity(0.18)
+                                  : Color.white.opacity(0.04))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(anglePreset == angle
+                                    ? VitaColors.accent.opacity(0.5)
+                                    : Color.white.opacity(0.06), lineWidth: 0.6)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Vista \(angle.displayName)")
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 18)
+                .fill(.ultraThinMaterial.opacity(0.7))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18)
+                        .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
+                )
+        )
+        .padding(.trailing, 10)
+        .padding(.top, 14)
+    }
+
+    // MARK: - Empty state hint
+
+    @ViewBuilder
+    private var emptyHint: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "hand.tap.fill")
+                .font(.system(size: 11, weight: .semibold))
+            Text("Toque numa estrutura pra explorar")
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundStyle(VitaColors.textSecondary)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(
+            Capsule().fill(.ultraThinMaterial.opacity(0.85))
+                .overlay(
+                    Capsule().stroke(Color.white.opacity(0.06), lineWidth: 0.5)
+                )
+        )
     }
 
     // MARK: - Top bar (shell-friendly)
@@ -195,11 +395,32 @@ struct AtlasSceneScreen: View {
             }
             .buttonStyle(.plain)
 
-            Text("Atlas 3D")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(VitaColors.textPrimary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Atlas 3D")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(VitaColors.textPrimary)
+                if let subtitle = headerSubtitle {
+                    Text(subtitle)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(VitaColors.textSecondary)
+                        .transition(.opacity)
+                }
+            }
 
             Spacer()
+
+            // Search structures by PT-BR/EN name (4887 entries in the lookup).
+            Button {
+                showSearch = true
+            } label: {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(VitaColors.textSecondary)
+                    .frame(width: 36, height: 36)
+                    .background(Circle().fill(.ultraThinMaterial))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Buscar estrutura")
 
             // Reset camera framing (useful after user zooms/rotates into the abyss).
             Button {
@@ -214,37 +435,69 @@ struct AtlasSceneScreen: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Recentralizar câmera")
 
-            Button {
-                scene = nil
-                errorMessage = nil
-                progress = 0
-                loadAttempt += 1
+            Menu {
+                Button {
+                    scene = nil
+                    errorMessage = nil
+                    progress = 0
+                    loadAttempt += 1
+                } label: {
+                    Label("Recarregar modelo", systemImage: "arrow.clockwise")
+                }
+                Button {
+                    clearAtlasCaches()
+                } label: {
+                    Label("Limpar cache", systemImage: "trash")
+                }
             } label: {
-                Image(systemName: "arrow.clockwise")
+                Image(systemName: "ellipsis")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(VitaColors.textSecondary)
                     .frame(width: 36, height: 36)
                     .background(Circle().fill(.ultraThinMaterial))
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Recarregar modelo")
+            .accessibilityLabel("Mais opções")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(.ultraThinMaterial.opacity(0.9))
     }
 
+    private func clearAtlasCaches() {
+        guard let cache = try? FileManager.default.url(
+            for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: false
+        ) else { return }
+        for layer in AtlasLayer.allCases {
+            let path = cache.appendingPathComponent("atlas-\(layer.rawValue).glb")
+            try? FileManager.default.removeItem(at: path)
+        }
+        try? FileManager.default.removeItem(at: cache.appendingPathComponent("atlas-lookup.json"))
+        cachedLayers.removeAll()
+        scene = nil
+        progress = 0
+        loadAttempt += 1
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+    }
+
     // MARK: - Loading & error
 
     private var loadingView: some View {
-        VStack(spacing: 14) {
-            ProgressView(value: progress)
-                .progressViewStyle(.linear)
-                .tint(VitaColors.accent)
-                .frame(width: 180)
-            Text(progress > 0 ? "Baixando modelo — \(Int(progress * 100))%" : "Carregando Atlas 3D…")
-                .font(.system(size: 13))
-                .foregroundStyle(VitaColors.textSecondary)
+        VStack(spacing: 18) {
+            // Pulsing anatomical silhouette in gold — feels like a heartbeat.
+            AtlasLoadingSilhouette()
+
+            VStack(spacing: 6) {
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .tint(VitaColors.accent)
+                    .frame(width: 180)
+                Text(progress > 0
+                     ? "Baixando \(currentLayer.displayName) — \(Int(progress * 100))%"
+                     : "Carregando Atlas 3D…")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(VitaColors.textSecondary)
+                    .monospacedDigit()
+            }
         }
     }
 
@@ -353,6 +606,15 @@ struct AtlasSceneScreen: View {
         }
     }
 
+    /// Subtitle shown under "Atlas 3D" — current system + structure count.
+    private var headerSubtitle: String? {
+        let system = currentLayer.displayName
+        if scene != nil, sceneMeshCount > 0 {
+            return "\(system) · \(sceneMeshCount) estruturas"
+        }
+        return system
+    }
+
     /// Scans Caches/ at view appear so chips already show a checkmark for
     /// layers downloaded in prior sessions (no cold-start false-negative).
     private func refreshCachedLayers() {
@@ -432,7 +694,9 @@ struct AtlasSceneScreen: View {
                 }
                 if status == .complete, let asset {
                     resumed = true
-                    atlasLog.notice("[Atlas] asset complete: scenes=\(asset.scenes.count) meshes=\(asset.meshes.count) materials=\(asset.materials.count)")
+                    let meshCount = asset.meshes.count
+                    Task { @MainActor in self.sceneMeshCount = meshCount }
+                    atlasLog.notice("[Atlas] asset complete: scenes=\(asset.scenes.count) meshes=\(meshCount) materials=\(asset.materials.count)")
 
                     let source = GLTFSCNSceneSource(asset: asset)
                     guard let scene = source.defaultScene else {
@@ -498,6 +762,54 @@ struct AtlasSceneScreen: View {
             case .httpStatus(let code): return "Servidor respondeu \(code) ao baixar o modelo."
             case .noScene: return "O arquivo .glb não tem cena padrão."
             }
+        }
+    }
+}
+
+// MARK: - Loading silhouette (pulsing anatomical figure)
+
+private struct AtlasLoadingSilhouette: View {
+    @State private var pulse = false
+
+    var body: some View {
+        Image(systemName: "figure.stand")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 64, height: 64)
+            .symbolRenderingMode(.palette)
+            .foregroundStyle(
+                LinearGradient(
+                    colors: [VitaColors.accent.opacity(0.95), VitaColors.accent.opacity(0.55)],
+                    startPoint: .top, endPoint: .bottom
+                )
+            )
+            .shadow(color: VitaColors.accent.opacity(pulse ? 0.55 : 0.2),
+                    radius: pulse ? 22 : 10)
+            .scaleEffect(pulse ? 1.04 : 0.96)
+            .animation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true), value: pulse)
+            .onAppear { pulse = true }
+    }
+}
+
+// MARK: - Camera angle presets
+
+enum AtlasCameraAngle: String, CaseIterable, Identifiable {
+    case front, side, back, top
+    var id: String { rawValue }
+    var displayName: String {
+        switch self {
+        case .front: return "Frente"
+        case .side:  return "Lado"
+        case .back:  return "Costas"
+        case .top:   return "Topo"
+        }
+    }
+    var icon: String {
+        switch self {
+        case .front: return "person.fill"
+        case .side:  return "person.fill.turn.right"
+        case .back:  return "person.fill.turn.down"
+        case .top:   return "arrow.down.to.line"
         }
     }
 }
@@ -573,11 +885,11 @@ private struct MeshDetailSheet: View {
                     }
                 }
 
-                HStack(spacing: 8) {
-                    if !info.system.isEmpty {
-                        Chip(label: systemLabel(info.system), color: VitaColors.accent.opacity(0.18))
-                    }
-                    Chip(label: "Prova: \(examLabel(info.exam))", color: examColor(info.exam).opacity(0.18))
+                // Only show system chip — the per-mesh exam priority field is
+                // unreliable in the legacy lookup, so we'd rather show nothing
+                // than mislead a student about whether radial artery cai em prova.
+                if !info.system.isEmpty {
+                    Chip(label: systemLabel(info.system), color: VitaColors.accent.opacity(0.18))
                 }
 
                 if let desc = info.description, !desc.isEmpty {
@@ -588,6 +900,17 @@ private struct MeshDetailSheet: View {
                 }
                 if let curiosity = info.curiosity, !curiosity.isEmpty {
                     sectionBlock("Curiosidade", content: curiosity, icon: "sparkles")
+                }
+
+                // When we have no rich content, nudge the user toward VITA — the
+                // LLM already covers anatomy, exam frequency and clinical relevance.
+                if (info.description ?? "").isEmpty
+                    && (info.tip ?? "").isEmpty
+                    && (info.curiosity ?? "").isEmpty {
+                    Text("Toque abaixo pra VITA explicar essa estrutura, sua função, relação clínica e frequência em provas.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(VitaColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Button(action: onAskVita) {
@@ -651,23 +974,6 @@ private struct MeshDetailSheet: View {
         }
     }
 
-    private func examLabel(_ exam: String) -> String {
-        switch exam {
-        case "high": return "alta"
-        case "med", "medium": return "média"
-        case "low": return "baixa"
-        default: return exam
-        }
-    }
-
-    private func examColor(_ exam: String) -> Color {
-        switch exam {
-        case "high": return VitaColors.dataRed
-        case "med", "medium": return VitaColors.dataAmber
-        default: return VitaColors.dataGreen
-        }
-    }
-
     private struct Chip: View {
         let label: String
         let color: Color
@@ -678,6 +984,151 @@ private struct MeshDetailSheet: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 5)
                 .background(Capsule().fill(color))
+        }
+    }
+}
+
+// MARK: - Search sheet
+
+private struct AtlasSearchSheet: View {
+    let lookup: [String: MeshInfo]
+    let currentLayer: AtlasLayer
+    let onPick: (MeshInfo) -> Void
+
+    @State private var query: String = ""
+    @FocusState private var focused: Bool
+
+    private var filtered: [MeshInfo] {
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard q.count >= 2 else { return [] }
+        // Score: starts-with > contains; current-system entries float to top.
+        var matches: [(MeshInfo, Int)] = []
+        for info in lookup.values {
+            let pt = info.pt.lowercased()
+            let en = info.en.lowercased()
+            var score = 0
+            if pt.hasPrefix(q) { score = 100 }
+            else if pt.contains(q) { score = 60 }
+            else if en.hasPrefix(q) { score = 40 }
+            else if en.contains(q) { score = 20 }
+            if score == 0 { continue }
+            if info.system == currentLayer.rawValue { score += 50 }
+            matches.append((info, score))
+        }
+        return matches
+            .sorted { $0.1 > $1.1 || ($0.1 == $1.1 && $0.0.pt < $1.0.pt) }
+            .prefix(40)
+            .map { $0.0 }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Search field
+            HStack(spacing: 10) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(VitaColors.textSecondary)
+                TextField("Buscar estrutura — fíbula, aorta, miocárdio…", text: $query)
+                    .focused($focused)
+                    .font(.system(size: 15))
+                    .foregroundStyle(VitaColors.textPrimary)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                if !query.isEmpty {
+                    Button { query = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(VitaColors.textSecondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.white.opacity(0.06))
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+
+            if query.count < 2 {
+                placeholderState
+            } else if filtered.isEmpty {
+                noResultsState
+            } else {
+                List(filtered) { info in
+                    Button { onPick(info) } label: {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(info.pt)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(VitaColors.textPrimary)
+                            HStack(spacing: 6) {
+                                if !info.system.isEmpty {
+                                    Text(systemLabel(info.system))
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(VitaColors.textSecondary)
+                                }
+                                if info.en != info.pt {
+                                    Text("· \(info.en)")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(VitaColors.textSecondary.opacity(0.7))
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+            }
+
+            Spacer()
+        }
+        .onAppear { focused = true }
+    }
+
+    private var placeholderState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "books.vertical.fill")
+                .font(.system(size: 38))
+                .foregroundStyle(VitaColors.textSecondary.opacity(0.5))
+            Text("\(lookup.count) estruturas no catálogo")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(VitaColors.textPrimary)
+            Text("Digite ao menos 2 letras pra começar")
+                .font(.system(size: 12))
+                .foregroundStyle(VitaColors.textSecondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var noResultsState: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 38))
+                .foregroundStyle(VitaColors.textSecondary.opacity(0.5))
+            Text("Nenhuma estrutura corresponde a \"\(query)\"")
+                .font(.system(size: 13))
+                .foregroundStyle(VitaColors.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func systemLabel(_ system: String) -> String {
+        switch system {
+        case "arthrology": return "Osteologia"
+        case "myology": return "Miologia"
+        case "neurology": return "Neurologia"
+        case "angiology": return "Angiologia"
+        case "splanchnology": return "Esplâncnologia"
+        case "lymphoid": return "Linfático"
+        case "joints": return "Articulações"
+        default: return system.capitalized
         }
     }
 }
@@ -706,6 +1157,8 @@ private final class DownloadProgressDelegate: NSObject, URLSessionDownloadDelega
 private struct AnatomySceneView: UIViewRepresentable {
     let scene: SCNScene
     let resetTrigger: Int
+    let angleTrigger: Int
+    let anglePreset: AtlasCameraAngle
     let onMeshTap: (String) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onMeshTap: onMeshTap) }
@@ -746,6 +1199,14 @@ private struct AnatomySceneView: UIViewRepresentable {
         context.coordinator.initialCameraPosition = initialPosition
         context.coordinator.cameraTarget = SCNVector3(cx, cy, cz)
 
+        // Find the GLB's root model node (skip the lights we just added so
+        // rotation only spins the anatomy, not the lighting rig).
+        if let modelRoot = scene.rootNode.childNodes.first(where: { node in
+            node.light == nil && node.camera == nil
+        }) {
+            context.coordinator.modelContainer = modelRoot
+        }
+
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
         tap.cancelsTouchesInView = false
         view.addGestureRecognizer(tap)
@@ -765,6 +1226,46 @@ private struct AnatomySceneView: UIViewRepresentable {
                 SCNTransaction.commit()
             }
         }
+        // Snap camera to a preset angle when angleTrigger increments.
+        if angleTrigger != context.coordinator.lastAngleTrigger {
+            context.coordinator.lastAngleTrigger = angleTrigger
+            applyAnglePreset(uiView, coord: context.coordinator)
+        }
+    }
+
+    private func applyAnglePreset(_ uiView: SCNView, coord: Coordinator) {
+        guard let cam = uiView.pointOfView else { return }
+        let target = coord.cameraTarget
+        let initial = coord.initialCameraPosition
+        let dx = initial.x - target.x, dy = initial.y - target.y, dz = initial.z - target.z
+        let distance = sqrt(dx * dx + dy * dy + dz * dz)
+
+        // Rotate the model itself for back/side views — keeps the rim+key+fill
+        // lights doing their job and avoids the dark-back problem you'd get if
+        // we just flipped the camera to a position with no light coverage.
+        let modelYaw: Float
+        let camPos: SCNVector3
+        switch anglePreset {
+        case .front:
+            modelYaw = 0
+            camPos = SCNVector3(target.x, target.y, target.z + distance)
+        case .side:
+            modelYaw = -.pi / 2
+            camPos = SCNVector3(target.x, target.y, target.z + distance)
+        case .back:
+            modelYaw = .pi
+            camPos = SCNVector3(target.x, target.y, target.z + distance)
+        case .top:
+            modelYaw = 0
+            camPos = SCNVector3(target.x, target.y + distance, target.z + 0.001)
+        }
+        SCNTransaction.begin()
+        SCNTransaction.animationDuration = 0.5
+        SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        cam.position = camPos
+        cam.look(at: target)
+        coord.modelContainer?.eulerAngles.y = modelYaw
+        SCNTransaction.commit()
     }
 
     final class Coordinator: NSObject {
@@ -772,6 +1273,8 @@ private struct AnatomySceneView: UIViewRepresentable {
         var initialCameraPosition = SCNVector3Zero
         var cameraTarget = SCNVector3Zero
         var lastResetTrigger = 0
+        var lastAngleTrigger = 0
+        weak var modelContainer: SCNNode?
         private weak var lastSelected: SCNNode?
         private var lastSelectedOriginalMaterials: [SCNMaterial] = []
 
