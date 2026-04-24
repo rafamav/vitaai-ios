@@ -56,6 +56,10 @@ final class TranscricaoViewModel {
     /// Gravações salvas só no device (quando transcribeWithAI=false). Carregadas
     /// por `loadLocalRecordings()` e merged com `recordings` na UI.
     private(set) var localRecordings: [LocalRecording] = []
+    /// User negou permissão do mic/speech — mostra banner sutil em vez de
+    /// jogar a UI toda pra phase=.error (que antes fazia a tela virar um
+    /// erro gigante toda vez que o user clicava "Não Permitir").
+    var permissionBanner: String? = nil
     /// Real-time SFSpeechRecognizer partial transcript shown during recording.
     private(set) var liveTranscript: String = ""
     private(set) var transcript: String = ""
@@ -121,10 +125,13 @@ final class TranscricaoViewModel {
 
     func startRecording() async {
         guard await requestPermissions() else {
-            phase = .error
-            errorMessage = "Microfone ou reconhecimento de voz bloqueado. Ative em Ajustes > Privacidade."
+            // Não joga a UI pra .error — user pode só ter clicado "Não
+            // Permitir" por acidente. Mostra um banner sutil no topo do
+            // recorder com CTA "Abrir Ajustes" (Screen resolve o action).
+            permissionBanner = "Ative microfone e reconhecimento de voz em Ajustes pra gravar."
             return
         }
+        permissionBanner = nil
 
         recordingStartDate = Date()
         let url = FileManager.default.temporaryDirectory

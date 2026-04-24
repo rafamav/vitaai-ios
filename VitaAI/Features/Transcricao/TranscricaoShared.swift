@@ -141,6 +141,11 @@ struct TranscricaoModeToggle: View {
                                     )
                                 : nil
                         )
+                        // contentShape garante que o tap area do button é
+                        // o próprio retângulo do label — sem isso SwiftUI
+                        // pode vazar o hit test pra views abaixo (mascote
+                        // do recorder ficava recebendo o tap de "Ao Vivo").
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }

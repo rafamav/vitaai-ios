@@ -1,5 +1,66 @@
 import SwiftUI
+import UIKit
 import Sentry
+
+private func openAppSettings() {
+    if let url = URL(string: UIApplication.openSettingsURLString) {
+        UIApplication.shared.open(url)
+    }
+}
+
+private struct PermissionBanner: View {
+    let message: String
+    let onOpenSettings: () -> Void
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "mic.slash.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(VitaColors.accent)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(message)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.85))
+                    .multilineTextAlignment(.leading)
+
+                HStack(spacing: 10) {
+                    Button(action: onOpenSettings) {
+                        Text("Abrir Ajustes")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(VitaColors.accentLight)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule().fill(VitaColors.accent.opacity(0.12))
+                                    .overlay(Capsule().stroke(VitaColors.accent.opacity(0.25), lineWidth: 0.5))
+                            )
+                    }
+                    .buttonStyle(.plain)
+
+                    Button("Dispensar", action: onDismiss)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.45))
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(
+            ZStack {
+                RoundedRectangle(cornerRadius: 12).fill(.ultraThinMaterial)
+                RoundedRectangle(cornerRadius: 12).fill(VitaColors.accent.opacity(0.06))
+            }
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(VitaColors.accent.opacity(0.22), lineWidth: 0.5)
+        )
+    }
+}
 
 /// Entry point for Transcrição feature. Owns the ViewModel, routes between phases.
 ///
@@ -89,6 +150,20 @@ private struct TranscricaoContent: View {
                     // "transcrevendo" via `cloudStatus`.
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 0) {
+                            // Banner de permissão negada — sutil, com CTA de
+                            // "Abrir Ajustes". Só aparece quando user negou
+                            // mic/speech na primeira vez. Some ao conceder.
+                            if let banner = viewModel.permissionBanner {
+                                PermissionBanner(
+                                    message: banner,
+                                    onOpenSettings: openAppSettings,
+                                    onDismiss: { viewModel.permissionBanner = nil }
+                                )
+                                .padding(.horizontal, 16)
+                                .padding(.top, 10)
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                            }
+
                             // Recorder card (mode toggle + recorder area)
                             VStack(spacing: 12) {
                                 TranscricaoModeToggle(selected: $selectedMode)
