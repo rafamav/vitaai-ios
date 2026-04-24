@@ -218,9 +218,23 @@ final class TranscricaoViewModel {
 
     // MARK: - Local recordings (rascunhos + uploads em background)
 
-    /// Recarrega a lista de gravações locais do disco.
+    /// Recarrega a lista de gravações locais do disco. Marca como failed
+    /// uploads em voo há mais de 5min (provavelmente zombies de sessões
+    /// anteriores que crasharam no meio do pipeline).
     func loadLocalRecordings() {
-        localRecordings = TranscricaoLocalStore.shared.loadAll()
+        var list = TranscricaoLocalStore.shared.loadAll()
+        let now = Date()
+        for (i, rec) in list.enumerated() {
+            let inFlight = rec.cloudStatus == "uploading"
+                || rec.cloudStatus == "transcribing"
+                || rec.cloudStatus == "summarizing"
+                || rec.cloudStatus == "generating_flashcards"
+            if inFlight && now.timeIntervalSince(rec.createdAt) > 300 {
+                list[i].cloudStatus = "failed"
+                try? TranscricaoLocalStore.shared.updateCloudStatus(id: rec.id, status: "failed")
+            }
+        }
+        localRecordings = list
     }
 
     /// Promove uma gravação local pro pipeline cloud (user clicou "Transcrever
@@ -504,11 +518,28 @@ final class TranscricaoViewModel {
         audioEngine = engine
 
         // Recognition task — updates live transcript only (does NOT control recording stop)
-        if recognizer == nil {
-            NSLog("[TranscricaoVM] SFSpeechRecognizer is nil (unsupported locale?)")
-        } else if recognizer?.isAvailable != true {
-            NSLog("[TranscricaoVM] SFSpeechRecognizer unavailable (no network? device unsupported?)")
+        let authStatus = SFSpeechRecognizer.authorizationStatus()
+        let authLabel: String
+        switch authStatus {
+        case .notDetermined: authLabel = "notDetermined"
+        case .denied: authLabel = "denied"
+        case .restricted: authLabel = "restricted"
+        case .authorized: authLabel = "authorized"
+        @unknown default: authLabel = "unknown"
         }
+        NSLog("[TranscricaoVM] speech auth=%@ recognizer=%@ available=%@ onDeviceSupported=%@",
+              authLabel,
+              recognizer == nil ? "nil" : "ok",
+              String(describing: recognizer?.isAvailable ?? false),
+              String(describing: recognizer?.supportsOnDeviceRecognition ?? false))
+
+        // Fallback defensivo: prefere on-device quando o device suporta.
+        // Evita depender de internet pro live show (SFSpeechRecognizer default
+        // tenta Apple cloud primeiro — simulador às vezes fica pendurado).
+        if recognizer?.supportsOnDeviceRecognition == true {
+            request.requiresOnDeviceRecognition = true
+        }
+
         recognitionTask = recognizer?.recognitionTask(with: request) { [weak self] result, error in
             if let error {
                 NSLog("[TranscricaoVM] speech recognition error: %@", "\(error)")
@@ -519,6 +550,9 @@ final class TranscricaoViewModel {
             Task { @MainActor [weak self] in
                 self?.liveTranscript = text
             }
+        }
+        if recognitionTask == nil {
+            NSLog("[TranscricaoVM] recognitionTask is nil — recognizer rejeitou silenciosamente")
         }
     }
 
