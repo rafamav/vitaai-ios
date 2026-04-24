@@ -13,8 +13,10 @@ struct TranscricaoRecorderArea: View {
     let disciplines: [String]
     let onToggle: () -> Void
     let onPauseResume: () -> Void
+    let onDiscard: () -> Void
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var showDiscardConfirm = false
 
     private var recorderButtonWidth: CGFloat {
         horizontalSizeClass == .regular ? 200 : 155
@@ -70,9 +72,31 @@ struct TranscricaoRecorderArea: View {
                     .transition(.opacity)
             }
 
-            // Pause/Resume + Stop buttons enquanto gravando/pausado.
+            // Descartar + Pause/Resume + Stop enquanto gravando/pausado.
+            // Padrão gold Otter/Voice Memos: trash icon separado pra abortar
+            // sem salvar, stop principal pra finalizar, pause secundário.
             if isActive {
                 HStack(spacing: 8) {
+                    // Descartar — trash vermelho sutil, confirmation dialog.
+                    Button {
+                        showDiscardConfirm = true
+                    } label: {
+                        Image(systemName: "trash.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(Color(red: 1.0, green: 0.40, blue: 0.40).opacity(0.90))
+                            .frame(width: 36, height: 36)
+                            .background(
+                                Circle()
+                                    .fill(Color(red: 1.0, green: 0.40, blue: 0.40).opacity(0.12))
+                            )
+                            .overlay(
+                                Circle()
+                                    .stroke(Color(red: 1.0, green: 0.40, blue: 0.40).opacity(0.32), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Descartar gravação")
+
                     TranscricaoPauseResumeButton(isPaused: isPaused, onTap: onPauseResume)
 
                     Button(action: onToggle) {
@@ -98,6 +122,16 @@ struct TranscricaoRecorderArea: View {
                     .buttonStyle(.plain)
                 }
                 .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .confirmationDialog(
+                    "Descartar gravação?",
+                    isPresented: $showDiscardConfirm,
+                    titleVisibility: .visible
+                ) {
+                    Button("Descartar", role: .destructive) { onDiscard() }
+                    Button("Continuar gravando", role: .cancel) {}
+                } message: {
+                    Text("O áudio será deletado. Não dá pra desfazer.")
+                }
             }
 
             // 3 chips compactos lado a lado (Rafael 2026-04-24): Disciplina /
@@ -332,6 +366,11 @@ struct TranscricaoRecordingsListSection: View {
     var onGenerate: ((TranscricaoEntry, String) -> Void)? = nil
     /// Swipe right quick-action: favorita gravação.
     var onFavorite: ((TranscricaoEntry) -> Void)? = nil
+    /// Long press → renomear. Abre alert inline sem precisar entrar no detail.
+    var onRename: ((TranscricaoEntry, String) -> Void)? = nil
+
+    @State private var renamingRec: TranscricaoEntry? = nil
+    @State private var renameValue: String = ""
 
     private var filteredRecordings: [TranscricaoEntry] {
         guard let filter = selectedFilter else { return recordings }
@@ -506,6 +545,14 @@ struct TranscricaoRecordingsListSection: View {
                                             Label("Ver detalhes", systemImage: "doc.text.magnifyingglass")
                                         }
 
+                                        // Renomear inline — sem precisar abrir sheet
+                                        Button {
+                                            renameValue = rec.title
+                                            renamingRec = rec
+                                        } label: {
+                                            Label("Renomear", systemImage: "pencil")
+                                        }
+
                                         Divider()
 
                                         // Gerar conteúdo — 5 ações direto, sem sheet
@@ -551,6 +598,24 @@ struct TranscricaoRecordingsListSection: View {
                     }
                 }
             }
+        }
+        .alert(
+            "Renomear gravação",
+            isPresented: Binding(
+                get: { renamingRec != nil },
+                set: { if !$0 { renamingRec = nil } }
+            )
+        ) {
+            TextField("Título", text: $renameValue)
+            Button("Cancelar", role: .cancel) { renamingRec = nil }
+            Button("Salvar") {
+                let trimmed = renameValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let rec = renamingRec, !trimmed.isEmpty {
+                    onRename?(rec, trimmed)
+                }
+                renamingRec = nil
+            }
+            .disabled(renameValue.trimmingCharacters(in: .whitespaces).isEmpty)
         }
     }
 }

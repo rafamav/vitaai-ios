@@ -387,6 +387,27 @@ final class TranscricaoViewModel {
         }
     }
 
+    /// Renomeia gravação cloud (chama PATCH studio/sources/:id) + recarrega lista.
+    /// Optimistic update na UI primeiro, revert silencioso se falhar.
+    func renameRecording(id: String, newTitle: String) {
+        guard let api else { return }
+        // Optimistic: atualiza in-memory pra UI sentir instantâneo
+        if let idx = recordings.firstIndex(where: { $0.id == id }) {
+            var updated = recordings[idx]
+            updated.title = newTitle
+            recordings[idx] = updated
+        }
+        Task {
+            do {
+                try await api.renameStudioSource(id: id, title: newTitle)
+                await loadRecordings(force: true)
+            } catch {
+                NSLog("[TranscricaoVM] renameRecording failed: %@", "\(error)")
+                await loadRecordings(force: true)
+            }
+        }
+    }
+
     /// "Gravação DD/MM HH:MM" — mesmo formato que o backend gera no deriveTitle.
     static func defaultTitleForNow() -> String {
         let now = Date()
@@ -441,6 +462,31 @@ final class TranscricaoViewModel {
         }
         phase = .recording
         startTimer()
+    }
+
+    /// Descarta a gravação em andamento SEM salvar nada (nem local, nem cloud).
+    /// Para audio engine, deleta o .m4a temp, reseta UI pra idle.
+    /// Padrão gold Voice Memos/Otter: botão trash mid-recording.
+    func discardRecording() {
+        guard phase == .recording || phase == .paused else { return }
+        timerTask?.cancel()
+        timerTask = nil
+        endAudioCapture()
+
+        if let url = recordingURL {
+            try? FileManager.default.removeItem(at: url)
+        }
+
+        VitaPostHogConfig.capture(event: "transcription_discarded", properties: [
+            "duration_seconds": elapsedSeconds,
+            "had_live_transcript": !liveTranscript.isEmpty,
+        ])
+
+        recordingURL = nil
+        phase = .idle
+        elapsedSeconds = 0
+        liveTranscript = ""
+        audioLevels = Array(repeating: 0, count: Self.waveformBarCount)
     }
 
     // MARK: - Waveform helpers

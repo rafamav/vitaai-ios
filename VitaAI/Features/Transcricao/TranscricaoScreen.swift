@@ -203,6 +203,9 @@ private struct TranscricaoContent: View {
                                         } else if viewModel.phase == .paused {
                                             viewModel.resumeRecording()
                                         }
+                                    },
+                                    onDiscard: {
+                                        viewModel.discardRecording()
                                     }
                                 )
                             }
@@ -288,6 +291,11 @@ private struct TranscricaoContent: View {
                                     UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
                                     showToast("⭐ Favoritado")
                                     // TODO: persistir favorito no backend quando endpoint existir
+                                },
+                                onRename: { rec, newTitle in
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                    viewModel.renameRecording(id: rec.id, newTitle: newTitle)
+                                    showToast("✓ Renomeado")
                                 }
                             )
                             .padding(.top, 10)
