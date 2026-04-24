@@ -91,24 +91,69 @@ final class WhisperLiveClient {
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return
         }
-        let type = obj["type"] as? String ?? ""
-        let text = obj["text"] as? String ?? ""
-        let isFinal = obj["is_final"] as? Bool ?? false
-        if type == "error" {
-            onError?(obj["message"] as? String ?? "unknown server error")
-            return
+
+        // Tipo "config" vem uma vez ao abrir — ignorar silenciosamente.
+        // Tipo "ready_to_stop" quando server terminou de processar.
+        if let type = obj["type"] as? String {
+            if type == "config" || type == "ready_to_stop" { return }
+            if type == "error" {
+                onError?(obj["message"] as? String ?? "server error")
+                return
+            }
         }
-        // WhisperLiveKit emits various message shapes; use `text` + is_final.
-        if !text.isEmpty {
-            if isFinal { onFinal?(text) } else { onPartial?(text) }
+
+        // Payload de transcrição real:
+        //   { "status": "...",
+        //     "lines": [{"speaker": 1, "text": "...", "start": "00:00:01"}, ...],
+        //     "buffer_transcription": "partial here",
+        //     ... }
+        // Finais = concat dos lines[].text. Parcial = buffer_transcription.
+        let lines = (obj["lines"] as? [[String: Any]]) ?? []
+        let finalText = lines
+            .compactMap { $0["text"] as? String }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        let buffer = (obj["buffer_transcription"] as? String) ?? ""
+
+        // Display: linhas finalizadas + buffer parcial em andamento.
+        let combined = [finalText, buffer]
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+            .joined(separator: " ")
+
+        if !combined.isEmpty {
+            // Só emite onFinal quando buffer some (fluxo terminou ou pausa longa).
+            if buffer.isEmpty && !finalText.isEmpty {
+                onFinal?(finalText)
+            } else {
+                onPartial?(combined)
+            }
         }
     }
 
     /// Converte buffer do AVAudioEngine (qualquer SR, 1-2 canais, Float32) pra
     /// PCM 16bit mono 16kHz e envia pro WS.
+    private var sendCount = 0
     func sendAudio(buffer: AVAudioPCMBuffer) {
         guard state == .connected else { return }
-        guard let pcm16 = downsampleTo16kMono(buffer) else { return }
+        guard let pcm16 = downsampleTo16kMono(buffer) else {
+            NSLog("[WhisperLive] downsample returned nil (sr=%.0f ch=%d frames=%d)",
+                  buffer.format.sampleRate, buffer.format.channelCount, buffer.frameLength)
+            return
+        }
+        sendCount += 1
+        // Log a cada ~20 chunks (~0.5s se 10Hz cadence): sample count + pico.
+        if sendCount % 20 == 1 {
+            var peak: Int16 = 0
+            pcm16.withUnsafeBytes { raw in
+                let ptr = raw.bindMemory(to: Int16.self)
+                for v in ptr {
+                    let m = v < 0 ? -v : v
+                    if m > peak { peak = m }
+                }
+            }
+            NSLog("[WhisperLive] sent chunk #%d bytes=%d peak_int16=%d (silence<200)",
+                  sendCount, pcm16.count, peak)
+        }
         task?.send(.data(pcm16)) { err in
             if let err { NSLog("[WhisperLive] WS send failed: %@", "\(err)") }
         }
