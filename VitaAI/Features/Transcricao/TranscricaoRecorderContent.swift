@@ -72,10 +72,9 @@ struct TranscricaoRecorderArea: View {
                         if !isRecording { transcribeWithAI.toggle() }
                     } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: transcribeWithAI ? "sparkles" : "iphone")
-                                .font(.system(size: 11, weight: .semibold))
                             Text(transcribeWithAI ? "Enviar pra Vita" : "Só no dispositivo")
                                 .font(.system(size: 11, weight: .semibold))
+                                .lineLimit(1)
                             Spacer()
                             Image(systemName: "chevron.up.chevron.down")
                                 .font(.system(size: 9, weight: .medium))
@@ -362,7 +361,7 @@ struct TranscricaoRecordingsListSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             // Header with count
             HStack {
                 Text("GRAVAÇÕES")
@@ -383,13 +382,11 @@ struct TranscricaoRecordingsListSection: View {
                 Spacer()
             }
             .padding(.horizontal, 16)
-            .padding(.top, 2)
 
-            // Filter chips (discipline filter)
+            // Filter chips — mesma tipografia do header (13 bold uppercased).
             if !filterChips.isEmpty {
                 TranscricaoFilterChips(chips: filterChips, selected: $selectedFilter)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 4)
             }
 
             if isLoading {
@@ -482,32 +479,26 @@ struct TranscricaoFilterChips: View {
 
     @ViewBuilder
     private func chipButton(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        // Match the "GRAVAÇÕES" header typography: 13 bold uppercased
+        // tracking 0.5, muted textWarm. Active chip acende com accent.
         Button(action: action) {
-            Text(label)
-                .font(.system(size: 11, weight: .medium))
+            Text(label.uppercased())
+                .font(.system(size: 13, weight: .bold))
+                .tracking(0.5)
                 .lineLimit(1)
                 .foregroundStyle(
                     isSelected
-                        ? VitaColors.accentHover.opacity(0.90)
-                        : VitaColors.textWarm.opacity(0.35)
+                        ? VitaColors.accentLight.opacity(0.90)
+                        : VitaColors.textWarm.opacity(0.55)
                 )
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
                 .background(
                     Capsule()
                         .fill(
                             isSelected
-                                ? VitaColors.accent.opacity(0.10)
-                                : Color.white.opacity(0.04)
-                        )
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(
-                            isSelected
-                                ? VitaColors.accent.opacity(0.30)
-                                : VitaColors.accent.opacity(0.06),
-                            lineWidth: 1
+                                ? VitaColors.accent.opacity(0.12)
+                                : Color.clear
                         )
                 )
         }

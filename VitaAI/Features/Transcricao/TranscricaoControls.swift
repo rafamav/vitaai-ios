@@ -28,26 +28,31 @@ struct TranscricaoDisciplinePicker: View {
             isOpen = true
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: isAuto ? "sparkles" : "folder.fill")
-                    .font(.system(size: 10, weight: .semibold))
-                Text(abbreviateDiscipline(selected.isEmpty ? autoLabel : selected))
+                Text(selected.isEmpty ? autoLabel : selected)
                     .font(.system(size: 11, weight: .semibold))
                     .lineLimit(1)
+                Spacer()
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .bold))
-                    .opacity(0.6)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.30))
             }
-            .foregroundStyle(VitaColors.accentHover.opacity(0.92))
-            .padding(.horizontal, 12)
+            .foregroundStyle(
+                isAuto ? Color.white.opacity(0.65) : VitaColors.accentLight.opacity(0.85)
+            )
+            .padding(.horizontal, 10)
             .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
             .background(
-                Capsule()
-                    .fill(VitaColors.accent.opacity(0.12))
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(
+                        isAuto ? Color.white.opacity(0.03) : VitaColors.accent.opacity(0.10)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(VitaColors.accent.opacity(0.18), lineWidth: 0.5)
+                    )
             )
-            .overlay(
-                Capsule()
-                    .stroke(VitaColors.accent.opacity(0.30), lineWidth: 1)
-            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(disabled)
@@ -254,20 +259,29 @@ struct TranscricaoLanguagePicker: View {
                 }
             }
         } label: {
-            HStack(spacing: 5) {
+            HStack(spacing: 6) {
                 Text(current.flag)
                     .font(.system(size: 12))
-                Text(current.code.uppercased())
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(VitaColors.accentHover.opacity(0.88))
+                Text(current.label)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.white.opacity(0.75))
+                Spacer()
                 Image(systemName: "chevron.down")
-                    .font(.system(size: 7, weight: .bold))
-                    .foregroundStyle(VitaColors.accent.opacity(0.6))
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.30))
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(Capsule().fill(Color.white.opacity(0.05)))
-            .overlay(Capsule().stroke(VitaColors.accent.opacity(0.15), lineWidth: 1))
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.white.opacity(0.03))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(VitaColors.accent.opacity(0.18), lineWidth: 0.5)
+                    )
+            )
+            .contentShape(Rectangle())
         }
         .disabled(disabled)
         .opacity(disabled ? 0.5 : 1)
