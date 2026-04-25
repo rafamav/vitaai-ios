@@ -31,7 +31,14 @@ struct AtlasSceneScreen: View {
     /// disagree with the catalogue on case (frequent — anatomy lookups Title
     /// Case, GLB exports often lowercase or all-caps).
     @State private var lookupCI: [String: MeshInfo] = [:]
+    /// Index keyed by the bare base name (everything before the FIRST `.`),
+    /// lowercased. Lets us resolve mesh names with arbitrary suffixes
+    /// (`.o1.002`, `.e1l`, `_001`, etc.) when none of the strict strategies hit.
+    @State private var lookupBase: [String: MeshInfo] = [:]
     @State private var selectedMesh: MeshInfo?
+    /// All mesh-name candidates from the most recent tap (geometry + ancestors).
+    /// Stored so "Esconder" hides every node that contributed to the selection.
+    @State private var lastTappedCandidates: [String] = []
     @State private var resetTrigger = 0
     @State private var currentLayer: AtlasLayer = .arthrology
     @State private var cachedLayers: Set<AtlasLayer> = []
@@ -40,6 +47,9 @@ struct AtlasSceneScreen: View {
     @State private var showSearch = false
     @State private var anglePreset: AtlasCameraAngle = .front
     @State private var angleTrigger = 0
+    /// Mesh node names hidden by the user via the Esconder button.
+    /// Cleared by "Mostrar tudo" or layer switch.
+    @State private var hiddenMeshes: Set<String> = []
 
     var body: some View {
         // No opaque base — the AppRouter's VitaAmbientBackground shows through.
@@ -55,6 +65,7 @@ struct AtlasSceneScreen: View {
                             resetTrigger: resetTrigger,
                             angleTrigger: angleTrigger,
                             anglePreset: anglePreset,
+                            hiddenMeshes: hiddenMeshes,
                             onMeshTap: { meshName in handleMeshTap(meshName) }
                         )
                         .transition(.opacity)
@@ -119,11 +130,19 @@ struct AtlasSceneScreen: View {
                         "system": info.system,
                     ])
                     selectedMesh = nil
-                    // Forward a richer prompt: name + system + EN fallback so the
-                    // chat LLM can disambiguate (helpful for laterality and rare
-                    // structures missing from anatomy-mesh-lookup.json).
                     let prompt = buildAskVitaPrompt(info)
                     onAskVita?(prompt)
+                },
+                onHide: {
+                    let toHide = Set(lastTappedCandidates)
+                    hiddenMeshes.formUnion(toHide)
+                    VitaPostHogConfig.capture(event: "atlas_mesh_hidden", properties: [
+                        "layer": currentLayer.rawValue,
+                        "structure": info.pt,
+                        "hidden_total": hiddenMeshes.count,
+                    ])
+                    selectedMesh = nil
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
                 },
                 onClose: { selectedMesh = nil }
             )
@@ -137,6 +156,7 @@ struct AtlasSceneScreen: View {
     private func handleMeshTap(_ candidates: [String]) {
         let resolved = resolveMeshLookup(candidates: candidates)
         selectedMesh = resolved.info
+        lastTappedCandidates = candidates
         hasTappedAnyMesh = true
         VitaPostHogConfig.capture(event: "atlas_mesh_tapped", properties: [
             "layer": currentLayer.rawValue,
@@ -211,6 +231,43 @@ struct AtlasSceneScreen: View {
                     )
                     return (enriched, true, lateralidade, "side-stripped")
                 }
+            }
+
+            // Strategy 4: probe lookup with TA2 laterality suffixes.
+            // Mesh "Piriformis muscle.o.001" strips to "Piriformis muscle"
+            // but lookup is keyed `<name>.l/.r/.j/.i` — try them.
+            let probeBase = stripped
+            for (suffix, lat) in [(".l", "esquerda"), (".r", "direita"), (".j", nil as String?), (".i", nil as String?)] {
+                let probed = probeBase + suffix
+                if let hit = lookup[probed] ?? lookupCI[probed.lowercased()] {
+                    let pt = lat.map { "\(hit.pt) (\($0))" } ?? hit.pt
+                    let enriched = MeshInfo(
+                        id: hit.id, pt: pt, en: hit.en, system: hit.system,
+                        exam: hit.exam, description: hit.description,
+                        tip: hit.tip, curiosity: hit.curiosity
+                    )
+                    return (enriched, true, lat, "suffix-probed")
+                }
+            }
+
+            // Strategy 5: base-name lookup. Strip from FIRST `.` onward.
+            // Catches `.o1.002`, `.e1l`, weird Blender duplicates.
+            let dotIdx = raw.firstIndex(of: ".") ?? raw.endIndex
+            let baseName = String(raw[..<dotIdx]).lowercased()
+            if !baseName.isEmpty, let hit = lookupBase[baseName] {
+                let lowerRaw = raw.lowercased()
+                let lat: String? = (
+                    lowerRaw.hasSuffix("l") || lowerRaw.hasSuffix(".l") || lowerRaw.contains("_left") ? "esquerda" :
+                    lowerRaw.hasSuffix("r") || lowerRaw.hasSuffix(".r") || lowerRaw.contains("_right") ? "direita" :
+                    nil
+                )
+                let pt = lat.map { "\(hit.pt) (\($0))" } ?? hit.pt
+                let enriched = MeshInfo(
+                    id: hit.id, pt: pt, en: hit.en, system: hit.system,
+                    exam: hit.exam, description: hit.description,
+                    tip: hit.tip, curiosity: hit.curiosity
+                )
+                return (enriched, true, lat, "base-lookup")
             }
         }
 
@@ -302,6 +359,8 @@ struct AtlasSceneScreen: View {
             progress = 0
             errorMessage = nil
             selectedMesh = nil
+            // Hidden meshes are scoped to a specific GLB — reset on switch.
+            hiddenMeshes.removeAll()
             currentLayer = layer
         } label: {
             VStack(spacing: 4) {
@@ -436,6 +495,31 @@ struct AtlasSceneScreen: View {
             }
 
             Spacer()
+
+            // "Mostrar tudo (N)" — only when the user has hidden meshes.
+            if !hiddenMeshes.isEmpty {
+                Button {
+                    hiddenMeshes.removeAll()
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    VitaPostHogConfig.capture(event: "atlas_show_all", properties: [
+                        "layer": currentLayer.rawValue,
+                    ])
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "eye.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("Mostrar tudo (\(hiddenMeshes.count))")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(VitaColors.accent)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(.ultraThinMaterial))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Mostrar tudo, \(hiddenMeshes.count) escondidas")
+                .transition(.opacity.combined(with: .scale))
+            }
 
             // Search structures by PT-BR/EN name (4887 entries in the lookup).
             Button {
@@ -611,11 +695,27 @@ struct AtlasSceneScreen: View {
             for (k, v) in out {
                 ciIndex[k.lowercased()] = v
             }
+            // Build base index: strip from FIRST `.` onward, prefer .l/.r/.j/.i
+            // keys so the canonical TA2 entry wins on collisions.
+            var baseIndex: [String: MeshInfo] = [:]
+            let preferredOrder = [".l", ".r", ".j", ".i"]
+            for (k, v) in out {
+                guard preferredOrder.contains(where: { k.hasSuffix($0) }) else { continue }
+                let dotIdx = k.firstIndex(of: ".") ?? k.endIndex
+                let base = String(k[..<dotIdx]).lowercased()
+                if baseIndex[base] == nil { baseIndex[base] = v }
+            }
+            for (k, v) in out {
+                let dotIdx = k.firstIndex(of: ".") ?? k.endIndex
+                let base = String(k[..<dotIdx]).lowercased()
+                if baseIndex[base] == nil { baseIndex[base] = v }
+            }
             await MainActor.run {
                 self.lookup = out
                 self.lookupCI = ciIndex
+                self.lookupBase = baseIndex
             }
-            atlasLog.notice("[Atlas] lookup loaded: \(out.count) entries (+\(ciIndex.count) CI)")
+            atlasLog.notice("[Atlas] lookup loaded: \(out.count) entries (+\(ciIndex.count) CI, +\(baseIndex.count) base)")
         } catch {
             atlasLog.error("[Atlas] lookup load failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -906,6 +1006,7 @@ struct MeshInfo: Identifiable, Hashable {
 private struct MeshDetailSheet: View {
     let info: MeshInfo
     let onAskVita: () -> Void
+    let onHide: () -> Void
     let onClose: () -> Void
 
     var body: some View {
@@ -970,6 +1071,23 @@ private struct MeshDetailSheet: View {
                                 RoundedRectangle(cornerRadius: 14)
                                     .stroke(VitaColors.accent.opacity(0.4), lineWidth: 1)
                             )
+                    )
+                }
+                .buttonStyle(.plain)
+
+                // "Esconder esta peça" — same UX as web AtlasViewer (Scissors).
+                Button(action: onHide) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "scissors")
+                        Text("Esconder esta peça")
+                    }
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(VitaColors.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(VitaColors.textSecondary.opacity(0.3), lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)
@@ -1197,6 +1315,7 @@ private struct AnatomySceneView: UIViewRepresentable {
     let resetTrigger: Int
     let angleTrigger: Int
     let anglePreset: AtlasCameraAngle
+    let hiddenMeshes: Set<String>
     let onMeshTap: ([String]) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onMeshTap: onMeshTap) }
@@ -1269,6 +1388,18 @@ private struct AnatomySceneView: UIViewRepresentable {
             context.coordinator.lastAngleTrigger = angleTrigger
             applyAnglePreset(uiView, coord: context.coordinator)
         }
+        // Apply hide/show. Only re-traverse when the set actually changed.
+        if hiddenMeshes != context.coordinator.lastHiddenMeshes {
+            context.coordinator.lastHiddenMeshes = hiddenMeshes
+            scene.rootNode.enumerateHierarchy { node, _ in
+                guard let name = node.name else { return }
+                if hiddenMeshes.contains(name) {
+                    node.isHidden = true
+                } else if node.isHidden {
+                    node.isHidden = false
+                }
+            }
+        }
     }
 
     private func applyAnglePreset(_ uiView: SCNView, coord: Coordinator) {
@@ -1312,6 +1443,7 @@ private struct AnatomySceneView: UIViewRepresentable {
         var cameraTarget = SCNVector3Zero
         var lastResetTrigger = 0
         var lastAngleTrigger = 0
+        var lastHiddenMeshes: Set<String> = []
         weak var modelContainer: SCNNode?
         private weak var lastSelected: SCNNode?
         private var lastSelectedOriginalMaterials: [SCNMaterial] = []
