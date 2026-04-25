@@ -166,37 +166,38 @@ struct VitaPaywallScreen: View {
     @State private var selectedFeature: PaywallFeature? = nil
 
     var body: some View {
-        VitaAmbientBackground {
-            ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: 20) {
-                    headerCard
+        // O AppRouter shell já aplica VitaAmbientBackground globalmente
+        // (.background { VitaAmbientBackground { Color.clear } }). Telas
+        // NÃO devem adicionar fundo próprio — o shell mostra através.
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 16) {
+                headerCard
 
-                    // 3 plan rows soltos, sem wrapper, cada um com seu próprio D4
-                    ForEach(PlanTier.allCases) { tier in
-                        PlanRow(
-                            tier: tier,
-                            isSelected: selectedTier == tier,
-                            product: product(for: tier),
-                            onTap: { select(tier) }
-                        )
-                    }
-
-                    featuresList
-
-                    if let err = storeKit.purchaseError ?? stripeError {
-                        Text(err)
-                            .font(VitaTypography.bodySmall)
-                            .foregroundStyle(.red)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 12)
-                    }
-                    ctaButton
-                    legalLinks
-                    Spacer().frame(height: 32)
+                // 3 plan rows soltos, cada um com seu próprio D4
+                ForEach(PlanTier.allCases) { tier in
+                    PlanRow(
+                        tier: tier,
+                        isSelected: selectedTier == tier,
+                        product: product(for: tier),
+                        onTap: { select(tier) }
+                    )
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
+
+                featuresList
+
+                if let err = storeKit.purchaseError ?? stripeError {
+                    Text(err)
+                        .font(VitaTypography.bodySmall)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 12)
+                }
+                ctaButton
+                legalLinks
+                Spacer().frame(height: 32)
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
         }
         .preferredColorScheme(.dark)
         .navigationTitle("Assinatura")
