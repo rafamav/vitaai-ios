@@ -171,6 +171,13 @@ struct AtlasSceneScreen: View {
                             "layers": analyticsLayers,
                             "structure": info.pt,
                         ])
+                        // Pair with atlas_focus_exit so we can measure the full
+                        // funnel (search → focus enter → time spent → exit).
+                        VitaPostHogConfig.capture(event: "atlas_focus_entered", properties: [
+                            "structure": info.pt,
+                            "system": info.system,
+                            "layers_active": activeLayers.count,
+                        ])
                     }
                 )
             }
