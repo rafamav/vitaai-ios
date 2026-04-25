@@ -110,6 +110,13 @@ final class AppDataManager {
                 await self.refreshDashboard()
             case "profile":
                 await self.refreshProfile()
+            case "calendar":
+                await self.refreshSchedule()
+            case "achievements", "notifications", "portal_status", "vita_chat", "mindmaps", "voice", "documents":
+                // Sem refresh dedicado em AppDataManager hoje — telas owners
+                // (NotificationsScreen, AchievementsScreen, etc) refetcham on-appear.
+                // No-op aqui: log ja foi emitido acima, telas pegam quando abrir.
+                break
             default:
                 // Unknown domain — refetch tudo defensivamente
                 await self.silentRefresh()
