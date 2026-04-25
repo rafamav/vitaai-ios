@@ -25,6 +25,9 @@ final class DisciplineDetailViewModel {
     private(set) var documents: [VitaDocument] = []
     private(set) var classSchedule: [AgendaClassBlock] = []
     private(set) var trabalhos: TrabalhosResponse?
+    /// Material folders (8 defaults + custom) — backend auto-cria os defaults
+    /// no primeiro GET, idempotente em re-loads.
+    private(set) var folders: [MaterialFolder] = []
     /// VitaScore computed server-side in /api/dashboard (grade + urgency + difficulty).
     /// Single source of truth — NEVER recompute client-side.
     private(set) var vitaScore: Int = 0
@@ -237,14 +240,16 @@ final class DisciplineDetailViewModel {
         async let docsTask: [VitaDocument]? = try? api.getDocuments(subjectId: disciplineId)
         async let agendaTask: AgendaResponse? = agendaFromCache != nil ? agendaFromCache : (try? api.getAgenda())
         async let trabalhosTask: TrabalhosResponse? = try? api.getTrabalhos()
+        async let foldersTask: [MaterialFolder]? = try? api.listSubjectFolders(subjectId: disciplineId)
 
-        let (progressResponse, gradesResponse, decks, docs, agenda, trabalhosResp) = await (
+        let (progressResponse, gradesResponse, decks, docs, agenda, trabalhosResp, foldersResp) = await (
             progressTask,
             gradesTask,
             decksTask,
             docsTask,
             agendaTask,
-            trabalhosTask
+            trabalhosTask,
+            foldersTask
         )
         let examsResponse: ExamsResponse? = nil  // deprecated: data via progress.upcomingExams
 
@@ -269,8 +274,29 @@ final class DisciplineDetailViewModel {
         documents = docs ?? []
         classSchedule = agenda?.schedule ?? []
         trabalhos = trabalhosResp
+        folders = foldersResp ?? []
 
         isLoading = false
+    }
+
+    // MARK: - Material folders mutations
+
+    /// Cria pasta custom + reinjeta no array sorted (UI atualiza via @Observable).
+    func createFolder(name: String, icon: String? = nil, color: String? = nil) async {
+        guard let created = try? await api.createCustomFolder(
+            subjectId: disciplineId,
+            name: name,
+            icon: icon,
+            color: color
+        ) else { return }
+        folders = (folders + [created]).sorted { $0.sortOrder < $1.sortOrder }
+    }
+
+    /// Refetch o set inteiro — usado após mover doc ou voltar do detail.
+    func refreshFolders() async {
+        if let fresh = try? await api.listSubjectFolders(subjectId: disciplineId) {
+            folders = fresh
+        }
     }
 
     // MARK: - Actions
