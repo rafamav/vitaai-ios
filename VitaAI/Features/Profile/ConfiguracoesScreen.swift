@@ -20,15 +20,19 @@ struct ConfiguracoesScreen: View {
 
     @Environment(\.appContainer) private var appContainer
 
-    @State private var aiConsent: Bool = true
     @State private var showDeleteAlert: Bool = false
     @State private var deleteConfirmInput: String = ""
     @State private var isDeletingAccount: Bool = false
     @State private var deleteErrorMessage: String?
 
-    // Mockup-specific colors not in design system
-    private let logoutColor = Color(red: 1.0, green: 0.47, blue: 0.31) // rgba(255,120,80)
-    private let greenToggle = Color(red: 0.51, green: 0.78, blue: 0.55) // rgba(130,200,140)
+    private let logoutColor = Color(red: 1.0, green: 0.47, blue: 0.31)
+
+    private var appVersionString: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "—"
+        let build = info?["CFBundleVersion"] as? String ?? "—"
+        return "VitaAI v\(version) (\(build))"
+    }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -42,83 +46,51 @@ struct ConfiguracoesScreen: View {
                     .padding(.top, 12)
 
                 // MARK: - Conta
+                // Shell §5.2.7: linha "Perfil" PROIBIDA aqui — User Card no topo já leva pra editar perfil.
                 settingsSectionLabel("Conta")
                 VitaGlassCard {
-                    VStack(spacing: 0) {
-                        settingsRow(
-                            icon: "person",
-                            label: "Perfil",
-                            desc: "\(authManager.userName ?? "Estudante") - \(authManager.userEmail ?? "")",
-                            action: { onNavigateToPerfil?() }
-                        )
-                        settingsDivider
-                        settingsRow(
-                            icon: "book",
-                            label: "Disciplinas",
-                            desc: "Gerenciar disciplinas e dificuldade",
-                            action: { onNavigateToDisciplinas?() }
-                        )
-                    }
+                    settingsRow(
+                        icon: "book",
+                        label: "Disciplinas",
+                        desc: "Gerenciar disciplinas e dificuldade",
+                        action: { onNavigateToDisciplinas?() }
+                    )
                 }
                 .padding(.horizontal, 14)
 
                 // MARK: - Preferencias
+                // Shell §5.2.7: "Idioma" PROIBIDO enquanto só pt-BR existir.
                 settingsSectionLabel("Preferencias")
                 VitaGlassCard {
-                    VStack(spacing: 0) {
-                        settingsRow(
-                            icon: "bell",
-                            label: "Notificações",
-                            desc: "Push, email, lembretes de estudo",
-                            action: { onNavigateToNotifications?() }
-                        )
-                        settingsDivider
-                        settingsRow(
-                            icon: "globe",
-                            label: "Idioma",
-                            desc: "Portugues (BR)",
-                            action: { }
-                        )
-                    }
+                    settingsRow(
+                        icon: "bell",
+                        label: "Notificações",
+                        desc: "Push, email, lembretes de estudo",
+                        action: { onNavigateToNotifications?() }
+                    )
                 }
                 .padding(.horizontal, 14)
 
-                // MARK: - Seguranca
-                settingsSectionLabel("Seguranca")
+                // MARK: - Suporte
+                // Shell §5.2.6: bloco SUPORTE (Feedback + Sobre + FAQ + Status). Privacidade migrou pra bloco
+                // próprio "Privacidade & Segurança" (criar como sub-tela em commit posterior).
+                settingsSectionLabel("Suporte")
                 VitaGlassCard {
-                    VStack(spacing: 0) {
-                        settingsRow(
-                            icon: "shield",
-                            label: "Privacidade",
-                            desc: "Politica de privacidade e dados",
-                            action: { }
-                        )
-                        settingsDivider
-                        settingsRow(
-                            icon: "info.circle",
-                            label: "Sobre",
-                            desc: "VitaAI v1.0",
-                            action: { onNavigateToAbout?() }
-                        )
-                    }
+                    settingsRow(
+                        icon: "info.circle",
+                        label: "Sobre",
+                        desc: appVersionString,
+                        action: { onNavigateToAbout?() }
+                    )
                 }
                 .padding(.horizontal, 14)
 
                 // MARK: - Privacidade & Dados
+                // Shell §5.2.7: "Gerenciar cookies" PROIBIDO em mobile (cookies = web).
+                // AI consent será reativado quando endpoint Swift existir (sync-api-spec.sh + getAiConsent/setAiConsent).
                 settingsSectionLabel("Privacidade & Dados")
                 VitaGlassCard {
-                    VStack(spacing: 0) {
-                        aiConsentRow
-                        settingsDivider
-                        settingsRow(
-                            icon: "circle.grid.2x2",
-                            label: "Gerenciar cookies",
-                            desc: "Redefinir preferencias de cookies",
-                            action: { }
-                        )
-                        settingsDivider
-                        deleteAccountRow
-                    }
+                    deleteAccountRow
                 }
                 .padding(.horizontal, 14)
 
@@ -127,8 +99,8 @@ struct ConfiguracoesScreen: View {
                     .padding(.horizontal, 14)
                     .padding(.top, 18)
 
-                // Version
-                Text("VitaAI v1.0.0 - Build 2026.03")
+                // Shell §5.2.7: versão lida de Bundle, NUNCA hardcoded.
+                Text(appVersionString)
                     .font(.system(size: 10))
                     .foregroundStyle(VitaColors.textWarm.opacity(0.18))
                     .padding(.top, 14)
@@ -307,51 +279,6 @@ struct ConfiguracoesScreen: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - AI Consent Row (with toggle)
-
-    private var aiConsentRow: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                VitaColors.accentHover.opacity(0.18),
-                                VitaColors.accentDark.opacity(0.08)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 34, height: 34)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(VitaColors.accentHover.opacity(0.12), lineWidth: 1)
-                    )
-                Image(systemName: "message")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(VitaColors.accentLight.opacity(0.80))
-            }
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text("Consentimento IA")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.88))
-                Text(aiConsent ? "Concedido" : "Negado")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(aiConsent ? greenToggle.opacity(0.65) : VitaColors.textWarm.opacity(0.35))
-            }
-
-            Spacer()
-
-            Toggle("", isOn: $aiConsent)
-                .toggleStyle(ConfigGoldToggleStyle())
-                .labelsHidden()
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 13)
-    }
-
     // MARK: - Delete Account Row
 
     private var deleteAccountRow: some View {
@@ -416,14 +343,6 @@ struct ConfiguracoesScreen: View {
             .padding(.bottom, 6)
     }
 
-    // MARK: - Divider
-
-    private var settingsDivider: some View {
-        Rectangle()
-            .fill(VitaColors.textWarm.opacity(0.04))
-            .frame(height: 1)
-    }
-
     // MARK: - Logout Button
 
     private var logoutButton: some View {
@@ -448,40 +367,3 @@ struct ConfiguracoesScreen: View {
     }
 }
 
-// MARK: - Gold Toggle Style (matches mockup)
-
-private struct ConfigGoldToggleStyle: ToggleStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        Button(action: { configuration.isOn.toggle() }) {
-            ZStack(alignment: configuration.isOn ? .trailing : .leading) {
-                Capsule()
-                    .fill(
-                        configuration.isOn
-                            ? VitaColors.accent.opacity(0.25)
-                            : Color.white.opacity(0.08)
-                    )
-                    .frame(width: 44, height: 24)
-                    .overlay(
-                        Capsule().stroke(
-                            configuration.isOn
-                                ? VitaColors.accentHover.opacity(0.25)
-                                : VitaColors.textTertiary.opacity(0.08),
-                            lineWidth: 1
-                        )
-                    )
-
-                Circle()
-                    .fill(
-                        configuration.isOn
-                            ? VitaColors.accentLight.opacity(0.90)
-                            : VitaColors.sectionLabel.opacity(0.50)
-                    )
-                    .frame(width: 18, height: 18)
-                    .shadow(color: .black.opacity(0.3), radius: 3, y: 2)
-                    .padding(3)
-            }
-            .animation(.easeInOut(duration: 0.2), value: configuration.isOn)
-        }
-        .buttonStyle(.plain)
-    }
-}

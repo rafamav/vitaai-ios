@@ -20,13 +20,15 @@ struct ProfileScreen: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
-                // TOP NAV
-                headerBar
+                // Shell §5.2.1: tab principal não tem chevron back nem cabeçalho redundante.
+                // Só ícone gear flutuante no canto direito.
+                gearFloatingButton
                     .padding(.top, 8)
+                    .padding(.horizontal, 20)
 
                 // AVATAR + NAME
                 profileHeader
-                    .padding(.top, 20)
+                    .padding(.top, 12)
 
                 // XP BAR inside glass card
                 xpBarSection
@@ -79,32 +81,11 @@ struct ProfileScreen: View {
         .trackScreen("Profile")
     }
 
-    // MARK: - Header
+    // MARK: - Header (gear-only, sem chevron back, sem título redundante)
 
-    private var headerBar: some View {
+    private var gearFloatingButton: some View {
         HStack {
-            HStack(spacing: 10) {
-                Button(action: { onNavigateToConfiguracoes?() }) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.80))
-                        .frame(minWidth: 44, minHeight: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("backButton")
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Perfil")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(VitaColors.textPrimary)
-                    Text("Suas informações")
-                        .font(.system(size: 11))
-                        .foregroundStyle(VitaColors.textSecondary)
-                }
-            }
-
             Spacer()
-
             Button(action: { onNavigateToConfiguracoes?() }) {
                 Image(systemName: "gearshape")
                     .font(.system(size: 17, weight: .medium))
@@ -112,8 +93,8 @@ struct ProfileScreen: View {
                     .frame(minWidth: 44, minHeight: 44)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Configurações")
         }
-        .padding(.horizontal, 20)
     }
 
     // MARK: - Profile Header (avatar + name + email + uni)
