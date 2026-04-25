@@ -243,18 +243,22 @@ struct TrabalhoScreen: View {
             }
 
             ForEach(items) { item in
-                SwipeToArchive(onArchive: { vm.dismiss(item) }) {
-                    Button {
+                VitaCardRow(
+                    onTap: {
                         if let onOpenDetail {
                             onOpenDetail(item.id)
                         } else {
                             editorAssignmentId = item.id
                             showEditor = true
                         }
-                    } label: {
-                        TrabalhoRow(item: item)
-                    }
-                    .buttonStyle(.plain)
+                    },
+                    onSwipeRight: {
+                        // TODO: persistir favorito no backend quando endpoint existir
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    },
+                    onSwipeLeft: { vm.dismiss(item) }
+                ) {
+                    TrabalhoRow(item: item)
                 }
             }
         }
@@ -481,65 +485,6 @@ private struct TrabalhoEmptyState: View {
                     .multilineTextAlignment(.center)
             }
             .padding(.vertical, 24)
-        }
-    }
-}
-
-// MARK: - Swipe to Archive
-
-private struct SwipeToArchive<Content: View>: View {
-    let onArchive: () -> Void
-    @ViewBuilder let content: Content
-
-    @State private var offset: CGFloat = 0
-    @State private var showingAction = false
-    private let threshold: CGFloat = -80
-
-    var body: some View {
-        ZStack(alignment: .trailing) {
-            // Background action
-            HStack {
-                Spacer()
-                VStack(spacing: 2) {
-                    Image(systemName: "archivebox.fill")
-                        .font(.system(size: 16))
-                    Text("Arquivar")
-                        .font(.system(size: 10, weight: .medium))
-                }
-                .foregroundStyle(.white)
-                .frame(width: 72)
-            }
-            .background(VitaColors.dataRed.opacity(0.8))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .opacity(offset < -20 ? 1 : 0)
-
-            // Content
-            content
-                .offset(x: offset)
-                .gesture(
-                    DragGesture(minimumDistance: 20)
-                        .onChanged { value in
-                            let translation = value.translation.width
-                            if translation < 0 {
-                                offset = translation * 0.7
-                            }
-                        }
-                        .onEnded { value in
-                            if offset < threshold {
-                                // Full swipe — archive
-                                withAnimation(.easeOut(duration: 0.25)) {
-                                    offset = -400
-                                }
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                                    onArchive()
-                                }
-                            } else {
-                                withAnimation(.spring(duration: 0.3)) {
-                                    offset = 0
-                                }
-                            }
-                        }
-                )
         }
     }
 }
