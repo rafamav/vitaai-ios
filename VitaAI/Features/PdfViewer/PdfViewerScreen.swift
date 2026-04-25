@@ -811,8 +811,8 @@ struct PdfViewerScreen: View {
         )
     }
 
-    /// Registra resultado no UserDefaults (fonte primária local).
-    /// Backend tracking adicional vem no commit 4 (fire-and-forget).
+    /// Registra resultado no UserDefaults (fonte primária local) e no backend
+    /// fire-and-forget (cross-device tracking via /api/pdf/masks/attempt).
     private func recordStudyAttempt(prompt: StudyMaskPrompt, correct: Bool) {
         let key = "pdf.mask.attempts.\(viewModel.fileHash)"
         var entries = UserDefaults.standard.array(forKey: key) as? [[String: Any]] ?? []
@@ -826,6 +826,17 @@ struct PdfViewerScreen: View {
             "correct": correct,
             "page_index": prompt.pageIndex,
         ])
+        // Backend tracking — fire-and-forget. Falha = silent (UserDefaults é SOT).
+        let docId = viewModel.fileHash
+        Task.detached(priority: .background) {
+            _ = try? await container.api.recordMaskAttempt(
+                documentId: docId,
+                maskId: prompt.maskId,
+                pageIndex: prompt.pageIndex,
+                bbox: prompt.bounds,
+                correct: correct
+            )
+        }
         // Esconde a mask revelada pra mostrar conteúdo embaixo.
         PdfMaskAnnotation.hide(prompt.annotation, on: prompt.page)
         viewModel.saveHighlights()
