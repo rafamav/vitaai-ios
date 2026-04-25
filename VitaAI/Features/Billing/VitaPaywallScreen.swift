@@ -233,10 +233,10 @@ struct VitaPaywallScreen: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
         .padding(.horizontal, 16)
-        .vitaGlassCard(cornerRadius: 18)
+        .background(d4CardBackground(cornerRadius: 18))
     }
 
-    // MARK: - Plans card (D4 wrapper, 3 PlanRows inside)
+    // MARK: - Plans card (D4 background sem nested Canvas)
 
     private var plansCard: some View {
         VStack(spacing: 10) {
@@ -250,7 +250,7 @@ struct VitaPaywallScreen: View {
             }
         }
         .padding(14)
-        .vitaGlassCard(cornerRadius: 18)
+        .background(d4CardBackground(cornerRadius: 18))
     }
 
     // MARK: - Features card (D4 wrapper, list inside)
@@ -302,7 +302,34 @@ struct VitaPaywallScreen: View {
             }
         }
         .padding(14)
-        .vitaGlassCard(cornerRadius: 18)
+        .background(d4CardBackground(cornerRadius: 18))
+    }
+
+    // MARK: - D4 background (simple version — Layer 1 gradient + border + shadow,
+    // sem Canvas radial glows que conflitam com VStack interno)
+
+    @ViewBuilder
+    private func d4CardBackground(cornerRadius: CGFloat) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 30/255, green: 22/255, blue: 15/255).opacity(0.92),
+                            Color(red: 14/255, green: 10/255, blue: 7/255).opacity(0.92)
+                        ],
+                        startPoint: UnitPoint(x: 0.46, y: 0.0),
+                        endPoint: UnitPoint(x: 0.54, y: 1.0)
+                    )
+                )
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(
+                    Color(red: 200/255, green: 160/255, blue: 80/255).opacity(0.22),
+                    lineWidth: 1
+                )
+        }
+        .shadow(color: .black.opacity(0.50), radius: 16, x: 0, y: 6)
+        .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 1)
     }
 
     // MARK: - CTA
