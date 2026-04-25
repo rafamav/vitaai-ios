@@ -16,6 +16,7 @@ struct PdfViewerScreen: View {
     @State private var viewModel = PdfViewerViewModel()
     @State private var workspace = PdfWorkspaceState()
     @State private var lastLoadedURL: URL? = nil
+    @State private var isLoadingTab: Bool = false
     @State private var showExportSheet: Bool = false
     @State private var exportedURL: URL? = nil
     @State private var searchDebounceTask: Task<Void, Never>? = nil
@@ -34,8 +35,12 @@ struct PdfViewerScreen: View {
     var body: some View {
         ZStack {
             if viewModel.isLoading {
-                ProgressView()
-                    .tint(VitaColors.accent)
+                VStack(spacing: 16) {
+                    OrbMascot(palette: .vita, state: .thinking, size: 120)
+                    Text("Abrindo documento")
+                        .font(VitaTypography.labelMedium)
+                        .foregroundStyle(VitaColors.textSecondary)
+                }
             } else if let document = viewModel.document, viewModel.pageCount > 0 {
                 mainContent(document: document)
             } else {
@@ -83,24 +88,32 @@ struct PdfViewerScreen: View {
         .task {
             // Multi-doc workspace: open the URL passed by the router as a tab.
             // If user already had other tabs from a previous session, they remain.
+            // Mutating activeId here triggers .onChange below — single load path.
             workspace.open(url: url, title: initialTitle)
-            await loadActiveTab()
-            ScreenLoadContext.finish(for: "PdfViewer")
-            VitaPostHogConfig.capture(event: "pdf_opened", properties: [
-                "page_count": viewModel.pageCount,
-                "loaded": viewModel.document != nil,
-                "tab_count": workspace.openDocs.count,
-            ])
         }
-        .onChange(of: workspace.activeId) { _, _ in
-            Task { await loadActiveTab() }
-        }
-        // vita-modals-ignore: UIDocumentPickerViewController is a UIKit-presented native sheet — VitaSheet wraps SwiftUI content and would break the system picker
-        .sheet(isPresented: $showFilePicker) {
-            PdfTabDocumentPicker { pickedURL in
-                workspace.open(url: pickedURL)
-                showFilePicker = false
+        .onChange(of: workspace.activeId, initial: true) { _, _ in
+            Task {
+                await loadActiveTab()
+                ScreenLoadContext.finish(for: "PdfViewer")
+                VitaPostHogConfig.capture(event: "pdf_opened", properties: [
+                    "page_count": viewModel.pageCount,
+                    "loaded": viewModel.document != nil,
+                    "tab_count": workspace.openDocs.count,
+                ])
             }
+        }
+        // Goodnotes-style: + tab abre picker dos PDFs do user (Vita library),
+        // não Files iOS. PdfUserDocumentsPicker já tem fallback "Importar Files"
+        // dentro pra casos edge.
+        // vita-modals-ignore: PdfUserDocumentsPicker tem NavigationStack próprio (necessário pra .searchable + toolbar com botão Files) — VitaSheet causaria header duplicado e quebra search nativo
+        .sheet(isPresented: $showFilePicker) {
+            PdfUserDocumentsPicker(
+                onSelect: { pickedURL, title in
+                    workspace.open(url: pickedURL, title: title)
+                    showFilePicker = false
+                },
+                onCancel: { showFilePicker = false }
+            )
         }
         .trackScreen("PdfViewer")
         .onDisappear { viewModel.saveAllAnnotations() }
@@ -558,11 +571,16 @@ struct PdfViewerScreen: View {
     /// Loads the workspace's active tab into the viewModel. Called on initial
     /// .task and on every workspace.activeId change. Saves annotations of the
     /// previous tab before swapping (caller is responsible for that).
+    @MainActor
     private func loadActiveTab() async {
         guard let active = workspace.activeDoc else { return }
-        // Skip if we already have this URL loaded (initial .task races with the
-        // workspace.open() write that happens just above it).
+        // Skip if we already have this URL loaded
         if lastLoadedURL == active.url, viewModel.document != nil { return }
+        // Serialize concurrent calls — onChange + .task can race on first mount
+        if isLoadingTab { return }
+        isLoadingTab = true
+        defer { isLoadingTab = false }
+
         lastLoadedURL = active.url
         viewModel.fileName = active.title
         await viewModel.load(url: active.url, tokenStore: container.tokenStore)
