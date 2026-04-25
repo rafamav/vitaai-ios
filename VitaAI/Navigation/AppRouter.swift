@@ -84,8 +84,7 @@ struct AppRouter: View {
                 // trigger global logout before onboarding even starts.
                 ZStack {
                     VitaColors.surface.ignoresSafeArea()
-                    ProgressView()
-                        .tint(VitaColors.accent)
+                    OrbMascot(palette: .vita, state: .thinking, size: 120)
                 }
             } else if !authManager.isLoggedIn {
                 LoginScreen(authManager: authManager)
