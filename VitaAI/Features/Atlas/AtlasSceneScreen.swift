@@ -63,6 +63,10 @@ struct AtlasSceneScreen: View {
     /// Mesh node names hidden by the user via the Esconder button.
     /// Persists across layer toggles (each mesh has a stable name).
     @State private var hiddenMeshes: Set<String> = []
+    /// Global transparency applied across every active layer. 0 = opaque,
+    /// 1 = fully invisible. Lets the user see organs hidden behind organs in
+    /// the splanchnology layer (or skin/muscle in stacked combinations).
+    @State private var transparency: Double = 0
 
     var body: some View {
         // No opaque base — the AppRouter's VitaAmbientBackground shows through.
@@ -80,6 +84,7 @@ struct AtlasSceneScreen: View {
                             anglePreset: anglePreset,
                             bboxTrigger: bboxTrigger,
                             hiddenMeshes: hiddenMeshes,
+                            transparency: transparency,
                             onMeshTap: { meshName in handleMeshTap(meshName) }
                         )
                         .transition(.opacity)
@@ -97,14 +102,20 @@ struct AtlasSceneScreen: View {
                     angleRail
                 }
 
-                // First-time empty hint (only when scene is up + no mesh tapped yet)
-                if scene != nil && !hasTappedAnyMesh {
+                // Bottom bar — transparency slider (always visible when scene
+                // has at least one layer) + first-time tap hint as a thin chip.
+                if scene != nil && !activeLayers.isEmpty {
                     VStack {
                         Spacer()
-                        emptyHint
-                            .padding(.bottom, 24)
+                        if !hasTappedAnyMesh {
+                            emptyHint
+                                .padding(.bottom, 6)
+                                .allowsHitTesting(false)
+                        }
+                        transparencyBar
+                            .padding(.horizontal, 14)
+                            .padding(.bottom, 18)
                     }
-                    .allowsHitTesting(false)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -154,7 +165,13 @@ struct AtlasSceneScreen: View {
                         onAskVita?(customPrompt)
                     },
                     onHide: {
-                        let toHide = Set(lastTappedCandidates)
+                        // Exclude the "layer-<rawValue>" container nodes — those
+                        // are bookkeeping wrappers from the multi-layer refactor;
+                        // hiding one would nuke the entire system. Hide only the
+                        // mesh itself + its immediate ancestors.
+                        let toHide = Set(
+                            lastTappedCandidates.filter { !$0.hasPrefix("layer-") }
+                        )
                         hiddenMeshes.formUnion(toHide)
                         VitaPostHogConfig.capture(event: "atlas_mesh_hidden", properties: [
                             "layers": analyticsLayers,
@@ -492,6 +509,53 @@ struct AtlasSceneScreen: View {
         .padding(.vertical, 9)
         .background(
             Capsule().fill(.ultraThinMaterial.opacity(0.85))
+                .overlay(
+                    Capsule().stroke(Color.white.opacity(0.06), lineWidth: 0.5)
+                )
+        )
+    }
+
+    /// Transparency slider — fades every active layer uniformly so the user
+    /// can peek through outer organs/muscles to see structures behind. Reset
+    /// button on the right snaps back to 0% (fully opaque).
+    private var transparencyBar: some View {
+        HStack(spacing: 12) {
+            Image(systemName: transparency > 0.05 ? "eye.slash.fill" : "eye.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(transparency > 0.05 ? VitaColors.accent : VitaColors.textSecondary)
+                .frame(width: 22)
+                .contentTransition(.symbolEffect(.replace))
+
+            Slider(value: $transparency, in: 0...0.85)
+                .tint(VitaColors.accent)
+                .accessibilityLabel("Transparência")
+                .accessibilityValue("\(Int(transparency * 100)) por cento")
+
+            Text("\(Int(transparency * 100))%")
+                .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                .foregroundStyle(VitaColors.textSecondary)
+                .frame(width: 32, alignment: .trailing)
+
+            if transparency > 0.05 {
+                Button {
+                    withAnimation(.easeOut(duration: 0.2)) { transparency = 0 }
+                    UISelectionFeedbackGenerator().selectionChanged()
+                } label: {
+                    Image(systemName: "arrow.uturn.backward")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(VitaColors.accent)
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill(VitaColors.accent.opacity(0.15)))
+                }
+                .buttonStyle(.plain)
+                .transition(.opacity.combined(with: .scale))
+                .accessibilityLabel("Voltar opaco")
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(
+            Capsule().fill(.ultraThinMaterial.opacity(0.92))
                 .overlay(
                     Capsule().stroke(Color.white.opacity(0.06), lineWidth: 0.5)
                 )
@@ -1501,6 +1565,7 @@ private struct AnatomySceneView: UIViewRepresentable {
     let anglePreset: AtlasCameraAngle
     let bboxTrigger: Int
     let hiddenMeshes: Set<String>
+    let transparency: Double
     let onMeshTap: ([String]) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onMeshTap: onMeshTap) }
@@ -1569,6 +1634,20 @@ private struct AnatomySceneView: UIViewRepresentable {
                     node.isHidden = false
                 }
             }
+        }
+        // Global transparency — applied at each layer container so it cascades
+        // to children automatically (SCNNode.opacity multiplies down). Lights,
+        // camera, and the highlight node skip this loop.
+        if abs(transparency - context.coordinator.lastTransparency) > 0.001 {
+            context.coordinator.lastTransparency = transparency
+            let opacity = CGFloat(1.0 - transparency)
+            SCNTransaction.begin()
+            SCNTransaction.animationDuration = 0.18
+            for node in scene.rootNode.childNodes
+                where (node.name ?? "").hasPrefix("layer-") {
+                node.opacity = opacity
+            }
+            SCNTransaction.commit()
         }
     }
 
@@ -1678,6 +1757,7 @@ private struct AnatomySceneView: UIViewRepresentable {
         var lastAngleTrigger = 0
         var lastBboxTrigger = 0
         var lastHiddenMeshes: Set<String> = []
+        var lastTransparency: Double = 0
         var modelContainers: [SCNNode] = []
         private weak var lastSelected: SCNNode?
         private var lastSelectedOriginalMaterials: [SCNMaterial] = []
