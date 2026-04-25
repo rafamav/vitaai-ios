@@ -269,6 +269,11 @@ struct PdfToolbar: View {
                         systemImage: isBookmarked ? "bookmark.fill" : "bookmark"
                     )
                 }
+                if let onShowBookmarksList {
+                    Button(action: onShowBookmarksList) {
+                        Label("Marcações salvas", systemImage: "bookmark.circle")
+                    }
+                }
             } label: {
                 Image(systemName: "chevron.down.circle")
                     .font(.system(size: 16))
