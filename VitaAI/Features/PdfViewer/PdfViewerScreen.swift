@@ -39,6 +39,7 @@ struct PdfViewerScreen: View {
     // ZONE-B — Header sheets (bookmarks list, outline, settings)
     @State private var showBookmarksSheet: Bool = false
     @State private var showOutlineSheet: Bool = false
+    @State private var showSettingsSheet: Bool = false
     @AppStorage("pdf_show_mascot") private var showMascot: Bool = true
     @FocusState private var isSearchFocused: Bool
 
@@ -175,6 +176,18 @@ struct PdfViewerScreen: View {
                 )
             }
         }
+        // vita-modals-ignore: PdfSettingsSheet já usa VitaSheet internamente — wrapper duplo causaria header duplicado
+        .sheet(isPresented: $showSettingsSheet) {
+            PdfSettingsSheet(
+                onResetAnnotations: {
+                    viewModel.resetAllAnnotations()
+                    showSettingsSheet = false
+                }
+            )
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .pdfSettingsChanged)) { note in
+            applyPdfSettingsLive(note: note)
+        }
         // Pen styles + highlight color popovers — abertos via long-press na toolbar.
         // vita-modals-ignore: VitaGlassCard custom inside, presentationDetent .height fixo — VitaSheet adiciona header/padding desnecessários pra picker compacto
         .sheet(isPresented: $showPenStyles) {
@@ -281,7 +294,8 @@ struct PdfViewerScreen: View {
                     onPenLongPress: { showPenStyles = true },
                     onHighlightLongPress: { showHighlightColor = true },
                     onShowBookmarksList: { showBookmarksSheet = true },
-                    onShowOutline: { showOutlineSheet = true }
+                    onShowOutline: { showOutlineSheet = true },
+                    onShowSettings: { showSettingsSheet = true }
                 )
 
             // Multi-doc tab bar (Goodnotes-style). Hidden in fullscreen so the
@@ -504,6 +518,25 @@ struct PdfViewerScreen: View {
         )
         .padding(.top, 54)     // clear the status bar / notch area
         .padding(.leading, 12)
+    }
+
+    // MARK: - Live PDF settings application
+    //
+    // Recebe Notification.pdfSettingsChanged do PdfSettingsSheet e aplica
+    // displayMode/two-page-spread/dark-mode no PDFView atual sem precisar
+    // fechar/reabrir o documento. Brilho aplica via overlay já no body.
+
+    private func applyPdfSettingsLive(note: Notification) {
+        guard let info = note.userInfo,
+              let pdfView = NativePdfView.pdfViewRef else { return }
+        let pageByPage = info["pageByPage"] as? Bool ?? false
+        let twoPageSpread = info["twoPageSpread"] as? Bool ?? false
+
+        if twoPageSpread && UIDevice.current.userInterfaceIdiom == .pad {
+            pdfView.displayMode = pageByPage ? .twoUp : .twoUpContinuous
+        } else {
+            pdfView.displayMode = pageByPage ? .singlePage : .singlePageContinuous
+        }
     }
 
     // MARK: - Error View

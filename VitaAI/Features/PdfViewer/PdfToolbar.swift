@@ -279,6 +279,11 @@ struct PdfToolbar: View {
                         Label("Sumário (TOC)", systemImage: "list.bullet.indent")
                     }
                 }
+                if let onShowSettings {
+                    Button(action: onShowSettings) {
+                        Label("Ajustes do PDF", systemImage: "slider.horizontal.3")
+                    }
+                }
             } label: {
                 Image(systemName: "chevron.down.circle")
                     .font(.system(size: 16))

@@ -307,6 +307,29 @@ final class PdfViewerViewModel {
         // Nothing extra needed here — file writes are synchronous in coordinator.
     }
 
+    /// Apaga TODAS as anotações deste PDF (drawings + highlights + bookmarks)
+    /// para o `fileHash` atual. Chamado pelo PdfSettingsSheet > Limpar
+    /// anotações. Irreversível.
+    func resetAllAnnotations() {
+        let fm = FileManager.default
+        let dir = fm.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("pdf_annotations", isDirectory: true)
+        guard let entries = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return }
+        for url in entries where url.lastPathComponent.hasPrefix(fileHash) {
+            try? fm.removeItem(at: url)
+        }
+        bookmarkedPages.removeAll()
+        // Drop in-memory highlight annotations to mirror disk wipe.
+        if let document {
+            for i in 0..<document.pageCount {
+                guard let page = document.page(at: i) else { continue }
+                for annotation in page.annotations where annotation.type == "Highlight" {
+                    page.removeAnnotation(annotation)
+                }
+            }
+        }
+    }
+
     // MARK: - Handwriting recognition
 
     func recognizeHandwriting(drawing: PKDrawing) async {

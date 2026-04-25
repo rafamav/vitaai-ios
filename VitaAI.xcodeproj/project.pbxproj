@@ -157,6 +157,7 @@
 		67630DBBBFB4D18CFFFDEED0 /* OsceSseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0387CC7FD36268CA8C03B06 /* OsceSseClient.swift */; };
 		6823BE1A2916D6A4CF41FB8B /* VitaModals.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17E3D63AD574133541620DA8 /* VitaModals.swift */; };
 		6868AD44A16304F2D90AEA46 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B27D9B4C7F44B7779A43CE3 /* CachedAsyncImage.swift */; };
+		696CBE7E1E29936CEF915F00 /* PdfSettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 303BA1D3D9EFF7031A182BB5 /* PdfSettingsSheet.swift */; };
 		696DCAF3DF165C21D20CC27C /* PdfUserDocumentsPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6154D44C92401CA70E43E53 /* PdfUserDocumentsPicker.swift */; };
 		6B15F1C56BFAF71BAAD0881C /* VitaTypingMascot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E1D7F50D43B24E6AA736C9A /* VitaTypingMascot.swift */; };
 		6B39D764E1FF15774658E978 /* DashboardHeroCardBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD7B8AB9F6F4EDC09B88BF0B /* DashboardHeroCardBackground.swift */; };
@@ -419,6 +420,7 @@
 		2FE1AAFA569EF09FEF974B98 /* CardDistributionDonutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardDistributionDonutView.swift; sourceTree = "<group>"; };
 		3019A4AC7D6BBDAD9969469B /* FlashcardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashcardViewModel.swift; sourceTree = "<group>"; };
 		3019ED975A5A0AA9949070BF /* CreateCheckoutSessionRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateCheckoutSessionRequest.swift; sourceTree = "<group>"; };
+		303BA1D3D9EFF7031A182BB5 /* PdfSettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PdfSettingsSheet.swift; sourceTree = "<group>"; };
 		303EAFF83B774D5B3B9DFC46 /* StudyModulesGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudyModulesGrid.swift; sourceTree = "<group>"; };
 		30670596AEFAD8034EF048D9 /* AtlasSceneScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasSceneScreen.swift; sourceTree = "<group>"; };
 		314297A0A778A73D82243DDC /* SilentPortalSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilentPortalSync.swift; sourceTree = "<group>"; };
@@ -792,6 +794,7 @@
 				47DF4AA36189B46AFFC315AD /* PdfOutlineView.swift */,
 				44C06662646A204B5E67E9A5 /* PdfPenStylesPopover.swift */,
 				05B1E34202A8907EFFFFACD1 /* PdfScanOverlay.swift */,
+				303BA1D3D9EFF7031A182BB5 /* PdfSettingsSheet.swift */,
 				D76BE069C1F75FD8C95A138A /* PdfTabBar.swift */,
 				E6EFEEFBA17AF37F355A4848 /* PdfToolbar.swift */,
 				A6154D44C92401CA70E43E53 /* PdfUserDocumentsPicker.swift */,
@@ -1861,6 +1864,7 @@
 				B92CD0666FE9C607265FBBAC /* PdfOutlineView.swift in Sources */,
 				8B35A877FC3261B3C393E133 /* PdfPenStylesPopover.swift in Sources */,
 				DB5C2B7F9757B2683C89B850 /* PdfScanOverlay.swift in Sources */,
+				696CBE7E1E29936CEF915F00 /* PdfSettingsSheet.swift in Sources */,
 				EBD32F8B6FC327034ED9A70E /* PdfTabBar.swift in Sources */,
 				042B3027A14F3834E0DCBC54 /* PdfToolbar.swift in Sources */,
 				696DCAF3DF165C21D20CC27C /* PdfUserDocumentsPicker.swift in Sources */,
