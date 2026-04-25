@@ -89,4 +89,9 @@ enum Route: Hashable {
     case faculdadeMaterias
     case faculdadeDocumentos
     case faculdadeProfessores
+
+    // MARK: - Material folder drill-down
+    /// Lista de documentos dentro de uma pasta de materiais (Slides/Provas/etc).
+    /// Aberto via DisciplineDetail ao tocar num card de pasta.
+    case materialFolderDetail(folderId: String, folderName: String, folderIcon: String)
 }

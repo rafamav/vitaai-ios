@@ -323,12 +323,7 @@ struct FaculdadeHomeScreen: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 14).fill(cardBg)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14).stroke(glassBorder, lineWidth: 0.5)
-            )
+            .glassCard(cornerRadius: 14)
         }
         .buttonStyle(.plain)
     }
@@ -378,12 +373,7 @@ struct FaculdadeHomeScreen: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: 14).fill(cardBg)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14).stroke(glassBorder, lineWidth: 0.5)
-            )
+            .glassCard(cornerRadius: 14)
         }
         .buttonStyle(.plain)
     }

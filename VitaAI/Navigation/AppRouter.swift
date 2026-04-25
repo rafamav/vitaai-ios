@@ -745,6 +745,13 @@ struct MainTabView: View {
             FaculdadeDocumentosScreen(onBack: { router.goBack() })
         case .faculdadeProfessores:
             FaculdadeProfessoresScreen()
+        case .materialFolderDetail(let folderId, let folderName, let folderIcon):
+            MaterialFolderDetailScreen(
+                folderId: folderId,
+                folderName: folderName,
+                folderIcon: folderIcon,
+                onBack: { router.goBack() }
+            )
         default:
             EmptyView()
         }
