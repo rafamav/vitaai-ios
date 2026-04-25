@@ -29,6 +29,7 @@ struct PdfScanOverlay: View {
         GeometryReader { geo in
             ZStack {
                 // Dimmed backdrop — fully covers the area so PDF below is muted.
+                // vita-modals-ignore: scan-mode-dimmed-overlay — UI mode de seleção de área, não modal dialog
                 Color.black.opacity(0.55)
                     .ignoresSafeArea()
                     .contentShape(Rectangle())
@@ -180,6 +181,7 @@ struct PdfScanOverlay: View {
                     .foregroundStyle(Color.white)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)
+                    // vita-modals-ignore: scan-mode-dimmed-overlay — UI mode de seleção de área, não modal dialog
                     .background(Color.black.opacity(0.55))
                     .clipShape(Capsule())
             }
@@ -193,6 +195,7 @@ struct PdfScanOverlay: View {
                 .foregroundStyle(Color.white)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
+                // vita-modals-ignore: scan-mode-dimmed-overlay — UI mode de seleção de área, não modal dialog
                 .background(Color.black.opacity(0.55))
                 .clipShape(Capsule())
             }

@@ -126,6 +126,7 @@ struct TranscricaoMovePickerSheet: View {
                         .foregroundStyle(VitaColors.accentLight)
                 }
             }
+            // vita-modals-ignore: TextField inline no .alert — VitaAlert não suporta input de texto
             .alert("Nova pasta", isPresented: $showCreateDialog) {
                 TextField("Nome da pasta", text: $newFolderName)
                 Button("Cancelar", role: .cancel) {}

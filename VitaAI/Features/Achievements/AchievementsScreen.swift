@@ -83,9 +83,7 @@ private struct AchievementsContent: View {
             get: { vm.selectedBadge },
             set: { vm.selectedBadge = $0 }
         )) { badge in
-            VitaSheet {
-                AchievementDetailSheet(badge: badge)
-            }
+            AchievementDetailSheet(badge: badge)
         }
     }
 }

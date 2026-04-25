@@ -255,6 +255,7 @@ struct TranscricaoDetailSheet: View {
             .frame(minWidth: 44, minHeight: 44)
         }
         .disabled(actionBusy)
+        // vita-modals-ignore: TextField inline no .alert — VitaAlert não suporta input de texto
         .alert("Renomear gravação", isPresented: $showRenameDialog) {
             TextField("Título", text: $renameValue)
             Button("Cancelar", role: .cancel) { }
@@ -273,13 +274,20 @@ struct TranscricaoDetailSheet: View {
         } message: {
             Text("O áudio, a transcrição e os resumos gerados serão removidos. Não dá pra desfazer.")
         }
-        .sheet(isPresented: $showShareSheet) {
-            VitaSheet(title: "Compartilhar") {
+        .vitaBubble(isPresented: $showShareSheet, arrowEdge: .top) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Compartilhar")
+                    .font(VitaTypography.titleSmall)
+                    .foregroundStyle(VitaColors.textPrimary)
                 TranscricaoShareSheet(items: shareItems)
             }
+            .frame(width: 280)
         }
-        .sheet(isPresented: $showMoveSheet) {
-            VitaSheet(title: "Mover para") {
+        .vitaBubble(isPresented: $showMoveSheet, arrowEdge: .top) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Mover para")
+                    .font(VitaTypography.titleSmall)
+                    .foregroundStyle(VitaColors.textPrimary)
                 TranscricaoMovePickerSheet(
                     currentSlug: currentDisciplineSlug,
                     currentFolderId: currentFolderId,
@@ -288,7 +296,9 @@ struct TranscricaoDetailSheet: View {
                         Task { await moveToTarget(folderId: folderId, slug: slug) }
                     }
                 )
+                .frame(maxHeight: 320)
             }
+            .frame(width: 300)
         }
         .overlay(alignment: .bottom) {
             if let err = actionError {

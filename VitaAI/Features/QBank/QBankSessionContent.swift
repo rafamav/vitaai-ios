@@ -44,14 +44,14 @@ struct QBankSessionContent: View {
                 }
             }
         }
-        .alert("Encerrar Sessão?", isPresented: $showFinishAlert) {
-            Button("Encerrar", role: .destructive) { vm.finishSession() }
-            Button("Continuar", role: .cancel) {}
-        } message: {
-            let answered = vm.state.sessionAnswers.count
-            let total = vm.state.totalInSession
-            Text("Você respondeu \(answered) de \(total) questões. Deseja encerrar?")
-        }
+        .vitaAlert(
+            isPresented: $showFinishAlert,
+            title: "Encerrar Sessão?",
+            message: "Você respondeu \(vm.state.sessionAnswers.count) de \(vm.state.totalInSession) questões. Deseja encerrar?",
+            destructiveLabel: "Encerrar",
+            cancelLabel: "Continuar",
+            onConfirm: { vm.finishSession() }
+        )
         .onAppear { startTimer() }
         .onDisappear { timerTask?.cancel() }
     }

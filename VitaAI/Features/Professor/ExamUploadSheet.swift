@@ -60,6 +60,7 @@ struct ExamUploadSheet: View {
                 Spacer()
             }
         }
+        // vita-modals-ignore: UIKit CameraPickerView wrapper — não é SwiftUI content
         .sheet(isPresented: $showCamera) {
             CameraPickerView { image in
                 selectedImage = image

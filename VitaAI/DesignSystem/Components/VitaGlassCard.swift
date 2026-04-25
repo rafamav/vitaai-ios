@@ -107,6 +107,7 @@ struct VitaGlassCard<Content: View>: View {
                         Spacer()
                         // Inset bottom shadow — dark bevel pra carved effect
                         Capsule()
+                        // vita-modals-ignore: inset-bevel design element (Capsule decorativo), não overlay modal
                             .fill(Color.black.opacity(0.5))
                             .frame(height: 1)
                             .padding(.horizontal, 20)
@@ -236,6 +237,7 @@ extension View {
                             .padding(.top, 1)
                         Spacer()
                         Capsule()
+                        // vita-modals-ignore: inset-bevel design element (Capsule decorativo), não overlay modal
                             .fill(Color.black.opacity(0.5))
                             .frame(height: 1)
                             .padding(.horizontal, 20)

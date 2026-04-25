@@ -466,16 +466,15 @@ struct TranscricaoRecordingsListSection: View {
                         )
                 }
                 .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 16)
-            .sheet(isPresented: $showFilterSheet) {
-                VitaSheet(title: "Filtrar") {
+                .vitaBubble(isPresented: $showFilterSheet, arrowEdge: .top) {
                     TranscricaoFilterSheet(
                         disciplines: filterChips,
                         selected: $selectedFilter
                     )
+                    .frame(width: 280)
                 }
             }
+            .padding(.horizontal, 16)
 
             if isLoading {
                 ProgressView()
@@ -600,6 +599,7 @@ struct TranscricaoRecordingsListSection: View {
                 }
             }
         }
+        // vita-modals-ignore: TextField inline no .alert — VitaAlert não suporta input de texto
         .alert(
             "Renomear gravação",
             isPresented: Binding(

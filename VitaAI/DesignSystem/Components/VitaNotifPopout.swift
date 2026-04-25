@@ -28,6 +28,7 @@ struct VitaNotifPopout: View {
         let _ = timeRefreshTick
         ZStack(alignment: .topTrailing) {
             // Dismiss backdrop — fills all content area
+            // vita-modals-ignore: scrim transparente p/ tap-outside (dismiss handler), não overlay visual
             Color.black.opacity(0.001)
                 .onTapGesture { dismiss() }
 

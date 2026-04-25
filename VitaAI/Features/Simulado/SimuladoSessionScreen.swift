@@ -68,17 +68,19 @@ struct SimuladoSessionScreen: View {
                 // vita-modals-ignore: gridSheet/explanationSheet already wrap VitaSheet internally
                 .sheet(isPresented: $showGrid) { gridSheet(vm: vm) }
                 .sheet(isPresented: $showExplanationSheet) { explanationSheet(vm: vm) }
-                .alert("Finalizar?", isPresented: $showFinishDialog) {
-                    Button("Finalizar", role: .destructive) { vm.finishSimulado() }
-                    Button("Continuar", role: .cancel) {}
-                } message: {
-                    let unanswered = vm.state.questions.count - vm.state.answers.count
-                    if unanswered > 0 {
-                        Text("Você ainda tem \(unanswered) questão(ões) sem resposta. Deseja finalizar mesmo assim?")
-                    } else {
-                        Text("Tem certeza que deseja finalizar a prova?")
-                    }
-                }
+                .vitaAlert(
+                    isPresented: $showFinishDialog,
+                    title: "Finalizar?",
+                    message: {
+                        let unanswered = vm.state.questions.count - vm.state.answers.count
+                        return unanswered > 0
+                            ? "Você ainda tem \(unanswered) questão(ões) sem resposta. Deseja finalizar mesmo assim?"
+                            : "Tem certeza que deseja finalizar a prova?"
+                    }(),
+                    destructiveLabel: "Finalizar",
+                    cancelLabel: "Continuar",
+                    onConfirm: { vm.finishSimulado() }
+                )
             } else {
                 ZStack {
                     Color.clear.ignoresSafeArea()
