@@ -56,18 +56,9 @@ targets:
         BGTaskSchedulerPermittedIdentifiers:
           - com.bymav.vitaai.refresh
         UILaunchScreen: {}
-        # iPhone: portrait only (medical app, app inteiro foi desenhado vertical).
-        # iPad: portrait + landscape (multitasking + leitura PDF lado-a-lado).
-        # UIRequiresFullScreen=false libera Split View no iPad — sem isso o iPad
-        # também é forçado fullscreen e perde o ganho do landscape.
-        UIRequiresFullScreen: false
+        UIRequiresFullScreen: true
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
-        UISupportedInterfaceOrientations~ipad:
-          - UIInterfaceOrientationPortrait
-          - UIInterfaceOrientationPortraitUpsideDown
-          - UIInterfaceOrientationLandscapeLeft
-          - UIInterfaceOrientationLandscapeRight
         CFBundleURLTypes:
           - CFBundleURLName: com.bymav.vitaai
             CFBundleURLSchemes:
