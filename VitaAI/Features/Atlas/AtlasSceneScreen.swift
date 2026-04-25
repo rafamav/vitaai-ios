@@ -45,8 +45,10 @@ struct AtlasSceneScreen: View {
     /// Stored so "Esconder" hides every node that contributed to the selection.
     @State private var lastTappedCandidates: [String] = []
     @State private var resetTrigger = 0
-    /// Layers currently in the scene. Tap a pill to add/remove. Default: skeleton.
-    @State private var activeLayers: Set<AtlasLayer> = [.arthrology]
+    /// Layers currently in the scene. Tap a pill to add/remove. Default: ALL
+    /// systems — user opens the body whole and dissects DOWN (toggling pills
+    /// off) instead of building UP from one bone at a time.
+    @State private var activeLayers: Set<AtlasLayer> = Set(AtlasLayer.allCases)
     /// Layers currently mid-download (network) — chip shows spinner overlay.
     @State private var loadingLayers: Set<AtlasLayer> = []
     /// In-memory cache of parsed model nodes per layer. Re-toggling a layer
@@ -62,6 +64,10 @@ struct AtlasSceneScreen: View {
     /// Bumped whenever a layer attaches/detaches so the scene wrapper can
     /// re-frame the camera around the new bounding box.
     @State private var bboxTrigger = 0
+    /// Set when the user picks a structure from the search sheet — every
+    /// other mesh is hidden and the camera zooms in. Tap the focus chip to
+    /// exit and restore visibility.
+    @State private var focusedMesh: MeshInfo?
     /// Mesh node names hidden by the user via the Esconder button.
     /// Persists across layer toggles (each mesh has a stable name).
     @State private var hiddenMeshes: Set<String> = []
@@ -91,6 +97,7 @@ struct AtlasSceneScreen: View {
                             bboxTrigger: bboxTrigger,
                             hiddenMeshes: hiddenMeshes,
                             transparency: transparency,
+                            focusedMeshId: focusedMesh?.id,
                             onMeshTap: { meshName in handleMeshTap(meshName) }
                         )
                         .transition(.opacity)
@@ -106,6 +113,16 @@ struct AtlasSceneScreen: View {
                     layerRail
                     Spacer()
                     angleRail
+                }
+
+                // Focus mode chip — floats top-center when the user isolates
+                // a structure from search. Tap × to exit and restore visibility.
+                if let focused = focusedMesh {
+                    VStack {
+                        focusChip(for: focused)
+                            .padding(.top, 70) // below the topBar
+                        Spacer()
+                    }
                 }
 
                 // Bottom bar — only the tap hint by default. Transparency slider
@@ -143,6 +160,11 @@ struct AtlasSceneScreen: View {
                     activeLayerIds: Set(activeLayers.map { $0.rawValue }),
                     onPick: { info in
                         showSearch = false
+                        // Focus mode: hide every other mesh and zoom into this
+                        // one. The detail sheet still opens so the student
+                        // immediately sees description/dica/curiosidade + can
+                        // ask VITA inline. Exit via the floating focus chip.
+                        focusedMesh = info
                         selectedMesh = info
                         hasTappedAnyMesh = true
                         VitaPostHogConfig.capture(event: "atlas_search_picked", properties: [
@@ -211,6 +233,45 @@ struct AtlasSceneScreen: View {
     /// "+"-joined sorted rawValues for telemetry (e.g. "arthrology+myology").
     private var analyticsLayers: String {
         activeLayers.map { $0.rawValue }.sorted().joined(separator: "+")
+    }
+
+    /// Floating chip when focus mode is on. Shows the isolated structure name
+    /// + a × to exit. Restoring visibility is just clearing focusedMesh —
+    /// the AnatomySceneView observes the change and unhides the rest.
+    private func focusChip(for info: MeshInfo) -> some View {
+        Button {
+            withAnimation(.easeOut(duration: 0.25)) {
+                focusedMesh = nil
+            }
+            UISelectionFeedbackGenerator().selectionChanged()
+            VitaPostHogConfig.capture(event: "atlas_focus_exit", properties: [
+                "structure": info.pt,
+            ])
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "scope")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(info.pt)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(VitaColors.textSecondary)
+            }
+            .foregroundStyle(VitaColors.accent)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        Capsule().stroke(VitaColors.accent.opacity(0.4), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Sair do modo foco em \(info.pt)")
+        .transition(.opacity.combined(with: .scale))
     }
 
     /// Try every ancestor name and the geometry name, with progressive stripping
@@ -420,9 +481,7 @@ struct AtlasSceneScreen: View {
                             .scaleEffect(0.6)
                             .tint(VitaColors.accent)
                     } else {
-                        Image(systemName: layer.icon)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(active ? VitaColors.accent : VitaColors.textSecondary)
+                        glyphView(layer.glyph, active: active)
                     }
                     // Cache dot: bottom-right of the icon circle
                     if cached && !loading {
@@ -447,6 +506,22 @@ struct AtlasSceneScreen: View {
             ? "Tocar pra remover da cena"
             : (cached ? "Baixado, adiciona instantâneo" : "Tocar pra baixar e adicionar"))
         .accessibilityAddTraits(active ? [.isSelected] : [])
+    }
+
+    /// Renders an emoji-text or SF symbol for a layer pill, with the right
+    /// tinting / sizing depending on whether the pill is active.
+    @ViewBuilder
+    private func glyphView(_ glyph: LayerGlyph, active: Bool) -> some View {
+        switch glyph {
+        case .sf(let symbol):
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(active ? VitaColors.accent : VitaColors.textSecondary)
+        case .emoji(let char):
+            Text(char)
+                .font(.system(size: 18))
+                .opacity(active ? 1.0 : 0.65)
+        }
     }
 
     // MARK: - Camera angle rail (right)
@@ -883,9 +958,9 @@ struct AtlasSceneScreen: View {
     // MARK: - Load pipeline (multi-layer composable)
 
     /// First entry into the screen (or after a manual "Recarregar"). Builds the
-    /// base scene with lights ONCE, then attaches every layer the user has
-    /// active (default = arthrology). Subsequent layer toggles bypass this and
-    /// hit attachLayer/detachLayer directly.
+    /// base scene with lights ONCE, then attaches every active layer in PARALLEL
+    /// (TaskGroup) so the user gets the full body in roughly the time of the
+    /// slowest GLB instead of summing across 7 systems sequentially.
     private func ensureSceneAndInitialLayer() async {
         if scene == nil {
             let base = buildBaseScene()
@@ -894,10 +969,12 @@ struct AtlasSceneScreen: View {
                 SentrySDK.reportFullyDisplayed()
             }
         }
-        // Snapshot to avoid mutating the set while iterating async.
         let pending = activeLayers.subtracting(layerNodes.keys)
-        for layer in pending {
-            await attachLayer(layer)
+        guard !pending.isEmpty else { return }
+        await withTaskGroup(of: Void.self) { group in
+            for layer in pending {
+                group.addTask { await attachLayer(layer) }
+            }
         }
     }
 
@@ -1220,17 +1297,27 @@ enum AtlasLayer: String, CaseIterable, Identifiable {
         }
     }
 
-    var icon: String {
+    /// Anatomy systems don't map to clean SF Symbols (no skeleton glyph in
+    /// Apple's set, no nerve glyph). We mix: emoji for the bones/blood/joints
+    /// where SF fails the metaphor, SF Symbols where they actually fit.
+    var glyph: LayerGlyph {
         switch self {
-        case .arthrology:    return "figure.stand"
-        case .myology:       return "figure.strengthtraining.traditional"
-        case .neurology:     return "brain.head.profile"
-        case .angiology:     return "heart.fill"
-        case .splanchnology: return "lungs.fill"
-        case .lymphoid:      return "drop.fill"
-        case .joints:        return "link"
+        case .arthrology:    return .emoji("🦴")
+        case .myology:       return .emoji("💪")
+        case .neurology:     return .emoji("🧠")
+        case .angiology:     return .emoji("🩸")
+        case .splanchnology: return .emoji("🫁")
+        case .lymphoid:      return .emoji("💧")
+        case .joints:        return .sf("circle.dotted.and.circle")
         }
     }
+}
+
+/// Tagged-union of icon source so the layer pill can render either an SF
+/// Symbol or a plain emoji-as-text without the call site doing detection.
+enum LayerGlyph {
+    case sf(String)
+    case emoji(String)
 }
 
 // MARK: - Mesh info + detail sheet
@@ -1444,12 +1531,17 @@ private struct MeshDetailSheet: View {
                             )
                             .frame(maxWidth: .infinity, alignment: .trailing)
                     } else {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(VitaColors.accent)
-                            .frame(width: 22, height: 22)
-                            .background(Circle().fill(VitaColors.accent.opacity(0.12)))
-                            .padding(.top, 2)
+                        // Avatar VITA real (mascote orb) — Rafael 2026-04-25:
+                        // pediu várias vezes pra parar com sparkles. Estado
+                        // muda conforme stream: thinking enquanto vazio, awake
+                        // quando texto começa a chegar.
+                        OrbMascot(
+                            palette: .vita,
+                            state: turn.text.isEmpty ? .thinking : .awake,
+                            size: 26,
+                            bounceEnabled: false
+                        )
+                        .padding(.top, 2)
                         Text(turn.text.isEmpty ? "…" : turn.text)
                             .font(.system(size: 14))
                             .foregroundStyle(VitaColors.textPrimary)
@@ -1749,6 +1841,9 @@ private struct AnatomySceneView: UIViewRepresentable {
     let bboxTrigger: Int
     let hiddenMeshes: Set<String>
     let transparency: Double
+    /// When non-nil: hide every mesh whose name does not match (or share the
+    /// stem with) this id. Camera animates to fit the focused node.
+    let focusedMeshId: String?
     let onMeshTap: ([String]) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onMeshTap: onMeshTap) }
@@ -1807,7 +1902,9 @@ private struct AnatomySceneView: UIViewRepresentable {
             applyAnglePreset(uiView, coord: context.coordinator)
         }
         // Apply hide/show. Only re-traverse when the set actually changed.
-        if hiddenMeshes != context.coordinator.lastHiddenMeshes {
+        // When focus mode is on, the focus pass below overrides hiddenMeshes.
+        if focusedMeshId == nil &&
+           hiddenMeshes != context.coordinator.lastHiddenMeshes {
             context.coordinator.lastHiddenMeshes = hiddenMeshes
             scene.rootNode.enumerateHierarchy { node, _ in
                 guard let name = node.name else { return }
@@ -1817,6 +1914,13 @@ private struct AnatomySceneView: UIViewRepresentable {
                     node.isHidden = false
                 }
             }
+        }
+        // Focus mode: hide everything that isn't the picked structure (or one
+        // of its ancestors), then animate the camera to fit it. Clearing it
+        // restores visibility honoring user-hidden meshes.
+        if focusedMeshId != context.coordinator.lastFocusedMeshId {
+            context.coordinator.lastFocusedMeshId = focusedMeshId
+            applyFocus(uiView, coord: context.coordinator)
         }
         // Global transparency — has to fight depth-buffer write or the GPU
         // will discard pixels behind a translucent mesh BEFORE blending. We
@@ -1909,6 +2013,98 @@ private struct AnatomySceneView: UIViewRepresentable {
         coord.modelContainers = layerContainers
     }
 
+    /// Focus mode: hide every mesh except the picked one (matched loosely on
+    /// name + stem) and zoom the camera onto it. Clearing focus restores
+    /// the previous hide state and re-frames to the full bbox.
+    private func applyFocus(_ uiView: SCNView, coord: Coordinator) {
+        guard let cam = uiView.pointOfView else { return }
+
+        if let target = focusedMeshId {
+            // Build candidate name set: exact id + lower-cased + base stem.
+            // Mesh names in GLBs vary (".o.001" suffixes etc.), so we match
+            // any node whose name SHARES the stem before the first dot.
+            let lower = target.lowercased()
+            let stem = lower.split(separator: ".").first.map(String.init) ?? lower
+
+            var matchedNodes: [SCNNode] = []
+            scene.rootNode.enumerateHierarchy { node, _ in
+                guard node.geometry != nil || !node.childNodes.isEmpty else { return }
+                guard let name = node.name?.lowercased() else { return }
+                let nameStem = name.split(separator: ".").first.map(String.init) ?? name
+                if name == lower || nameStem == stem {
+                    matchedNodes.append(node)
+                }
+            }
+
+            // Mark every "layer-*" node tree as hidden, then unhide ancestors
+            // and self of every matched node so SceneKit still traverses them.
+            scene.rootNode.enumerateHierarchy { node, _ in
+                guard let nm = node.name else { return }
+                if nm.hasPrefix("layer-") || node.geometry != nil {
+                    node.isHidden = true
+                }
+            }
+            var unhideSet: Set<ObjectIdentifier> = []
+            for node in matchedNodes {
+                var cursor: SCNNode? = node
+                while let n = cursor {
+                    unhideSet.insert(ObjectIdentifier(n))
+                    n.isHidden = false
+                    cursor = n.parent
+                }
+                node.enumerateChildNodes { child, _ in
+                    child.isHidden = false
+                    unhideSet.insert(ObjectIdentifier(child))
+                }
+            }
+
+            // Frame camera around the union bbox of every matched node.
+            guard let first = matchedNodes.first else { return }
+            var (lo, hi) = first.boundingBox
+            var minW = first.convertPosition(lo, to: scene.rootNode)
+            var maxW = first.convertPosition(hi, to: scene.rootNode)
+            for n in matchedNodes.dropFirst() {
+                let (l, h) = n.boundingBox
+                let wl = n.convertPosition(l, to: scene.rootNode)
+                let wh = n.convertPosition(h, to: scene.rootNode)
+                minW = SCNVector3(min(minW.x, wl.x, wh.x), min(minW.y, wl.y, wh.y), min(minW.z, wl.z, wh.z))
+                maxW = SCNVector3(max(maxW.x, wl.x, wh.x), max(maxW.y, wl.y, wh.y), max(maxW.z, wl.z, wh.z))
+            }
+            let dx = maxW.x - minW.x, dy = maxW.y - minW.y, dz = maxW.z - minW.z
+            let diag = sqrt(dx * dx + dy * dy + dz * dz)
+            let safeDiag: Float = diag > 0.0001 ? diag : 0.5
+            let cx = (minW.x + maxW.x) / 2
+            let cy = (minW.y + maxW.y) / 2
+            let cz = (minW.z + maxW.z) / 2
+            let camPos = SCNVector3(cx, cy, cz + safeDiag * 2.4)
+            SCNTransaction.begin()
+            SCNTransaction.animationDuration = 0.55
+            SCNTransaction.animationTimingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            cam.position = camPos
+            cam.look(at: SCNVector3(cx, cy, cz))
+            SCNTransaction.commit()
+            atlasLog.notice("[Atlas] focus → matched=\(matchedNodes.count) target=\(target, privacy: .public)")
+        } else {
+            // Restore: unhide everything not in user-driven hiddenMeshes,
+            // then re-frame to the full active scene.
+            scene.rootNode.enumerateHierarchy { node, _ in
+                guard let name = node.name else { return }
+                if hiddenMeshes.contains(name) {
+                    node.isHidden = true
+                } else if node.isHidden {
+                    node.isHidden = false
+                }
+            }
+            // Reuse reframe via initial camera framing.
+            SCNTransaction.begin()
+            SCNTransaction.animationDuration = 0.45
+            cam.position = coord.initialCameraPosition
+            cam.look(at: coord.cameraTarget)
+            SCNTransaction.commit()
+            atlasLog.notice("[Atlas] focus cleared")
+        }
+    }
+
     private func applyAnglePreset(_ uiView: SCNView, coord: Coordinator) {
         guard let cam = uiView.pointOfView else { return }
         let target = coord.cameraTarget
@@ -1955,6 +2151,7 @@ private struct AnatomySceneView: UIViewRepresentable {
         var lastBboxTrigger = 0
         var lastHiddenMeshes: Set<String> = []
         var lastTransparency: Double = 0
+        var lastFocusedMeshId: String?
         var modelContainers: [SCNNode] = []
         private weak var lastSelected: SCNNode?
         private var lastSelectedOriginalMaterials: [SCNMaterial] = []
