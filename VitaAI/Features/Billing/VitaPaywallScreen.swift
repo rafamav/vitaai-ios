@@ -503,7 +503,7 @@ private struct PlanRow: View {
         }
         .padding(.vertical, 14)
         .padding(.horizontal, 16)
-        .glassCard(cornerRadius: 18)
+        .vitaGlassCard(cornerRadius: 18)
         .overlay(
             // Selection highlight ring on top of D4 stroke (subtle when not selected).
             RoundedRectangle(cornerRadius: 18, style: .continuous)
