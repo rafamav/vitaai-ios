@@ -22,6 +22,8 @@ struct AtlasSceneScreen: View {
     var onBack: () -> Void
     var onAskVita: ((String) -> Void)?
 
+    @Environment(\.appContainer) private var container
+
     /// Single shared scene built once with lights + camera. Layers attach as
     /// child nodes (added/removed live), so toggling Ossos+Músculos keeps both
     /// in the same viewport without rebuilding anything.
@@ -67,6 +69,10 @@ struct AtlasSceneScreen: View {
     /// 1 = fully invisible. Lets the user see organs hidden behind organs in
     /// the splanchnology layer (or skin/muscle in stacked combinations).
     @State private var transparency: Double = 0
+    /// Dissect mode is OFF by default — the slider only appears after the
+    /// user taps "Dissecar" in the angle rail. Keeps the bottom of the
+    /// viewport clean for the 80% of users who never need transparency.
+    @State private var dissectMode: Bool = false
 
     var body: some View {
         // No opaque base — the AppRouter's VitaAmbientBackground shows through.
@@ -102,19 +108,22 @@ struct AtlasSceneScreen: View {
                     angleRail
                 }
 
-                // Bottom bar — transparency slider (always visible when scene
-                // has at least one layer) + first-time tap hint as a thin chip.
+                // Bottom bar — only the tap hint by default. Transparency slider
+                // appears below it ONLY when the user enabled "Dissecar" mode.
                 if scene != nil && !activeLayers.isEmpty {
                     VStack {
                         Spacer()
-                        if !hasTappedAnyMesh {
+                        if !hasTappedAnyMesh && !dissectMode {
                             emptyHint
                                 .padding(.bottom, 6)
                                 .allowsHitTesting(false)
                         }
-                        transparencyBar
-                            .padding(.horizontal, 14)
-                            .padding(.bottom, 18)
+                        if dissectMode {
+                            transparencyBar
+                                .padding(.horizontal, 14)
+                                .padding(.bottom, 18)
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
                     }
                 }
             }
@@ -148,20 +157,15 @@ struct AtlasSceneScreen: View {
             VitaSheet(detents: [.medium, .large]) {
                 MeshDetailSheet(
                     info: info,
-                    onAskVita: { customPrompt in
-                        VitaPostHogConfig.capture(event: "atlas_ask_vita", properties: [
+                    chatClient: container.chatClient,
+                    onExpandToFullChat: { customPrompt in
+                        VitaPostHogConfig.capture(event: "atlas_ask_vita_expand", properties: [
                             "layers": analyticsLayers,
                             "structure": info.pt,
                             "system": info.system,
-                            "prompt_chars": customPrompt.count,
-                            "edited": customPrompt != "Me explica sobre \(info.pt)",
                         ])
                         selectedMesh = nil
-                        // The mesh sheet now owns the prompt entirely (user may
-                        // have edited or dictated). buildAskVitaPrompt is only
-                        // used as a richer fallback if the user sends the
-                        // pristine seed and we want to expand it server-side —
-                        // for now we just pass the user's text through.
+                        // Hand off to the full chat screen with the same seed.
                         onAskVita?(customPrompt)
                     },
                     onHide: {
@@ -479,6 +483,54 @@ struct AtlasSceneScreen: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Vista \(angle.displayName)")
             }
+
+            // Thin separator between camera presets and the dissect toggle.
+            Rectangle()
+                .fill(Color.white.opacity(0.08))
+                .frame(width: 30, height: 0.5)
+                .padding(.vertical, 2)
+
+            // Dissecar — toggles the transparency slider at the bottom of the
+            // viewport. Off by default; on when the user wants to peek through
+            // outer layers (e.g. see ossos behind músculos).
+            Button {
+                UISelectionFeedbackGenerator().selectionChanged()
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    dissectMode.toggle()
+                    if !dissectMode { transparency = 0 }
+                }
+                VitaPostHogConfig.capture(event: "atlas_dissect_toggled", properties: [
+                    "to_active": dissectMode,
+                    "layers": analyticsLayers,
+                ])
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: dissectMode ? "rectangle.portrait.slash" : "scissors")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("Dissecar")
+                        .font(.system(size: 8, weight: .semibold))
+                }
+                .foregroundStyle(dissectMode ? VitaColors.accent : VitaColors.textSecondary)
+                .frame(width: 44, height: 38)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(dissectMode
+                              ? VitaColors.accent.opacity(0.18)
+                              : Color.white.opacity(0.04))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(dissectMode
+                                ? VitaColors.accent.opacity(0.5)
+                                : Color.white.opacity(0.06), lineWidth: 0.6)
+                )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Modo dissecar")
+            .accessibilityHint(dissectMode
+                ? "Toque pra desativar transparência"
+                : "Toque pra ativar slider de transparência")
+            .accessibilityAddTraits(dissectMode ? [.isSelected] : [])
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 8)
@@ -1194,17 +1246,34 @@ struct MeshInfo: Identifiable, Hashable {
     let curiosity: String?
 }
 
+/// One bubble inside the inline anatomy chat. Kept local on purpose —
+/// we don't need the heavy ChatMessage type from the main chat screen
+/// (no images, no feedback, no markdown render yet — just text).
+private struct AnatomyChatTurn: Identifiable {
+    let id = UUID()
+    let role: Role
+    var text: String
+    enum Role { case user, assistant }
+}
+
 private struct MeshDetailSheet: View {
     let info: MeshInfo
-    /// Receives the (possibly user-edited or voice-dictated) prompt and routes
-    /// it to VitaChatScreen. The sheet seeds the text with a sensible default,
-    /// the user can tweak or dictate, then taps send.
-    let onAskVita: (String) -> Void
+    /// Streams the chat reply directly into the sheet — we never leave the
+    /// atlas viewport. Acts as actor since VitaChatClient is one.
+    let chatClient: VitaChatClient
+    /// Used by the "expand" button to escape into the full VitaChatScreen
+    /// when the user wants more space / history / files. Optional.
+    let onExpandToFullChat: (String) -> Void
     let onHide: () -> Void
     let onClose: () -> Void
 
     @State private var prompt: String = ""
     @FocusState private var promptFocused: Bool
+    @State private var turns: [AnatomyChatTurn] = []
+    @State private var isStreaming: Bool = false
+    @State private var streamTask: Task<Void, Never>?
+    @State private var streamError: String?
+    @State private var conversationId: String?
 
     var body: some View {
         ScrollView {
@@ -1221,9 +1290,6 @@ private struct MeshDetailSheet: View {
                     }
                 }
 
-                // Only show system chip — the per-mesh exam priority field is
-                // unreliable in the legacy lookup, so we'd rather show nothing
-                // than mislead a student about whether radial artery cai em prova.
                 if !info.system.isEmpty {
                     Chip(label: systemLabel(info.system), color: VitaColors.accent.opacity(0.18))
                 }
@@ -1238,11 +1304,16 @@ private struct MeshDetailSheet: View {
                     sectionBlock("Curiosidade", content: curiosity, icon: "sparkles")
                 }
 
-                // VITA prompt composer — text seeded with the default question,
-                // mic on the left for voice, paperplane on the right to send.
+                // Inline chat: shows turns as they stream in. Composer always at
+                // the bottom of the sheet — user tweaks question, mic dictates,
+                // paperplane sends. We do NOT close the sheet; everything happens
+                // here. "Expand" icon escapes to VitaChatScreen if more room is
+                // wanted (history, attachments, etc.).
+                if !turns.isEmpty || streamError != nil {
+                    chatTranscript
+                }
                 askVitaComposer
 
-                // "Esconder esta peça" — same UX as web AtlasViewer (Scissors).
                 Button(action: onHide) {
                     HStack(spacing: 8) {
                         Image(systemName: "scissors")
@@ -1262,13 +1333,16 @@ private struct MeshDetailSheet: View {
             .padding(20)
         }
         .onAppear {
-            // Seed once per appearance; respects the user re-opening to change
-            // the question after a voice dictation.
             if prompt.isEmpty {
                 prompt = "Me explica sobre \(info.pt)"
             }
         }
+        .onDisappear {
+            streamTask?.cancel()
+        }
     }
+
+    // MARK: - Composer
 
     private var askVitaComposer: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -1276,10 +1350,29 @@ private struct MeshDetailSheet: View {
                 Image(systemName: "bubble.left.and.bubble.right.fill")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(VitaColors.accent)
-                Text("PERGUNTE À VITA")
+                Text(turns.isEmpty ? "PERGUNTE À VITA" : "CONTINUE A CONVERSA")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(VitaColors.textSecondary)
                     .kerning(0.5)
+                Spacer()
+                if !turns.isEmpty {
+                    Button {
+                        // Hand off the conversation to the full chat screen,
+                        // passing the latest user prompt as the seed (the full
+                        // history is server-side under conversationId).
+                        let lastUser = turns.last(where: { $0.role == .user })?.text
+                            ?? "Me explica sobre \(info.pt)"
+                        onExpandToFullChat(lastUser)
+                    } label: {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(VitaColors.textSecondary)
+                            .padding(6)
+                            .background(Circle().fill(.ultraThinMaterial))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Abrir conversa completa com VITA")
+                }
             }
 
             HStack(alignment: .center, spacing: 8) {
@@ -1287,8 +1380,6 @@ private struct MeshDetailSheet: View {
                     onTranscript: { text in
                         let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
                         guard !clean.isEmpty else { return }
-                        // Replace seeded text with what the user actually said —
-                        // they tapped mic to dictate a NEW question, not append.
                         prompt = clean
                         promptFocused = false
                     }
@@ -1305,21 +1396,22 @@ private struct MeshDetailSheet: View {
                 .focused($promptFocused)
                 .submitLabel(.send)
                 .onSubmit { submit() }
+                .disabled(isStreaming)
 
                 Button(action: submit) {
-                    Image(systemName: "paperplane.fill")
+                    Image(systemName: isStreaming ? "stop.fill" : "paperplane.fill")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(canSend ? .white : VitaColors.textSecondary)
+                        .foregroundStyle(canSendOrStop ? .white : VitaColors.textSecondary)
                         .frame(width: 36, height: 36)
                         .background(
                             Circle().fill(
-                                canSend ? VitaColors.accent : VitaColors.glassBg
+                                canSendOrStop ? VitaColors.accent : VitaColors.glassBg
                             )
                         )
                 }
                 .buttonStyle(.plain)
-                .disabled(!canSend)
-                .accessibilityLabel("Enviar pergunta pra VITA")
+                .disabled(!canSendOrStop)
+                .accessibilityLabel(isStreaming ? "Parar resposta" : "Enviar pergunta")
             }
             .padding(10)
             .background(
@@ -1333,15 +1425,106 @@ private struct MeshDetailSheet: View {
         }
     }
 
-    private var canSend: Bool {
-        !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    // MARK: - Transcript
+
+    private var chatTranscript: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(turns) { turn in
+                HStack(alignment: .top, spacing: 8) {
+                    if turn.role == .user {
+                        Spacer(minLength: 32)
+                        Text(turn.text)
+                            .font(.system(size: 14))
+                            .foregroundStyle(VitaColors.textPrimary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 9)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(VitaColors.accent.opacity(0.18))
+                            )
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    } else {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(VitaColors.accent)
+                            .frame(width: 22, height: 22)
+                            .background(Circle().fill(VitaColors.accent.opacity(0.12)))
+                            .padding(.top, 2)
+                        Text(turn.text.isEmpty ? "…" : turn.text)
+                            .font(.system(size: 14))
+                            .foregroundStyle(VitaColors.textPrimary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            if let err = streamError {
+                Text("⚠︎ \(err)")
+                    .font(.system(size: 12))
+                    .foregroundStyle(VitaColors.dataRed)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Actions
+
+    private var canSendOrStop: Bool {
+        if isStreaming { return true }
+        return !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func submit() {
+        if isStreaming {
+            // Stop button — cancel the in-flight stream.
+            streamTask?.cancel()
+            isStreaming = false
+            UISelectionFeedbackGenerator().selectionChanged()
+            return
+        }
         let final = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !final.isEmpty else { return }
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
-        onAskVita(final)
+
+        // Append turns optimistically so the UI feels instant.
+        turns.append(AnatomyChatTurn(role: .user, text: final))
+        let assistantId = AnatomyChatTurn(role: .assistant, text: "")
+        turns.append(assistantId)
+        let assistantIndex = turns.count - 1
+        prompt = ""
+        promptFocused = false
+        streamError = nil
+        isStreaming = true
+
+        let convId = conversationId
+        streamTask = Task { @MainActor in
+            do {
+                let stream = await chatClient.streamChat(
+                    message: final,
+                    conversationId: convId
+                )
+                for try await event in stream {
+                    if Task.isCancelled { break }
+                    switch event {
+                    case .textDelta(let chunk):
+                        if assistantIndex < turns.count {
+                            turns[assistantIndex].text += chunk
+                        }
+                    case .messageStop(let cid):
+                        if let cid { conversationId = cid }
+                    case .toolProgress:
+                        break
+                    case .error(let msg):
+                        streamError = msg
+                    }
+                }
+            } catch is CancellationError {
+                // user pressed stop — keep partial text as-is
+            } catch {
+                streamError = error.localizedDescription
+            }
+            isStreaming = false
+        }
     }
 
     @ViewBuilder
@@ -1635,17 +1818,31 @@ private struct AnatomySceneView: UIViewRepresentable {
                 }
             }
         }
-        // Global transparency — applied at each layer container so it cascades
-        // to children automatically (SCNNode.opacity multiplies down). Lights,
-        // camera, and the highlight node skip this loop.
+        // Global transparency — has to fight depth-buffer write or the GPU
+        // will discard pixels behind a translucent mesh BEFORE blending. We
+        // set writesToDepthBuffer=false on every material when opacity<1 so
+        // the inner skeleton stays visible through translucent muscle layers.
+        // Reverts cleanly when opacity returns to 1 (depth write back on).
         if abs(transparency - context.coordinator.lastTransparency) > 0.001 {
             context.coordinator.lastTransparency = transparency
-            let opacity = CGFloat(1.0 - transparency)
+            let alpha = CGFloat(1.0 - transparency)
+            let translucent = alpha < 0.999
             SCNTransaction.begin()
             SCNTransaction.animationDuration = 0.18
-            for node in scene.rootNode.childNodes
-                where (node.name ?? "").hasPrefix("layer-") {
-                node.opacity = opacity
+            for layerNode in scene.rootNode.childNodes
+                where (layerNode.name ?? "").hasPrefix("layer-") {
+                layerNode.enumerateHierarchy { n, _ in
+                    guard let geom = n.geometry else { return }
+                    for material in geom.materials {
+                        material.transparency = alpha
+                        material.transparencyMode = .singleLayer
+                        material.blendMode = .alpha
+                        material.readsFromDepthBuffer = true
+                        // Critical: when translucent, DON'T write depth — lets
+                        // ossos behind músculos render through the muscle.
+                        material.writesToDepthBuffer = !translucent
+                    }
+                }
             }
             SCNTransaction.commit()
         }
