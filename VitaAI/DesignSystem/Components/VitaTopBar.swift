@@ -18,6 +18,7 @@ struct VitaTopBar: View {
     var xpToast: VitaXpToastState?
     var notificationCount: Int = 0
     var onAvatarTap: (() -> Void)?
+    var onBellTap: (() -> Void)?
     var onMenuTap: (() -> Void)?
 
     @State private var xpGainedText: String?
@@ -116,7 +117,7 @@ struct VitaTopBar: View {
                 if !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.system(size: 10.5))
-                        .foregroundStyle(Color.white.opacity(0.60))
+                        .foregroundStyle(Color.white.opacity(0.35))
                         .lineLimit(1)
                 }
             }
@@ -124,9 +125,14 @@ struct VitaTopBar: View {
 
             Spacer()
 
-            navButton(icon: "line.3.horizontal", badgeCount: notificationCount) { onMenuTap?() }
-                .accessibilityLabel("Menu")
-                .accessibilityIdentifier("menuButton")
+            HStack(spacing: 6) {
+                navButton(icon: "bell", badgeCount: notificationCount) { onBellTap?() }
+                    .accessibilityLabel("Notificações")
+                    .accessibilityIdentifier("bellButton")
+                navButton(icon: "line.3.horizontal") { onMenuTap?() }
+                    .accessibilityLabel("Menu")
+                    .accessibilityIdentifier("menuButton")
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)

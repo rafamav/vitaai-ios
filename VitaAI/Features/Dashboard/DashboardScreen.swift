@@ -210,12 +210,7 @@ struct DashboardScreen: View {
         .onAppear {
             heroCardCount = cardCount
             heroTimer?.invalidate()
-            // Em "fogo" (danger tone no card 0), trava no card urgente — sem rotação,
-            // ansiedade real merece atenção. Senão rotaciona 6s/card. Apple TV usa
-            // padrão similar com episódios novos de séries que tu segue.
-            let pauseRotation = viewModel.heroCards.first?.labelTone == .danger
-            guard !pauseRotation, cardCount > 1 else { return }
-            heroTimer = Timer.scheduledTimer(withTimeInterval: 6, repeats: true) { _ in
+            heroTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { _ in
                 Task { @MainActor in
                     withAnimation(.easeInOut(duration: 0.4)) {
                         heroIndex = (heroIndex + 1) % heroCardCount

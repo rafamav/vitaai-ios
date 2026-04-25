@@ -220,6 +220,10 @@ struct MainTabView: View {
                         xpToast: container.gamificationEvents.xpToast,
                         notificationCount: pushManager.unreadNotificationCount,
                         onAvatarTap: { router.selectedTab = .progresso },
+                        onBellTap: {
+                            showMenuPopout = false
+                            withAnimation(.spring(duration: 0.3, bounce: 0.12)) { showNotifPopout.toggle() }
+                        },
                         onMenuTap: {
                             withAnimation(.spring(duration: 0.3, bounce: 0.12)) { showNotifPopout = false }
                             showMenuPopout.toggle()
