@@ -27,6 +27,10 @@ struct AtlasSceneScreen: View {
     @State private var errorMessage: String?
     @State private var loadAttempt = 0
     @State private var lookup: [String: MeshInfo] = [:]
+    /// Lowercased-key mirror of `lookup` so we can match GLB mesh names that
+    /// disagree with the catalogue on case (frequent — anatomy lookups Title
+    /// Case, GLB exports often lowercase or all-caps).
+    @State private var lookupCI: [String: MeshInfo] = [:]
     @State private var selectedMesh: MeshInfo?
     @State private var resetTrigger = 0
     @State private var currentLayer: AtlasLayer = .arthrology
@@ -130,38 +134,26 @@ struct AtlasSceneScreen: View {
         .trackScreen("Atlas3D")
     }
 
-    private func handleMeshTap(_ meshName: String) {
-        let resolved = resolveMeshLookup(meshName)
+    private func handleMeshTap(_ candidates: [String]) {
+        let resolved = resolveMeshLookup(candidates: candidates)
         selectedMesh = resolved.info
         hasTappedAnyMesh = true
         VitaPostHogConfig.capture(event: "atlas_mesh_tapped", properties: [
             "layer": currentLayer.rawValue,
-            "mesh_name": meshName,
+            "mesh_name": candidates.first ?? "",
+            "candidates_count": candidates.count,
+            "matched_via": resolved.matchedVia,
             "has_lookup": resolved.hit,
             "lateralidade": resolved.lateralidade ?? "none",
             "pt_name": resolved.info.pt,
         ])
     }
 
-    /// Mesh names from GLBs come polluted: `Radial artery_l`, `Femur.j.002`,
-    /// `Carpal bones_03`. Strip those suffixes — first try the original key,
-    /// then progressively cleaner variants — so we land on the lookup entry.
-    /// Track the lateralidade so the sheet can append "(esquerda)/(direita)".
-    private func resolveMeshLookup(_ meshName: String) -> (info: MeshInfo, hit: Bool, lateralidade: String?) {
-        var lateralidade: String?
-
-        // 1) Direct hit (rare but possible if the GLB matches the lookup key exactly)
-        if let direct = lookup[meshName] {
-            return (direct, true, nil)
-        }
-
-        // 2) Strip GLTFKit2 instance suffixes (.j.NNN, _NNN)
-        var candidate = meshName
-            .replacingOccurrences(of: #"\.j\.\d+$"#, with: "", options: .regularExpression)
-            .replacingOccurrences(of: #"_\d+$"#, with: "", options: .regularExpression)
-        if let hit = lookup[candidate] { return (hit, true, nil) }
-
-        // 3) Strip side markers (_l, _r, _left, _right, _sup, _inf, _med, _lat)
+    /// Try every ancestor name and the geometry name, with progressive stripping
+    /// (instance suffix → side marker → case-insensitive). Lateralidade is
+    /// extracted from whichever candidate carried it, so the sheet shows
+    /// "Fáscia antebraquial (esquerda)" even when the lookup key is bilateral.
+    private func resolveMeshLookup(candidates: [String]) -> (info: MeshInfo, hit: Bool, lateralidade: String?, matchedVia: String) {
         let sideMatchers: [(pattern: String, label: String)] = [
             (#"[_\.\s]+(left|l)$"#,    "esquerda"),
             (#"[_\.\s]+(right|r)$"#,   "direita"),
@@ -172,47 +164,83 @@ struct AtlasSceneScreen: View {
             (#"[_\.\s]+(anterior|ant)$"#,  "anterior"),
             (#"[_\.\s]+(posterior|post)$"#, "posterior"),
         ]
+
+        // For each candidate, run strategies from most specific to most general.
+        // First win across candidates breaks the loop.
+        for raw in candidates {
+            // Strategy 1: exact key (handles "Antebrachial fascia.l" already in lookup)
+            if let hit = lookup[raw] {
+                return (hit, true, nil, "exact")
+            }
+            if let hit = lookupCI[raw.lowercased()] {
+                return (hit, true, nil, "exact-ci")
+            }
+
+            // Strategy 2: strip instance suffixes
+            let stripped = raw
+                .replacingOccurrences(of: #"\.[joJOgcGC]\.\d+$"#, with: "", options: .regularExpression)
+                .replacingOccurrences(of: #"\.\d+$"#, with: "", options: .regularExpression)
+                .replacingOccurrences(of: #"_\d+$"#, with: "", options: .regularExpression)
+            if stripped != raw {
+                if let hit = lookup[stripped] {
+                    return (hit, true, nil, "stripped")
+                }
+                if let hit = lookupCI[stripped.lowercased()] {
+                    return (hit, true, nil, "stripped-ci")
+                }
+            }
+
+            // Strategy 3: also strip side, capture lateralidade
+            var sideStripped = stripped
+            var lateralidade: String?
+            for (pattern, label) in sideMatchers {
+                if let range = sideStripped.range(of: pattern, options: [.regularExpression, .caseInsensitive]) {
+                    sideStripped.removeSubrange(range)
+                    lateralidade = label
+                    break
+                }
+            }
+            if sideStripped != stripped {
+                let baseHit = lookup[sideStripped] ?? lookupCI[sideStripped.lowercased()]
+                if let hit = baseHit {
+                    let label = lateralidade.map { "\(hit.pt) (\($0))" } ?? hit.pt
+                    let enriched = MeshInfo(
+                        id: hit.id, pt: label, en: hit.en, system: hit.system,
+                        exam: hit.exam, description: hit.description,
+                        tip: hit.tip, curiosity: hit.curiosity
+                    )
+                    return (enriched, true, lateralidade, "side-stripped")
+                }
+            }
+        }
+
+        // Last resort: prettify the most specific candidate name.
+        let raw = candidates.first ?? ""
+        let stripped = raw
+            .replacingOccurrences(of: #"\.[joJOgcGC]\.\d+$"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"\.\d+$"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"_\d+$"#, with: "", options: .regularExpression)
+        var lateralidade: String?
+        var sideStripped = stripped
         for (pattern, label) in sideMatchers {
-            if let range = candidate.range(of: pattern, options: [.regularExpression, .caseInsensitive]) {
-                candidate.removeSubrange(range)
+            if let range = sideStripped.range(of: pattern, options: [.regularExpression, .caseInsensitive]) {
+                sideStripped.removeSubrange(range)
                 lateralidade = label
                 break
             }
         }
-        if let hit = lookup[candidate] {
-            let suffixed = lateralidade.map { "\(hit.pt) (\($0))" } ?? hit.pt
-            let enrich = MeshInfo(
-                id: hit.id,
-                pt: suffixed,
-                en: hit.en,
-                system: hit.system,
-                exam: hit.exam,
-                description: hit.description,
-                tip: hit.tip,
-                curiosity: hit.curiosity
-            )
-            return (enrich, true, lateralidade)
-        }
-
-        // 4) Try title-cased variant (lookup keys are usually capitalized)
-        let titleCased = candidate.split(separator: " ").enumerated().map { idx, word -> String in
-            idx == 0 ? word.prefix(1).uppercased() + word.dropFirst() : String(word)
-        }.joined(separator: " ")
-        if let hit = lookup[titleCased] { return (hit, true, lateralidade) }
-
-        // 5) Fallback: surface a clean label, no fake exam priority
-        atlasLog.notice("[Atlas] tap mesh '\(meshName, privacy: .public)' → '\(candidate, privacy: .public)' no lookup hit")
+        atlasLog.notice("[Atlas] mesh miss — tried \(candidates.count) candidates, first='\(raw, privacy: .public)' fallback='\(sideStripped, privacy: .public)'")
         let fallback = MeshInfo(
-            id: candidate,
-            pt: prettify(candidate, lateralidade: lateralidade),
-            en: candidate,
+            id: sideStripped,
+            pt: prettify(sideStripped, lateralidade: lateralidade),
+            en: sideStripped,
             system: currentLayer.rawValue,
-            exam: "",   // empty = chip hidden
+            exam: "",
             description: nil,
             tip: nil,
             curiosity: nil
         )
-        return (fallback, false, lateralidade)
+        return (fallback, false, lateralidade, "fallback")
     }
 
     /// Compose a self-contained prompt the chat LLM can act on without needing
@@ -576,8 +604,18 @@ struct AtlasSceneScreen: View {
                                         description: nil, tip: nil, curiosity: nil)
                 }
             }
-            await MainActor.run { self.lookup = out }
-            atlasLog.notice("[Atlas] lookup loaded: \(out.count) entries")
+            // Build a case-insensitive index (key.lowercased() → MeshInfo) so
+            // mesh names whose case drifted from the catalogue still resolve.
+            var ciIndex: [String: MeshInfo] = [:]
+            ciIndex.reserveCapacity(out.count)
+            for (k, v) in out {
+                ciIndex[k.lowercased()] = v
+            }
+            await MainActor.run {
+                self.lookup = out
+                self.lookupCI = ciIndex
+            }
+            atlasLog.notice("[Atlas] lookup loaded: \(out.count) entries (+\(ciIndex.count) CI)")
         } catch {
             atlasLog.error("[Atlas] lookup load failed: \(error.localizedDescription, privacy: .public)")
         }
@@ -1159,7 +1197,7 @@ private struct AnatomySceneView: UIViewRepresentable {
     let resetTrigger: Int
     let angleTrigger: Int
     let anglePreset: AtlasCameraAngle
-    let onMeshTap: (String) -> Void
+    let onMeshTap: ([String]) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(onMeshTap: onMeshTap) }
 
@@ -1269,7 +1307,7 @@ private struct AnatomySceneView: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject {
-        let onMeshTap: (String) -> Void
+        let onMeshTap: ([String]) -> Void
         var initialCameraPosition = SCNVector3Zero
         var cameraTarget = SCNVector3Zero
         var lastResetTrigger = 0
@@ -1278,7 +1316,7 @@ private struct AnatomySceneView: UIViewRepresentable {
         private weak var lastSelected: SCNNode?
         private var lastSelectedOriginalMaterials: [SCNMaterial] = []
 
-        init(onMeshTap: @escaping (String) -> Void) { self.onMeshTap = onMeshTap }
+        init(onMeshTap: @escaping ([String]) -> Void) { self.onMeshTap = onMeshTap }
 
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
             guard let view = gesture.view as? SCNView else { return }
@@ -1292,22 +1330,31 @@ private struct AnatomySceneView: UIViewRepresentable {
                 clearHighlight()
                 return
             }
-            // Climb to the first named ancestor (GLTFKit2 often leaves mesh names on parents).
-            var node: SCNNode? = hit.node
-            var name: String?
-            while let n = node {
-                if let nm = n.name, !nm.isEmpty, nm != "AtlasCamera" {
-                    name = nm
-                    break
-                }
-                node = n.parent
+
+            // GLTFKit2 stores names on the geometry, the leaf node, and the parent
+            // chain — and which one carries the lookup key (e.g. "X.l") varies by
+            // mesh. Collect ALL of them so the resolver can try the most specific
+            // first. Order: geometry → self → climb to root.
+            var candidates: [String] = []
+            if let geomName = hit.node.geometry?.name, !geomName.isEmpty {
+                candidates.append(geomName)
             }
-            guard let picked = node, let pickedName = name else { return }
+            var cursor: SCNNode? = hit.node
+            while let n = cursor {
+                if let nm = n.name, !nm.isEmpty, nm != "AtlasCamera" {
+                    candidates.append(nm)
+                }
+                cursor = n.parent
+            }
+            guard !candidates.isEmpty else {
+                clearHighlight()
+                return
+            }
 
             // Tactile confirmation — feels like selecting a physical surface.
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            highlight(picked)
-            onMeshTap(pickedName)
+            highlight(hit.node)
+            onMeshTap(candidates)
         }
 
         private func highlight(_ node: SCNNode) {
