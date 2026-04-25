@@ -165,12 +165,13 @@ struct PdfViewerScreen: View {
         .onDisappear { viewModel.saveAllAnnotations() }
         .navigationBarHidden(true)
         .ignoresSafeArea(.keyboard)
-        // Fullscreen: hide status bar + home indicator. Propagate immersive state
-        // to AppRouter via preference so it hides TopBar + TabBar + breadcrumb.
+        // PDF é experiência imersiva — esconde TopBar + Breadcrumb + TabBar
+        // assim que abre (não só em fullscreen). Botão back fica no header
+        // interno (ícone casa). Status bar e safe-area só somem em fullscreen real.
         .statusBarHidden(isFullscreen)
         .persistentSystemOverlays(isFullscreen ? .hidden : .automatic)
         .ignoresSafeArea(isFullscreen ? .all : [])
-        .preference(key: ImmersivePreferenceKey.self, value: isFullscreen)
+        .preference(key: ImmersivePreferenceKey.self, value: true)
         // vita-modals-ignore: ShareSheet (UIActivityViewController) é UIKit wrapper, não SwiftUI content — VitaSheet quebra a apresentação nativa do share dialog
         .sheet(isPresented: $showExportSheet) {
             if let exportedURL {
