@@ -46,7 +46,11 @@ targets:
         NSMicrophoneUsageDescription: "VitaAI precisa do microfone para gravar suas aulas e gerar transcricoes automaticas."
         NSSpeechRecognitionUsageDescription: "VitaAI usa reconhecimento de fala para transcrever suas aulas em tempo real."
         UIBackgroundModes:
+          - fetch
+          - processing
           - remote-notification
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.bymav.vitaai.refresh
         UILaunchScreen: {}
         UIRequiresFullScreen: true
         UISupportedInterfaceOrientations:
