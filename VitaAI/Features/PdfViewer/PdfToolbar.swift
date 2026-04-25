@@ -274,6 +274,11 @@ struct PdfToolbar: View {
                         Label("Marcações salvas", systemImage: "bookmark.circle")
                     }
                 }
+                if let onShowOutline {
+                    Button(action: onShowOutline) {
+                        Label("Sumário (TOC)", systemImage: "list.bullet.indent")
+                    }
+                }
             } label: {
                 Image(systemName: "chevron.down.circle")
                     .font(.system(size: 16))

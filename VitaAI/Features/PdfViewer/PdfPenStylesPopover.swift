@@ -149,7 +149,10 @@ struct PdfPenStylesPopover: View {
     private func styleChip(_ style: PdfPenStyle) -> some View {
         let active = (style == currentStyle)
         Button {
-            styleRaw = style.rawValue
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            withAnimation(.easeInOut(duration: 0.18)) {
+                styleRaw = style.rawValue
+            }
             apply()
         } label: {
             VStack(spacing: 4) {
@@ -171,6 +174,8 @@ struct PdfPenStylesPopover: View {
                     .stroke(active ? VitaColors.accent.opacity(0.6) : Color.white.opacity(0.08), lineWidth: 0.8)
             )
             .foregroundStyle(active ? VitaColors.accent : VitaColors.textSecondary)
+            .scaleEffect(active ? 1.03 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.75), value: active)
         }
         .buttonStyle(.plain)
     }
@@ -180,6 +185,7 @@ struct PdfPenStylesPopover: View {
         let hex = color.toHex() ?? ""
         let active = hex.lowercased() == colorHex.lowercased()
         Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             colorHex = hex
             apply()
         } label: {
@@ -192,6 +198,8 @@ struct PdfPenStylesPopover: View {
                             lineWidth: active ? 2.5 : 0.8)
                     .frame(width: 28, height: 28)
             }
+            .scaleEffect(active ? 1.15 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: active)
         }
         .buttonStyle(.plain)
     }
@@ -249,6 +257,7 @@ struct PdfHighlightColorPopover: View {
         let hex = color.toHex() ?? ""
         let active = hex.lowercased() == colorHex.lowercased()
         Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             colorHex = hex
             applyCurrent()
         } label: {
@@ -261,6 +270,8 @@ struct PdfHighlightColorPopover: View {
                             lineWidth: active ? 2.5 : 0.8)
                     .frame(width: 48, height: 36)
             }
+            .scaleEffect(active ? 1.08 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: active)
         }
         .buttonStyle(.plain)
     }
