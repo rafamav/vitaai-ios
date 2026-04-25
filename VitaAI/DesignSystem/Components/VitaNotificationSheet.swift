@@ -32,6 +32,26 @@ struct VitaNotification: Identifiable, Decodable {
         }
     }
 
+    /// SF Symbol matching `type` — used by VitaNotifPopout pra render gold-tinted
+    /// icons em vez de emoji (alinha com paleta monocromática gold do app).
+    var sfSymbol: String {
+        switch type {
+        case "gradePosted": return "chart.bar.fill"
+        case "examAlert", "exam": return "doc.text.fill"
+        case "assignment": return "list.clipboard.fill"
+        case "seminar": return "mic.fill"
+        case "attendanceAlert": return "exclamationmark.triangle.fill"
+        case "newMaterial": return "books.vertical.fill"
+        case "badge": return "trophy.fill"
+        case "streak": return "flame.fill"
+        case "flashcard", "flashcardDue": return "rectangle.stack.fill"
+        case "reminder", "studyPlan": return "alarm.fill"
+        case "deadline": return "hourglass"
+        case "vitaInsight": return "lightbulb.fill"
+        default: return "bell.fill"
+        }
+    }
+
     var relativeTime: String {
         guard let createdAt, let date = Self.parseDate(createdAt) else {
             return time ?? ""

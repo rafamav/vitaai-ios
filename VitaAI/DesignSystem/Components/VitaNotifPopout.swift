@@ -64,17 +64,17 @@ struct VitaNotifPopout: View {
             // Header
             HStack(spacing: 8) {
                 Text("Notificações")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(0.96))
+                    .font(VitaTypography.titleMedium)
+                    .foregroundStyle(VitaColors.textPrimary)
 
                 if unreadCount > 0 {
                     Text("\(unreadCount)")
-                        .font(.system(size: 10, weight: .bold))
+                        .font(VitaTypography.labelSmall)
                         .foregroundStyle(VitaColors.surface)
-                        .padding(.horizontal, 6)
+                        .padding(.horizontal, 7)
                         .padding(.vertical, 2)
                         .background(
-                            Capsule().fill(VitaColors.accentHover)
+                            Capsule().fill(VitaColors.accentHover.opacity(0.92))
                         )
                 }
 
@@ -83,7 +83,7 @@ struct VitaNotifPopout: View {
                 if unreadCount > 0 {
                     Button(action: { markAllRead() }) {
                         Text("Marcar lidas")
-                            .font(.system(size: 12, weight: .medium))
+                            .font(VitaTypography.labelMedium)
                             .foregroundStyle(VitaColors.accentHover.opacity(0.90))
                     }
                     .buttonStyle(.plain)
@@ -91,8 +91,8 @@ struct VitaNotifPopout: View {
 
                 Button(action: { dismiss(); onSettingsTap() }) {
                     Image(systemName: "gearshape")
-                        .font(.system(size: 12))
-                        .foregroundStyle(VitaColors.textTertiary)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(VitaColors.accent.opacity(0.65))
                         .frame(width: 28, height: 28)
                         .contentShape(Rectangle())
                 }
@@ -173,68 +173,78 @@ struct VitaNotifPopout: View {
     }
 
     private func notifRow(_ item: VitaNotification) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text(item.icon)
-                .font(.system(size: 18))
-                .frame(width: 24)
+        HStack(alignment: .top, spacing: 12) {
+            // Gold icon medallion — D4 carved feel
+            ZStack {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                VitaColors.accentHover.opacity(item.read ? 0.10 : 0.18),
+                                VitaColors.accent.opacity(item.read ? 0.06 : 0.10)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .stroke(VitaColors.accentHover.opacity(item.read ? 0.12 : 0.22), lineWidth: 0.6)
+                    )
+                Image(systemName: item.sfSymbol)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(item.read ? VitaColors.accent.opacity(0.55) : VitaColors.accentHover.opacity(0.95))
+            }
+            .frame(width: 32, height: 32)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(item.read ? Color.white.opacity(0.68) : Color.white.opacity(0.96))
+                    .font(VitaTypography.titleSmall)
+                    .foregroundStyle(item.read ? VitaColors.textPrimary.opacity(0.70) : VitaColors.textPrimary)
                     .lineLimit(1)
 
                 Text(item.description)
-                    .font(.system(size: 13, weight: .regular))
-                    .foregroundStyle(Color.white.opacity(item.read ? 0.55 : 0.80))
+                    .font(VitaTypography.bodySmall)
+                    .foregroundStyle(item.read ? VitaColors.textSecondary.opacity(0.85) : VitaColors.textSecondary)
                     .lineLimit(2)
             }
 
-            Spacer()
+            Spacer(minLength: 6)
 
             Text(item.relativeTime)
-                .font(.system(size: 11, weight: .regular))
-                .foregroundStyle(Color.white.opacity(0.50))
+                .font(VitaTypography.labelSmall)
+                .foregroundStyle(VitaColors.textTertiary)
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.071, green: 0.055, blue: 0.039).opacity(0.60),
-                            Color(red: 0.055, green: 0.043, blue: 0.031).opacity(0.55)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(
-                            item.read
-                                ? VitaColors.accentHover.opacity(0.04)
-                                : VitaColors.accentHover.opacity(0.12),
-                            lineWidth: 1
-                        )
-                )
-        )
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .glassCard(cornerRadius: 14)
     }
 
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "bell.slash")
-                .font(.system(size: 24))
-                .foregroundStyle(VitaColors.textTertiary)
+        VStack(spacing: 10) {
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [VitaColors.accentHover.opacity(0.18), .clear],
+                            center: .center,
+                            startRadius: 2,
+                            endRadius: 28
+                        )
+                    )
+                    .frame(width: 56, height: 56)
+                Image(systemName: "bell.slash.fill")
+                    .font(.system(size: 22, weight: .medium))
+                    .foregroundStyle(VitaColors.accentHover.opacity(0.75))
+            }
             Text("Tudo em dia!")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(Color.white.opacity(0.80))
-            Text("Nenhuma notificação.")
-                .font(.system(size: 12, weight: .regular))
-                .foregroundStyle(Color.white.opacity(0.55))
+                .font(VitaTypography.titleSmall)
+                .foregroundStyle(VitaColors.textPrimary.opacity(0.92))
+            Text("Nenhuma notificação por agora.")
+                .font(VitaTypography.bodySmall)
+                .foregroundStyle(VitaColors.textSecondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 32)
