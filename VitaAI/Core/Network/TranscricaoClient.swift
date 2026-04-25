@@ -20,6 +20,12 @@ struct TranscricaoEntry: Identifiable {
     var fileName: String?
     var fileSize: Int?
     var createdAt: String?
+    /// User-toggled favorite (via PATCH studio/sources/:id). Optional —
+    /// backend pode não enviar em respostas legadas; client trata como false.
+    var favorite: Bool?
+    /// Custom user folder ID (studio_folders.id). Quando set, gravação
+    /// aparece dentro daquela pasta no header chip.
+    var folderId: String?
 
     var isTranscribed: Bool {
         let s = status?.lowercased() ?? ""
@@ -82,6 +88,8 @@ extension TranscricaoEntry: Decodable {
         fileName = try? c.decode(String.self, forKey: RawKey(stringValue: "fileName")!)
         fileSize = try? c.decode(Int.self, forKey: RawKey(stringValue: "fileSize")!)
         createdAt = try? c.decode(String.self, forKey: RawKey(stringValue: "createdAt")!)
+        favorite = try? c.decode(Bool.self, forKey: RawKey(stringValue: "favorite")!)
+        folderId = try? c.decode(String.self, forKey: RawKey(stringValue: "folderId")!)
 
         // Debug: dump all keys in the JSON to find what's actually there
         let allKeys = c.allKeys.map { $0.stringValue }

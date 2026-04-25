@@ -350,6 +350,17 @@ struct TranscricaoLiveTranscriptBox: View {
     }
 }
 
+// MARK: - List view mode (chips: Todas / Favoritas / Pastas)
+
+/// Sub-view filter aplicado pelas chips horizontais no header. Combina
+/// com `selectedFilter` (disciplina, do filtro avançado) — ambos têm que
+/// passar pra gravação aparecer.
+enum TranscricaoListView: Equatable {
+    case all
+    case favorites
+    case folder(id: String)
+}
+
 // MARK: - Recordings List Section (data from API)
 
 struct TranscricaoRecordingsListSection: View {
@@ -357,6 +368,9 @@ struct TranscricaoRecordingsListSection: View {
     let isLoading: Bool
     @Binding var selectedFilter: String?
     let filterChips: [String]
+    @Binding var listView: TranscricaoListView
+    let folders: [VitaAPI.StudioFolder]
+    let onCreateFolder: () -> Void
     let onTap: (TranscricaoEntry) -> Void
     let onDelete: (TranscricaoEntry) -> Void
     /// Context menu action: dispara geração direto (summary, flashcards, questions,
@@ -371,8 +385,21 @@ struct TranscricaoRecordingsListSection: View {
     @State private var renameValue: String = ""
 
     private var filteredRecordings: [TranscricaoEntry] {
-        guard let filter = selectedFilter else { return recordings }
-        return recordings.filter { $0.discipline?.uppercased() == filter.uppercased() }
+        var items = recordings
+        // Step 1 — chip de view (Todas / ⭐ / 📁 pasta)
+        switch listView {
+        case .all:
+            break
+        case .favorites:
+            items = items.filter { $0.favorite == true }
+        case .folder(let id):
+            items = items.filter { $0.folderId == id }
+        }
+        // Step 2 — filtro disciplina (sheet avançado, opcional)
+        if let filter = selectedFilter {
+            items = items.filter { $0.discipline?.uppercased() == filter.uppercased() }
+        }
+        return items
     }
 
     // Group recordings by date bucket
@@ -407,6 +434,11 @@ struct TranscricaoRecordingsListSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // Chips horizontais — Todas / ⭐ Favoritas / 📁 Pastas / + Nova.
+            // Padrão Apple Notes/Files: scroll horizontal pra navegar sem sair
+            // da tela principal.
+            viewModeChips
+
             // Header: "GRAVAÇÕES · N" + botão filtro à direita (padrão Apple
             // Mail/Notes). Quando filtro ativo, mostra pill removível.
             HStack(spacing: 6) {
@@ -616,6 +648,91 @@ struct TranscricaoRecordingsListSection: View {
             }
             .disabled(renameValue.trimmingCharacters(in: .whitespaces).isEmpty)
         }
+    }
+
+    /// Scroll horizontal de chips — Todas / ⭐ Favoritas / 📁 Pastas / + Nova.
+    /// Estilo Apple Notes: indicação visual qual está selecionada (gold fill),
+    /// outras ficam outlined. Tap troca filtro instantâneo (sem reload).
+    @ViewBuilder
+    private var viewModeChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                viewChip(
+                    label: "Todas",
+                    icon: "tray.full",
+                    isSelected: listView == .all
+                ) { listView = .all }
+
+                viewChip(
+                    label: "Favoritas",
+                    icon: "star.fill",
+                    isSelected: listView == .favorites
+                ) { listView = .favorites }
+
+                ForEach(folders) { folder in
+                    viewChip(
+                        label: folder.name,
+                        icon: folder.icon ?? "folder.fill",
+                        isSelected: listView == .folder(id: folder.id)
+                    ) { listView = .folder(id: folder.id) }
+                }
+
+                // CTA "Nova pasta" — sempre por último, abre alert TextField.
+                Button(action: onCreateFolder) {
+                    HStack(spacing: 5) {
+                        Image(systemName: "plus.circle")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("Nova pasta")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(VitaColors.accentLight)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 7)
+                    .background(
+                        Capsule()
+                            .strokeBorder(VitaColors.accent.opacity(0.32), style: StrokeStyle(lineWidth: 0.8, dash: [3, 3]))
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 2)
+        }
+        .padding(.bottom, 4)
+    }
+
+    private func viewChip(
+        label: String,
+        icon: String,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+            withAnimation(.easeInOut(duration: 0.18)) { action() }
+        }) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 10, weight: .semibold))
+                Text(label)
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(isSelected ? Color.black : VitaColors.textWarm.opacity(0.85))
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
+            .background(
+                Capsule().fill(
+                    isSelected ? VitaColors.accentLight : VitaColors.accent.opacity(0.10)
+                )
+            )
+            .overlay(
+                Capsule().strokeBorder(
+                    isSelected ? Color.clear : VitaColors.accent.opacity(0.22),
+                    lineWidth: 0.6
+                )
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

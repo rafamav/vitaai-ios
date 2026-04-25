@@ -93,7 +93,8 @@ struct TranscricaoScreen: View {
             if viewModel == nil {
                 viewModel = TranscricaoViewModel(client: container.transcricaoClient, api: container.api, gamificationEvents: container.gamificationEvents)
             }
-            await viewModel?.loadRecordings()
+            async let _ = viewModel?.loadRecordings()
+            async let _ = viewModel?.loadFolders()
             SentrySDK.reportFullyDisplayed()
         }
         .onDisappear {
@@ -124,6 +125,12 @@ private struct TranscricaoContent: View {
     // payload (R2 metadata + backend) without a second piece of state.
     @State private var selectedFilter: String? = nil
     @State private var selectedRecording: TranscricaoEntry? = nil
+    /// Chip horizontal selecionada — Todas / Favoritas / 📁 pasta. Combina
+    /// com `selectedFilter` (disciplina, do filtro avançado).
+    @State private var listView: TranscricaoListView = .all
+    /// Alert "Nova pasta" — TextField pra criar folder direto da chip "+".
+    @State private var showCreateFolderAlert: Bool = false
+    @State private var newFolderName: String = ""
     /// Toast visual (appear + auto-dismiss) pra quick-actions (gerar, favoritar).
     /// Sem Sheets/Alerts — UX pattern Instagram/WhatsApp.
     @State private var toastMessage: String? = nil
@@ -254,6 +261,12 @@ private struct TranscricaoContent: View {
                                 isLoading: viewModel.recordingsLoading,
                                 selectedFilter: $selectedFilter,
                                 filterChips: disciplines,
+                                listView: $listView,
+                                folders: viewModel.folders,
+                                onCreateFolder: {
+                                    newFolderName = ""
+                                    showCreateFolderAlert = true
+                                },
                                 onTap: { rec in selectedRecording = rec },
                                 onDelete: { rec in
                                     withAnimation {
@@ -289,8 +302,9 @@ private struct TranscricaoContent: View {
                                 },
                                 onFavorite: { rec in
                                     UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
-                                    showToast("⭐ Favoritado")
-                                    // TODO: persistir favorito no backend quando endpoint existir
+                                    let willBeFavorite = !(rec.favorite ?? false)
+                                    showToast(willBeFavorite ? "⭐ Favoritado" : "Removido dos favoritos")
+                                    viewModel.toggleFavoriteOnRecording(id: rec.id)
                                 },
                                 onRename: { rec, newTitle in
                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -334,6 +348,28 @@ private struct TranscricaoContent: View {
                 selectedRecording = rec
                 viewModel.justCompletedRecordingId = nil
             }
+        }
+        // vita-modals-ignore: TextField inline no .alert — VitaAlert não suporta input
+        .alert("Nova pasta", isPresented: $showCreateFolderAlert) {
+            TextField("Nome da pasta", text: $newFolderName)
+            Button("Cancelar", role: .cancel) {}
+            Button("Criar") {
+                let trimmed = newFolderName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return }
+                Task {
+                    if let f = await viewModel.createFolder(name: trimmed) {
+                        await MainActor.run {
+                            listView = .folder(id: f.id)
+                            showToast("✓ Pasta '\(trimmed)' criada")
+                        }
+                    } else {
+                        await MainActor.run { showToast("Falha ao criar pasta") }
+                    }
+                }
+            }
+            .disabled(newFolderName.trimmingCharacters(in: .whitespaces).isEmpty)
+        } message: {
+            Text("Organize suas gravações em pastas customizadas.")
         }
         // Toast overlay — feedback visual de quick-actions (gerar, favoritar).
         .overlay(alignment: .top) {

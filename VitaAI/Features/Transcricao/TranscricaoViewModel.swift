@@ -74,6 +74,9 @@ final class TranscricaoViewModel {
     /// Saved recordings loaded from API
     private(set) var recordings: [TranscricaoEntry] = []
     private(set) var recordingsLoading: Bool = false
+    /// User-created folders (studio_folders) — fonte das chips de pasta no
+    /// header da lista. Populated por loadFolders.
+    private(set) var folders: [VitaAPI.StudioFolder] = []
 
     // MARK: - Private
 
@@ -384,6 +387,53 @@ final class TranscricaoViewModel {
             loadLocalRecordings()
         } catch {
             NSLog("[TranscricaoVM] renameLocalRecording failed: %@", "\(error)")
+        }
+    }
+
+    /// Carrega pastas custom do user (studio_folders). Chamado em paralelo
+    /// com loadRecordings — alimenta as chips de pasta no header da lista.
+    func loadFolders() async {
+        guard let api else { return }
+        do {
+            folders = try await api.listStudioFolders()
+        } catch {
+            NSLog("[TranscricaoVM] loadFolders failed: %@", "\(error)")
+        }
+    }
+
+    /// Cria pasta nova pelo header (chip "+"). Após sucesso, recarrega lista
+    /// de pastas pra chip aparecer; opcionalmente seleciona a pasta criada.
+    @discardableResult
+    func createFolder(name: String) async -> VitaAPI.StudioFolder? {
+        guard let api else { return nil }
+        do {
+            let f = try await api.createStudioFolder(name: name)
+            folders.insert(f, at: 0)
+            return f
+        } catch {
+            NSLog("[TranscricaoVM] createFolder failed: %@", "\(error)")
+            return nil
+        }
+    }
+
+    /// Toggle favorito (PATCH studio/sources/:id). Optimistic update local
+    /// pra swipe-action sentir instantâneo; revert silencioso se a request falha.
+    func toggleFavoriteOnRecording(id: String) {
+        guard let api else { return }
+        guard let idx = recordings.firstIndex(where: { $0.id == id }) else { return }
+        let newValue = !(recordings[idx].favorite ?? false)
+        recordings[idx].favorite = newValue
+        Task {
+            do {
+                try await api.updateStudioSource(id: id, favorite: newValue)
+            } catch {
+                NSLog("[TranscricaoVM] toggleFavorite failed: %@", "\(error)")
+                await MainActor.run {
+                    if let idx = recordings.firstIndex(where: { $0.id == id }) {
+                        recordings[idx].favorite = !newValue
+                    }
+                }
+            }
         }
     }
 

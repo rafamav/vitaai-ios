@@ -38,6 +38,10 @@ targets:
     info:
       path: VitaAI/Info.plist
       properties:
+        # Apple export-compliance gate G1 in deploy-testflight.sh — explicit
+        # NO so TestFlight doesn't hold the build awaiting manual review.
+        # We don't use proprietary crypto, only standard HTTPS/TLS.
+        ITSAppUsesNonExemptEncryption: false
         SENTRY_DSN: https://305f5aa7326a463a0a676bdff2458632@o4510763265097728.ingest.us.sentry.io/4511237378211840
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
