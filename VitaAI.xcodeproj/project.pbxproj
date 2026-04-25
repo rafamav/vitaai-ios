@@ -39,6 +39,7 @@
 		1503B7BB5D7623276C09EED9 /* DocumentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A39A50DBBBBFF4725FAB863 /* DocumentModels.swift */; };
 		150EAC70F68E9DC56354A5ED /* BillingModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F3C9143F545BC2D2CD800CD /* BillingModels.swift */; };
 		152C448FBAF7D17BB14C6F9E /* DisciplineDetailScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5CBDEBE92E57751092C2AD1 /* DisciplineDetailScreen.swift */; };
+		162C02F9A35AE862A245FE75 /* GLTFKit2 in Frameworks */ = {isa = PBXBuildFile; productRef = 1C90EB3168CB992A0F979BBD /* GLTFKit2 */; };
 		17CE67B8972258F8E99E6CC4 /* MindMapSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1070781C3ADCC296E31A5731 /* MindMapSyncManager.swift */; };
 		188F640BE0E0742DCB152A35 /* PortalConnectViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27F6AD78A7F2B4F76991CD5D /* PortalConnectViewModel.swift */; };
 		18BBEF0316C9D438575EE7E8 /* FlashcardContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD0378CC209283D82A5B4FFC /* FlashcardContentView.swift */; };
@@ -134,6 +135,7 @@
 		591DE0A1FEC5FEC82837F393 /* OnboardingE2ETest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AED48F07C761C2FF910AC85 /* OnboardingE2ETest.swift */; };
 		5B827EC5C87B6411384CF532 /* DashboardHeroCardPillsInner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EBCC90E2A0A1B4640DDA686 /* DashboardHeroCardPillsInner.swift */; };
 		5E1DC4816E0E10F7EBBF7168 /* StrokeFileStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C64F17D9E572284984FE6451 /* StrokeFileStorage.swift */; };
+		5EA049F87DDAF0DB70B98033 /* AtlasSceneScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30670596AEFAD8034EF048D9 /* AtlasSceneScreen.swift */; };
 		5FA5F1D86DDFC8917A2F9C98 /* ActivityModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A4D770EA37E73C3601ACCFC /* ActivityModels.swift */; };
 		5FB79FC460A136B856EF3033 /* AppConfigResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FB81E58389F9A442111E690 /* AppConfigResponse.swift */; };
 		6062CC4A19A91A357FD6EDF2 /* EditorToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ACA8EC2FB67189D143B7317 /* EditorToolbar.swift */; };
@@ -183,7 +185,6 @@
 		822DBB8F80100A644A834BB4 /* VitaEmptyState.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD10C9568121CE822C1C45E0 /* VitaEmptyState.swift */; };
 		823D5C5A43B0CE111F2B2A87 /* FaculdadeHomeScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B2FF894ECCB56BF0B38F9FB /* FaculdadeHomeScreen.swift */; };
 		8288F09531C36C728BFBE8A1 /* AnnotationEntity.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0A01ED827C886E44CE23CD5 /* AnnotationEntity.swift */; };
-		833C00137E1A44B55427BDEF /* AtlasSceneScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42808CEE837EE43860935FD4 /* AtlasSceneScreen.swift */; };
 		833F3D1124AE7A5E53D303E7 /* PortalExtractRequestPagesInner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 421A2AF54EA8F234FAC42680 /* PortalExtractRequestPagesInner.swift */; };
 		83B32C6936794D2F314830F3 /* FlashcardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3019A4AC7D6BBDAD9969469B /* FlashcardViewModel.swift */; };
 		844DDFC734158DE360CD158D /* TranscricaoMovePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 387DB8A72A6849F082AE94EE /* TranscricaoMovePickerSheet.swift */; };
@@ -279,7 +280,6 @@
 		CADC05294F3B256F8E69599D /* SimuladoConfigScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37003CEC2FA82479AA0037DE /* SimuladoConfigScreen.swift */; };
 		CAFC22F70859BC5E8856DE49 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 58B636EDE3D2FC8F4C739405 /* PrivacyInfo.xcprivacy */; };
 		CBDB52325B789D01A697EBAE /* EmailAuthSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC8FE94587B7F5721A573CFB /* EmailAuthSheet.swift */; };
-		CC5A9A17BBEB760B61E66834 /* GLTFKit2 in Frameworks */ = {isa = PBXBuildFile; productRef = FAD89F654A9A8B6B720B063C /* GLTFKit2 */; };
 		CD764114E07D347F8DF2A44D /* OsceScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A9EFD803AA3823BCDAB4F04 /* OsceScreen.swift */; };
 		CDC626FD70D21814D55D60EC /* VitaBreadcrumb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7032B7F8C0B61415B9E30313 /* VitaBreadcrumb.swift */; };
 		CF4DE67B9635CD50602C0B01 /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF29D66014585DBCBD22EAE0 /* ChatViewModel.swift */; };
@@ -399,6 +399,7 @@
 		3019A4AC7D6BBDAD9969469B /* FlashcardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashcardViewModel.swift; sourceTree = "<group>"; };
 		3019ED975A5A0AA9949070BF /* CreateCheckoutSessionRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateCheckoutSessionRequest.swift; sourceTree = "<group>"; };
 		303EAFF83B774D5B3B9DFC46 /* StudyModulesGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudyModulesGrid.swift; sourceTree = "<group>"; };
+		30670596AEFAD8034EF048D9 /* AtlasSceneScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AtlasSceneScreen.swift; sourceTree = "<group>"; };
 		314297A0A778A73D82243DDC /* SilentPortalSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilentPortalSync.swift; sourceTree = "<group>"; };
 		318005B6285DC5F01E5C3374 /* ActivityFeedViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityFeedViewModel.swift; sourceTree = "<group>"; };
 		3198A25AAF0B219D68DDB707 /* SimuladoHomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimuladoHomeScreen.swift; sourceTree = "<group>"; };
@@ -435,7 +436,6 @@
 		41A461824D7C6411A6B64725 /* SleepStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SleepStep.swift; sourceTree = "<group>"; };
 		421A2AF54EA8F234FAC42680 /* PortalExtractRequestPagesInner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PortalExtractRequestPagesInner.swift; sourceTree = "<group>"; };
 		421D25ED7A8BC5451EA6DB98 /* SyncingStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncingStep.swift; sourceTree = "<group>"; };
-		42808CEE837EE43860935FD4 /* AtlasSceneScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AtlasSceneScreen.swift; sourceTree = "<group>"; };
 		43D42AA80449E5C406E2B3B3 /* MindMapRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MindMapRepository.swift; sourceTree = "<group>"; };
 		443BC23869204129FA12AD43 /* RatingButtons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RatingButtons.swift; sourceTree = "<group>"; };
 		44EAF7F741D5CD9DCC447A01 /* TranscricaoViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscricaoViewModel.swift; sourceTree = "<group>"; };
@@ -680,7 +680,7 @@
 				E032B7AB430B778EB2CC814E /* Sentry in Frameworks */,
 				65B3D9025C1304C171AA8537 /* SentrySwiftUI in Frameworks */,
 				A63BA82F96785DD38FE2EFD5 /* PostHog in Frameworks */,
-				CC5A9A17BBEB760B61E66834 /* GLTFKit2 in Frameworks */,
+				162C02F9A35AE862A245FE75 /* GLTFKit2 in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1429,7 +1429,7 @@
 		E49B6A2236E62DB112EE89CF /* Atlas */ = {
 			isa = PBXGroup;
 			children = (
-				42808CEE837EE43860935FD4 /* AtlasSceneScreen.swift */,
+				30670596AEFAD8034EF048D9 /* AtlasSceneScreen.swift */,
 			);
 			path = Atlas;
 			sourceTree = "<group>";
@@ -1528,6 +1528,8 @@
 				3F7FD2A6B35DB3CF75D10AF9 /* PBXTargetDependency */,
 			);
 			name = VitaAIUITests;
+			packageProductDependencies = (
+			);
 			productName = VitaAIUITests;
 			productReference = 71A803CD05ACDB97E5A85BD7 /* VitaAIUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -1549,7 +1551,7 @@
 				BE8487C3CD50772214487973 /* Sentry */,
 				E99C11A3C78FC200CABA2D4C /* SentrySwiftUI */,
 				4B4B1876310F69478EE49BD0 /* PostHog */,
-				FAD89F654A9A8B6B720B063C /* GLTFKit2 */,
+				1C90EB3168CB992A0F979BBD /* GLTFKit2 */,
 			);
 			productName = VitaAI;
 			productReference = 931E6A0CE40828813FE25C12 /* VitaAI.app */;
@@ -1586,9 +1588,9 @@
 			mainGroup = F9B452838B0A8E0FA96C322C;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
+				A3B6C9E38D2A8E4583BE8E6F /* XCRemoteSwiftPackageReference "GLTFKit2" */,
 				4B8B6C3BD730056191E42326 /* XCRemoteSwiftPackageReference "posthog-ios" */,
 				B3F2C503FEE96A00E7D890E0 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
-				EC8EB2C7C325AD610EED3687 /* XCRemoteSwiftPackageReference "GLTFKit2" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = DCD696659AC5F5DDCA830456 /* Products */;
@@ -1646,6 +1648,7 @@
 				B686750D047AF3E85B1FBCAA /* AppRouter.swift in Sources */,
 				36E9C4E0AB2724D60B8B51CC /* AppearanceScreen.swift in Sources */,
 				0780E271D8611FDE00449801 /* AssinaturaScreen.swift in Sources */,
+				5EA049F87DDAF0DB70B98033 /* AtlasSceneScreen.swift in Sources */,
 				E0CE8FD436F882D717038F8D /* AuthManager.swift in Sources */,
 				774FF3CFA293F2A1D9FFA28D /* AuthViewModel.swift in Sources */,
 				150EAC70F68E9DC56354A5ED /* BillingModels.swift in Sources */,
@@ -1942,7 +1945,6 @@
 				BB3144C91665AED5016FA3DF /* WebAlunoWebViewScreen.swift in Sources */,
 				314B13E5687E06A6CB1030D6 /* WeekAgendaSection.swift in Sources */,
 				1A22403509BD373659DF1FF4 /* WelcomeStep.swift in Sources */,
-				833C00137E1A44B55427BDEF /* AtlasSceneScreen.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1977,7 +1979,7 @@
 				CODE_SIGN_ENTITLEMENTS = VitaAI/VitaAI.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 96;
+				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = PJ8972D48J;
 				ENABLE_PREVIEWS = YES;
@@ -2021,7 +2023,7 @@
 				CODE_SIGN_ENTITLEMENTS = VitaAI/VitaAI.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 96;
+				CURRENT_PROJECT_VERSION = 1;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = PJ8972D48J;
 				ENABLE_PREVIEWS = YES;
@@ -2222,6 +2224,14 @@
 				minimumVersion = 3.15.0;
 			};
 		};
+		A3B6C9E38D2A8E4583BE8E6F /* XCRemoteSwiftPackageReference "GLTFKit2" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/warrenm/GLTFKit2";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.5.0;
+			};
+		};
 		B3F2C503FEE96A00E7D890E0 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/getsentry/sentry-cocoa";
@@ -2230,17 +2240,14 @@
 				minimumVersion = 8.40.0;
 			};
 		};
-		EC8EB2C7C325AD610EED3687 /* XCRemoteSwiftPackageReference "GLTFKit2" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/warrenm/GLTFKit2";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.5.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		1C90EB3168CB992A0F979BBD /* GLTFKit2 */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A3B6C9E38D2A8E4583BE8E6F /* XCRemoteSwiftPackageReference "GLTFKit2" */;
+			productName = GLTFKit2;
+		};
 		4B4B1876310F69478EE49BD0 /* PostHog */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 4B8B6C3BD730056191E42326 /* XCRemoteSwiftPackageReference "posthog-ios" */;
@@ -2255,11 +2262,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = B3F2C503FEE96A00E7D890E0 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
 			productName = SentrySwiftUI;
-		};
-		FAD89F654A9A8B6B720B063C /* GLTFKit2 */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = EC8EB2C7C325AD610EED3687 /* XCRemoteSwiftPackageReference "GLTFKit2" */;
-			productName = GLTFKit2;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

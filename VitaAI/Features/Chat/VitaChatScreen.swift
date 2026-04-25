@@ -10,6 +10,9 @@ struct VitaChatScreen: View {
     /// Pre-attached image (JPEG Data) shown as soon as the chat opens.
     /// Used by the PDF viewer "Pergunte ao Vita" scanner to pipe a page screenshot in.
     var initialImageData: Data? = nil
+    /// Pre-filled prompt sent automatically when the chat opens.
+    /// Used by the Atlas 3D "Perguntar pra VITA sobre …" button.
+    var initialPrompt: String? = nil
     @State private var viewModel: ChatViewModel?
     @State private var showVoiceMode: Bool = false
     @FocusState private var isInputFocused: Bool
@@ -52,6 +55,12 @@ struct VitaChatScreen: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                     isInputFocused = true
                 }
+            }
+            if let prompt = initialPrompt, !prompt.isEmpty, let vm = viewModel {
+                // Auto-send the pre-filled prompt — student tapped "Perguntar
+                // pra VITA" expecting an answer, not an empty input.
+                vm.inputText = prompt
+                Task { await vm.send() }
             }
             // Chat is interactive immediately — no async fetch needed before first render.
             SentrySDK.reportFullyDisplayed()
@@ -153,18 +162,11 @@ private struct EmptyState: View {
             Spacer()
 
             VStack(spacing: 16) {
-                // Sparkles icon
-                ZStack {
-                    Circle()
-                        .fill(VitaColors.accent.opacity(0.08))
-                        .frame(width: 56, height: 56)
-                    Circle()
-                        .stroke(VitaColors.glassBorder, lineWidth: 1)
-                        .frame(width: 56, height: 56)
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundColor(VitaColors.accent.opacity(0.60))
-                }
+                // VITA mascot — same OrbMascot used in onboarding (Rafael's
+                // explicit ask: never the SF "sparkles" star here).
+                OrbMascot(palette: .vita, state: .awake, size: 88)
+                    .frame(width: 88, height: 88)
+                    .accessibilityHidden(true)
 
                 Text("Como posso te ajudar?")
                     .font(.system(size: 14))

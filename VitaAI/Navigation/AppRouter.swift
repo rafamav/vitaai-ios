@@ -194,6 +194,10 @@ struct MainTabView: View {
     @Environment(\.subscriptionStatus) private var subStatus
     @ObservedObject private var pushManager = PushManager.shared
     @State private var showChat = false
+    /// Optional pre-filled prompt sent into VitaChatScreen on its next open.
+    /// Set by Atlas 3D's "Perguntar pra VITA" so the chat lands with the
+    /// student's question already submitted; cleared after consumption.
+    @State private var chatInitialPrompt: String? = nil
     @State private var showMenuPopout = false
     @State private var showNotifPopout = false
     @State private var dashboardSubtitle: String = ""
@@ -257,7 +261,13 @@ struct MainTabView: View {
 
                     // Chat overlay — sits in content area (below top bar, above tab bar)
                     if showChat {
-                        VitaChatScreen(onClose: { withAnimation(.easeInOut(duration: 0.25)) { showChat = false } })
+                        VitaChatScreen(
+                            onClose: {
+                                withAnimation(.easeInOut(duration: 0.25)) { showChat = false }
+                                chatInitialPrompt = nil
+                            },
+                            initialPrompt: chatInitialPrompt
+                        )
                             .padding(.bottom, 80) // space for tab bar
                             .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
@@ -320,6 +330,7 @@ struct MainTabView: View {
                 VitaMenuPopout(
                     userName: authManager.userName,
                     userImageURL: authManager.userImage.flatMap(URL.init(string:)),
+                    notificationCount: pushManager.unreadNotificationCount,
                     onProfile: { router.navigateFromMenu(to: .profile) },
                     onNotifications: { showMenuPopout = false; showNotifPopout = true },
                     onAgenda: { router.navigateFromMenu(to: .agenda) },
@@ -644,7 +655,8 @@ struct MainTabView: View {
         case .atlas3D:
             AtlasSceneScreen(
                 onBack: { router.goBack() },
-                onAskVita: { _ in
+                onAskVita: { prompt in
+                    chatInitialPrompt = prompt
                     router.goBack()
                     withAnimation(.easeInOut(duration: 0.25)) { showChat = true }
                 }
