@@ -21,6 +21,29 @@ struct MonthlyCalendarView: View {
     @State private var cachedCells: [MonthCell] = []
     @State private var viewMode: ViewMode = .month
     @State private var focusDate: Date = .now
+    @State private var footerSheet: FooterSheet?
+
+    enum FooterSheet: Identifiable {
+        case avaliacoes([AgendaEvaluation])
+        case provas([AgendaEvaluation])
+        case aulas([AgendaClassBlock])
+
+        var id: String {
+            switch self {
+            case .avaliacoes: return "avaliacoes"
+            case .provas: return "provas"
+            case .aulas: return "aulas"
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .avaliacoes: return "Avaliações do mês"
+            case .provas: return "Provas do mês"
+            case .aulas: return "Horário semanal"
+            }
+        }
+    }
 
     enum ViewMode: String, CaseIterable, Identifiable {
         case month, week, day
@@ -437,6 +460,125 @@ struct MonthlyCalendarView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.78), value: selectedDay?.id)
         .onAppear { rebuildCellsIfNeeded() }
         .onChange(of: displayedMonth) { _, _ in rebuildCellsIfNeeded() }
+        .sheet(item: $footerSheet) { sheet in
+            footerSheetView(sheet)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(.ultraThinMaterial)
+        }
+    }
+
+    @ViewBuilder
+    private func footerSheetView(_ sheet: FooterSheet) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(sheet.title)
+                    .font(VitaTypography.headlineSmall)
+                    .foregroundStyle(VitaColors.textPrimary)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 20)
+
+                switch sheet {
+                case .avaliacoes(let items), .provas(let items):
+                    if items.isEmpty {
+                        emptySheetState(message: "Nada marcado no mês")
+                    } else {
+                        ForEach(items.sorted(by: evalSortAsc)) { eval in
+                            evalRowDetail(eval)
+                        }
+                    }
+                case .aulas(let blocks):
+                    if blocks.isEmpty {
+                        emptySheetState(message: "Sem aulas registradas")
+                    } else {
+                        ForEach(blocks.sorted(by: blockSortAsc), id: \.id) { block in
+                            aulaRowDetail(block)
+                        }
+                    }
+                }
+
+                Spacer().frame(height: 24)
+            }
+        }
+    }
+
+    private func evalRowDetail(_ eval: AgendaEvaluation) -> some View {
+        HStack(spacing: 12) {
+            Circle()
+                .fill(isProva(eval.type) ? colorFor(subject: eval.subjectName ?? "—") : Color.clear)
+                .overlay(
+                    Circle().stroke(colorFor(subject: eval.subjectName ?? "—"), lineWidth: 1.5)
+                )
+                .frame(width: 10, height: 10)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(eval.title)
+                    .font(VitaTypography.titleSmall)
+                    .foregroundStyle(VitaColors.textPrimary)
+                    .lineLimit(2)
+                HStack(spacing: 6) {
+                    Text(eval.subjectName ?? "—")
+                        .font(VitaTypography.bodySmall)
+                        .foregroundStyle(VitaColors.textSecondary)
+                    if let dStr = eval.date, let d = parseDate(dStr) {
+                        Text("·").foregroundStyle(VitaColors.textTertiary)
+                        Text(d, format: .dateTime.day().month(.abbreviated).locale(Locale(identifier: "pt_BR")))
+                            .font(VitaTypography.bodySmall)
+                            .foregroundStyle(VitaColors.textSecondary)
+                    }
+                }
+            }
+            Spacer()
+            Text(isProva(eval.type) ? "Prova" : "Trabalho")
+                .font(VitaTypography.labelSmall)
+                .foregroundStyle(VitaColors.textTertiary)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+    }
+
+    private func aulaRowDetail(_ block: AgendaClassBlock) -> some View {
+        HStack(spacing: 12) {
+            Text(subjectInitial(block.subjectName))
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(colorFor(subject: block.subjectName))
+                .frame(width: 24, height: 24)
+                .background(Circle().fill(colorFor(subject: block.subjectName).opacity(0.12)))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(block.subjectName)
+                    .font(VitaTypography.titleSmall)
+                    .foregroundStyle(VitaColors.textPrimary)
+                Text("\(weekdayLabel(block.dayOfWeek)) · \(block.startTime)–\(block.endTime)")
+                    .font(VitaTypography.bodySmall)
+                    .foregroundStyle(VitaColors.textSecondary)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+    }
+
+    private func emptySheetState(message: String) -> some View {
+        Text(message)
+            .font(VitaTypography.bodyMedium)
+            .foregroundStyle(VitaColors.textSecondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 32)
+    }
+
+    private func evalSortAsc(_ a: AgendaEvaluation, _ b: AgendaEvaluation) -> Bool {
+        (a.date ?? "") < (b.date ?? "")
+    }
+
+    private func blockSortAsc(_ a: AgendaClassBlock, _ b: AgendaClassBlock) -> Bool {
+        if a.dayOfWeek != b.dayOfWeek { return a.dayOfWeek < b.dayOfWeek }
+        return a.startTime < b.startTime
+    }
+
+    private func weekdayLabel(_ wd: Int) -> String {
+        // dayOfWeek: 1=Mon, 7=Sun (backend convention)
+        let labels = ["—", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
+        guard wd >= 0, wd < labels.count else { return "—" }
+        return labels[wd]
     }
 
     private func rebuildCellsIfNeeded() {
@@ -462,6 +604,7 @@ struct MonthlyCalendarView: View {
             case .month:
                 weekdaysRow
                 daysGrid
+                calendarLegend
                 monthFooter
             case .week:
                 weekModePlaceholder
@@ -817,7 +960,49 @@ struct MonthlyCalendarView: View {
         }
     }
 
-    // MARK: - Footer summary
+    // MARK: - Legend (visible explanation of marker shapes + letter colors)
+
+    private var calendarLegend: some View {
+        HStack(spacing: 12) {
+            legendItem(icon: legendDot(filled: true), text: "prova")
+            legendItem(icon: legendDot(filled: false), text: "trabalho")
+            HStack(spacing: 3) {
+                Text("A")
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundStyle(goldPrimary.opacity(0.80))
+                Text("matéria")
+                    .font(.system(size: 10))
+                    .foregroundStyle(textDim)
+            }
+            Spacer()
+        }
+        .padding(.top, 2)
+    }
+
+    @ViewBuilder
+    private func legendItem<Icon: View>(icon: Icon, text: String) -> some View {
+        HStack(spacing: 4) {
+            icon
+            Text(text)
+                .font(.system(size: 10))
+                .foregroundStyle(textDim)
+        }
+    }
+
+    @ViewBuilder
+    private func legendDot(filled: Bool) -> some View {
+        if filled {
+            Circle()
+                .fill(goldPrimary.opacity(0.85))
+                .frame(width: 6, height: 6)
+        } else {
+            Circle()
+                .stroke(goldPrimary.opacity(0.85), lineWidth: 1)
+                .frame(width: 6, height: 6)
+        }
+    }
+
+    // MARK: - Footer summary (clicável: cada stat abre lista detalhada)
 
     private var monthFooter: some View {
         let monthEvals = evaluations.filter { eval in
@@ -828,11 +1013,23 @@ struct MonthlyCalendarView: View {
         let weeklyAulas = schedule.count
 
         return HStack(spacing: 10) {
-            footerStat(value: "\(monthEvals.count)", label: monthEvals.count == 1 ? "avaliação" : "avaliações")
+            footerStatButton(
+                value: "\(monthEvals.count)",
+                label: monthEvals.count == 1 ? "avaliação" : "avaliações",
+                action: { footerSheet = .avaliacoes(monthEvals) }
+            )
             divider
-            footerStat(value: "\(provasCount)", label: provasCount == 1 ? "prova" : "provas")
+            footerStatButton(
+                value: "\(provasCount)",
+                label: provasCount == 1 ? "prova" : "provas",
+                action: { footerSheet = .provas(monthEvals.filter { isProva($0.type) }) }
+            )
             divider
-            footerStat(value: "\(weeklyAulas)", label: "aulas/sem")
+            footerStatButton(
+                value: "\(weeklyAulas)",
+                label: "aulas/sem",
+                action: { footerSheet = .aulas(schedule) }
+            )
             Spacer()
         }
         .padding(.top, 4)
@@ -844,15 +1041,21 @@ struct MonthlyCalendarView: View {
             .frame(width: 1, height: 14)
     }
 
-    private func footerStat(value: String, label: String) -> some View {
-        HStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundStyle(goldPrimary.opacity(0.85))
-            Text(label)
-                .font(.system(size: 10))
-                .foregroundStyle(textDim)
+    private func footerStatButton(value: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Text(value)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(goldPrimary.opacity(0.85))
+                Text(label)
+                    .font(.system(size: 10))
+                    .foregroundStyle(textDim)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 7, weight: .semibold))
+                    .foregroundStyle(textDim.opacity(0.6))
+            }
         }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Popover layer
