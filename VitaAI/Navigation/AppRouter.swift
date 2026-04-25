@@ -404,9 +404,11 @@ struct MainTabView: View {
                     await container.mindMapSyncManager.pull()
                 }
             }
-            // Pré-aquece os caches das tabs Progresso e Flashcards em background.
-            // Quando o usuário tap a tab pela primeira vez, o cache já está
-            // quente e a tela render instantânea — zero spinner cold.
+            // Pré-aquece os caches no boot: Dashboard (HeroCard), Progresso e
+            // Flashcards. Quando o MainTabView aparece, o cache do Dashboard
+            // já está quente e o HeroCard renderiza sem spinner. Tabs Progresso
+            // e Flashcards idem quando o user tap.
+            Task { await container.dashboardViewModel.loadDashboard() }
             Task { await container.progressoViewModel.loadIfNeeded() }
             Task { _ = try? await container.flashcardsListCache.refresh() }
         }

@@ -3015,6 +3015,21 @@ paths:
           schema:
             type: integer
             default: 20
+        - name: tag
+          in: query
+          schema:
+            type: string
+        - name: summary
+          in: query
+          description: Returns deck metadata only (no cards), used by FlashcardsListCache.
+          schema:
+            type: boolean
+        - name: scope
+          in: query
+          description: Filter by enrollment scope. `current` = decks of disciplines in current semester only.
+          schema:
+            type: string
+            enum: [current]
       responses:
         '200':
           description: List of decks

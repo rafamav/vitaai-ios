@@ -23,7 +23,9 @@ final class FlashcardsListCache {
     }
 
     func refresh() async throws -> [FlashcardDeckEntry] {
-        let fetched = try await api.getFlashcardDecks(deckLimit: 1000, summary: true)
+        // scope=current: backend filtra só decks das disciplinas em curso.
+        // Era ~528 decks / 175KB; com scope vira ~37 decks / 12.8KB (-93%).
+        let fetched = try await api.getFlashcardDecks(deckLimit: 1000, summary: true, scope: "current")
         decks = fetched
         lastFetched = Date()
         return fetched

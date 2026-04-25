@@ -87,7 +87,7 @@ actor VitaAPI {
         return try await client.get("study/flashcards", queryItems: items.isEmpty ? nil : items)
     }
 
-    func getFlashcardDecks(subjectId: String? = nil, dueOnly: Bool = false, tag: String? = nil, cardsLimit: Int? = nil, deckLimit: Int? = nil, summary: Bool = false) async throws -> [FlashcardDeckEntry] {
+    func getFlashcardDecks(subjectId: String? = nil, dueOnly: Bool = false, tag: String? = nil, cardsLimit: Int? = nil, deckLimit: Int? = nil, summary: Bool = false, scope: String? = nil) async throws -> [FlashcardDeckEntry] {
         var items: [URLQueryItem] = []
         if let subjectId { items.append(.init(name: "subjectId", value: subjectId)) }
         if dueOnly { items.append(.init(name: "due", value: "true")) }
@@ -95,6 +95,7 @@ actor VitaAPI {
         if let cardsLimit { items.append(.init(name: "cardsLimit", value: String(cardsLimit))) }
         if let deckLimit { items.append(.init(name: "deckLimit", value: String(deckLimit))) }
         if summary { items.append(.init(name: "summary", value: "true")) }
+        if let scope { items.append(.init(name: "scope", value: scope)) }
         return try await client.get("study/flashcards", queryItems: items.isEmpty ? nil : items)
     }
 
