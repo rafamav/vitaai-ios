@@ -87,16 +87,10 @@ struct DisciplineDetailScreen: View {
             ScreenLoadContext.finish(for: "DisciplineDetail")
         }
         .trackScreen("DisciplineDetail", extra: ["subject_id": disciplineId])
+        // vita-modals-ignore: VitaSheet wrapping inside closure (hook regex false positive)
         .sheet(isPresented: $showProfessorSheet) {
             VitaSheet {
                 ProfessorProfileSheet(subjectId: disciplineId)
-            }
-        }
-        .sheet(isPresented: $showColorPicker) {
-            VitaSheet(detents: [.height(320)]) {
-                SubjectColorPicker(subjectName: disciplineName) { _ in
-                    colorRefreshTrigger = UUID()
-                }
             }
         }
     }
@@ -258,6 +252,12 @@ struct DisciplineDetailScreen: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             .padding(.trailing, 14)
             .padding(.bottom, 12)
+            .vitaBubble(isPresented: $showColorPicker, arrowEdge: .bottom) {
+                SubjectColorPicker(subjectName: disciplineName) { _ in
+                    colorRefreshTrigger = UUID()
+                }
+                .frame(width: 280)
+            }
         }
         .frame(height: 162)
         .id(colorRefreshTrigger)

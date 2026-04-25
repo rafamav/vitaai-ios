@@ -23,18 +23,12 @@ struct MonthlyCalendarView: View {
     @State private var focusDate: Date = .now
     @State private var footerSheet: FooterSheet?
 
-    enum FooterSheet: Identifiable {
-        case avaliacoes([AgendaEvaluation])
-        case provas([AgendaEvaluation])
-        case aulas([AgendaClassBlock])
+    enum FooterSheet: String, Identifiable {
+        case avaliacoes
+        case provas
+        case aulas
 
-        var id: String {
-            switch self {
-            case .avaliacoes: return "avaliacoes"
-            case .provas: return "provas"
-            case .aulas: return "aulas"
-            }
-        }
+        var id: String { rawValue }
 
         var title: String {
             switch self {
@@ -460,39 +454,45 @@ struct MonthlyCalendarView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.78), value: selectedDay?.id)
         .onAppear { rebuildCellsIfNeeded() }
         .onChange(of: displayedMonth) { _, _ in rebuildCellsIfNeeded() }
-        .sheet(item: $footerSheet) { sheet in
-            VitaSheet(title: sheet.title) {
-                footerSheetContent(sheet)
-            }
-        }
     }
 
     @ViewBuilder
-    private func footerSheetContent(_ sheet: FooterSheet) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                switch sheet {
-                case .avaliacoes(let items), .provas(let items):
-                    if items.isEmpty {
-                        emptySheetState(message: "Nada marcado no mês")
-                    } else {
-                        ForEach(items.sorted(by: evalSortAsc)) { eval in
-                            evalRowDetail(eval)
+    private func footerBubbleContent(
+        _ sheet: FooterSheet,
+        evals: [AgendaEvaluation],
+        blocks: [AgendaClassBlock]
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(sheet.title)
+                .font(VitaTypography.titleSmall)
+                .foregroundStyle(VitaColors.textPrimary)
+                .padding(.bottom, 4)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    switch sheet {
+                    case .avaliacoes, .provas:
+                        if evals.isEmpty {
+                            emptySheetState(message: "Nada marcado no mês")
+                        } else {
+                            ForEach(evals.sorted(by: evalSortAsc)) { eval in
+                                evalRowDetail(eval)
+                            }
                         }
-                    }
-                case .aulas(let blocks):
-                    if blocks.isEmpty {
-                        emptySheetState(message: "Sem aulas registradas")
-                    } else {
-                        ForEach(blocks.sorted(by: blockSortAsc), id: \.id) { block in
-                            aulaRowDetail(block)
+                    case .aulas:
+                        if blocks.isEmpty {
+                            emptySheetState(message: "Sem aulas registradas")
+                        } else {
+                            ForEach(blocks.sorted(by: blockSortAsc), id: \.id) { block in
+                                aulaRowDetail(block)
+                            }
                         }
                     }
                 }
-
-                Spacer().frame(height: 24)
             }
+            .frame(maxHeight: 320)
         }
+        .frame(width: 300)
     }
 
     private func evalRowDetail(_ eval: AgendaEvaluation) -> some View {
@@ -1005,24 +1005,64 @@ struct MonthlyCalendarView: View {
         let provasCount = monthEvals.filter { isProva($0.type) }.count
         let weeklyAulas = schedule.count
 
+        let provas = monthEvals.filter { isProva($0.type) }
+
         return HStack(spacing: 10) {
             footerStatButton(
                 value: "\(monthEvals.count)",
                 label: monthEvals.count == 1 ? "avaliação" : "avaliações",
-                action: { footerSheet = .avaliacoes(monthEvals) }
+                action: {
+                    footerSheet = (footerSheet == .avaliacoes) ? nil : .avaliacoes
+                }
             )
+            .vitaBubble(
+                isPresented: Binding(
+                    get: { footerSheet == .avaliacoes },
+                    set: { if !$0 { footerSheet = nil } }
+                ),
+                arrowEdge: .top
+            ) {
+                footerBubbleContent(.avaliacoes, evals: monthEvals, blocks: [])
+            }
+
             divider
+
             footerStatButton(
                 value: "\(provasCount)",
                 label: provasCount == 1 ? "prova" : "provas",
-                action: { footerSheet = .provas(monthEvals.filter { isProva($0.type) }) }
+                action: {
+                    footerSheet = (footerSheet == .provas) ? nil : .provas
+                }
             )
+            .vitaBubble(
+                isPresented: Binding(
+                    get: { footerSheet == .provas },
+                    set: { if !$0 { footerSheet = nil } }
+                ),
+                arrowEdge: .top
+            ) {
+                footerBubbleContent(.provas, evals: provas, blocks: [])
+            }
+
             divider
+
             footerStatButton(
                 value: "\(weeklyAulas)",
                 label: "aulas/sem",
-                action: { footerSheet = .aulas(schedule) }
+                action: {
+                    footerSheet = (footerSheet == .aulas) ? nil : .aulas
+                }
             )
+            .vitaBubble(
+                isPresented: Binding(
+                    get: { footerSheet == .aulas },
+                    set: { if !$0 { footerSheet = nil } }
+                ),
+                arrowEdge: .top
+            ) {
+                footerBubbleContent(.aulas, evals: [], blocks: schedule)
+            }
+
             Spacer()
         }
         .padding(.top, 4)

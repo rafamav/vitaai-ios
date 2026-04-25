@@ -76,10 +76,14 @@ struct MindMapEditorView: View {
                     editTextDialog
                 }
             }
-            .sheet(isPresented: $viewModel.showColorPickerDialog) {
-                VitaSheet(title: "Cor do Nó") {
+            .vitaBubble(isPresented: $viewModel.showColorPickerDialog, arrowEdge: .top) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Cor do Nó")
+                        .font(VitaTypography.titleSmall)
+                        .foregroundStyle(VitaColors.textPrimary)
                     colorPickerDialog
                 }
+                .frame(width: 280)
             }
             .task {
                 await viewModel.onAppear()
