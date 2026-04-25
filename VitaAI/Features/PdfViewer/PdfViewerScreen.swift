@@ -484,12 +484,12 @@ struct PdfViewerScreen: View {
                         height: height
                     )
                     let annotation = PDFAnnotation(bounds: bounds, forType: .freeText, withProperties: nil)
-                    annotation.font = UIFont.systemFont(ofSize: 13)
-                    annotation.fontColor = UIColor.white
-                    annotation.color = UIColor(white: 0.1, alpha: 0.85)
-                    annotation.border = PDFBorder()
-                    annotation.border?.lineWidth = 0.5
-                    annotation.border?.style = .solid
+                    annotation.font = UIFont.systemFont(ofSize: 16, weight: .regular)
+                    annotation.fontColor = UIColor.label
+                    annotation.color = .clear
+                    let nb = PDFBorder()
+                    nb.lineWidth = 0
+                    annotation.border = nb
                     annotation.isReadOnly = false
                     annotation.contents = text
                     page.addAnnotation(annotation)
@@ -806,17 +806,20 @@ private final class Coordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDe
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else { return }
 
-            // Auto-size annotation bounds to fit final text using same font.
-            let font = UIFont.systemFont(ofSize: 14, weight: .medium)
+            // Goodnotes pattern: texto puro no PDF — fundo transparente default,
+            // sem moldura. Usuário pode ativar fundo opaco depois via toolbar
+            // contextual (Fase 3). Cor do texto preta pra legibilidade em PDF
+            // branco — paleta editável no color picker.
+            let font = UIFont.systemFont(ofSize: 16, weight: .regular)
             let textSize = (trimmed as NSString).boundingRect(
                 with: CGSize(width: 280, height: CGFloat.greatestFiniteMagnitude),
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
                 attributes: [.font: font],
                 context: nil
             ).size
-            let pad: CGFloat = 8
+            let pad: CGFloat = 4
             let width = ceil(textSize.width) + pad * 2
-            let height = max(28, ceil(textSize.height) + pad * 2)
+            let height = max(24, ceil(textSize.height) + pad * 2)
             let bounds = CGRect(
                 x: pagePoint.x,
                 y: pagePoint.y - height,
@@ -826,12 +829,10 @@ private final class Coordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDe
 
             let annotation = PDFAnnotation(bounds: bounds, forType: .freeText, withProperties: nil)
             annotation.font = font
-            annotation.fontColor = UIColor.white
-            // Glass-feel: subtle dark + gold border (matches Vita design tokens)
-            annotation.color = UIColor(red: 0.10, green: 0.08, blue: 0.06, alpha: 0.78)
+            annotation.fontColor = UIColor.label
+            annotation.color = .clear
             let border = PDFBorder()
-            border.lineWidth = 1
-            border.style = .solid
+            border.lineWidth = 0
             annotation.border = border
             annotation.isReadOnly = false
             annotation.contents = trimmed
