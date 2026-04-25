@@ -168,10 +168,21 @@ struct VitaPaywallScreen: View {
     var body: some View {
         VitaAmbientBackground {
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
+                LazyVStack(spacing: 20) {
                     headerCard
-                    plansCard
-                    featuresCard
+
+                    // 3 plan rows soltos, sem wrapper, cada um com seu próprio D4
+                    ForEach(PlanTier.allCases) { tier in
+                        PlanRow(
+                            tier: tier,
+                            isSelected: selectedTier == tier,
+                            product: product(for: tier),
+                            onTap: { select(tier) }
+                        )
+                    }
+
+                    featuresList
+
                     if let err = storeKit.purchaseError ?? stripeError {
                         Text(err)
                             .font(VitaTypography.bodySmall)
@@ -236,26 +247,9 @@ struct VitaPaywallScreen: View {
         .background(d4CardBackground(cornerRadius: 18))
     }
 
-    // MARK: - Plans card (D4 background sem nested Canvas)
+    // MARK: - Features list (D4 background, items dentro)
 
-    private var plansCard: some View {
-        VStack(spacing: 10) {
-            ForEach(PlanTier.allCases) { tier in
-                PlanRow(
-                    tier: tier,
-                    isSelected: selectedTier == tier,
-                    product: product(for: tier),
-                    onTap: { select(tier) }
-                )
-            }
-        }
-        .padding(14)
-        .background(d4CardBackground(cornerRadius: 18))
-    }
-
-    // MARK: - Features card (D4 wrapper, list inside)
-
-    private var featuresCard: some View {
+    private var featuresList: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.seal.fill")
@@ -482,19 +476,38 @@ private struct PlanRow: View {
                     .foregroundStyle(VitaColors.textTertiary)
             }
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 12)
+        .padding(.vertical, 14)
+        .padding(.horizontal, 16)
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(isSelected ? VitaColors.accent.opacity(0.08) : Color.clear)
+            ZStack {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 30/255, green: 22/255, blue: 15/255).opacity(0.92),
+                                Color(red: 14/255, green: 10/255, blue: 7/255).opacity(0.92)
+                            ],
+                            startPoint: UnitPoint(x: 0.46, y: 0.0),
+                            endPoint: UnitPoint(x: 0.54, y: 1.0)
+                        )
+                    )
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(VitaColors.accent.opacity(0.06))
+                }
+            }
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(
-                    isSelected ? VitaColors.accent : VitaColors.glassBorder.opacity(0.4),
-                    lineWidth: isSelected ? 1.5 : 0.5
+                    isSelected
+                        ? VitaColors.accent
+                        : Color(red: 200/255, green: 160/255, blue: 80/255).opacity(0.22),
+                    lineWidth: isSelected ? 1.5 : 1
                 )
         )
+        .shadow(color: .black.opacity(0.40), radius: 12, x: 0, y: 4)
+        .shadow(color: .black.opacity(0.20), radius: 3, x: 0, y: 1)
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
         .animation(.spring(response: 0.3, dampingFraction: 0.78), value: isSelected)
