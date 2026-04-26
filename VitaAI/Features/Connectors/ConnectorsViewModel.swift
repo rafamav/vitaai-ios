@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import SafariServices
 import Observation
 
 // MARK: - ConnectorsViewModel
@@ -31,9 +32,37 @@ final class ConnectorsViewModel {
     private let api: VitaAPI
     private weak var dataManager: AppDataManager?
 
+    // SFSafariViewController apresentado para OAuth in-app (Spotify, Google Drive,
+    // Google Calendar). Guardado pra poder dismissar quando o deep link callback
+    // (vitaai://integrations/done) volta — SafariViewController não fecha sozinho
+    // como ASWebAuthenticationSession faria.
+    private weak var presentedOAuthSafari: SFSafariViewController?
+
     init(api: VitaAPI, dataManager: AppDataManager? = nil) {
         self.api = api
         self.dataManager = dataManager
+        // Listen pro callback de OAuth completar (postado pelo AppRouter quando
+        // recebe o deep link vitaai://integrations/done?provider=X).
+        NotificationCenter.default.addObserver(
+            forName: .integrationOAuthCompleted,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            Task { @MainActor in
+                self?.dismissOAuthSheet()
+                if let provider = note.object as? String {
+                    self?.toastMessage = "\(provider.capitalized) conectado"
+                    self?.toastType = .success
+                }
+                await self?.loadAll()
+            }
+        }
+    }
+
+    @MainActor
+    private func dismissOAuthSheet() {
+        presentedOAuthSafari?.dismiss(animated: true)
+        presentedOAuthSafari = nil
     }
 
     // MARK: - All integration connectors
@@ -125,8 +154,8 @@ final class ConnectorsViewModel {
                 }
 
                 // Separamos os dois conceitos:
-                // lastSyncAt  = ultima vez que dados foram extraidos com sucesso
-                // lastPingAt  = ultima vez que o token/sessao foi verificado vivo (keep-alive)
+                // lastSyncAt  = última vez que dados foram extraídos com êxito
+                // lastPingAt  = última vez que o token/sessão foi verificado vivo (keep-alive)
                 // Se sync > 12h, card vira "stale" mesmo com status=connected.
                 let syncRelative = conn.lastSyncAt.flatMap { formatRelativeTime($0) }
                 let pingRelative = conn.lastPingAt.flatMap { formatRelativeTime($0) }
@@ -151,7 +180,7 @@ final class ConnectorsViewModel {
                     canvas.isStale = stale
                     canvas.instanceUrl = conn.instanceUrl
                     canvas.stats = [
-                        (conn.counts?.subjects ?? 0, "disciplinas"),
+                        (conn.counts?.subjects ?? 0, "matérias"),
                         (conn.counts?.evaluations ?? 0, "atividades"),
                         (conn.counts?.documents ?? 0, "arquivos"),
                     ]
@@ -163,7 +192,7 @@ final class ConnectorsViewModel {
                     mannesoft.isStale = stale
                     mannesoft.instanceUrl = conn.instanceUrl
                     mannesoft.stats = [
-                        (conn.counts?.subjects ?? 0, "disciplinas"),
+                        (conn.counts?.subjects ?? 0, "matérias"),
                         (conn.counts?.evaluations ?? 0, "notas"),
                         (conn.counts?.schedule ?? 0, "aulas"),
                     ]
@@ -329,7 +358,7 @@ final class ConnectorsViewModel {
     func connectAppleHealth() async {
         let hk = HealthKitManager.shared
         guard hk.isAvailable else {
-            toastMessage = "Apple Health nao disponivel neste dispositivo"
+            toastMessage = "Apple Health não disponível neste dispositivo"
             toastType = .error
             return
         }
@@ -356,18 +385,38 @@ final class ConnectorsViewModel {
         }
     }
 
+    /// Apresenta SFSafariViewController in-app pro OAuth do provider (Spotify,
+    /// Google Calendar, Google Drive). Cookies persistem no view: user loga
+    /// 1x e nas próximas reconexões cai direto no "Authorize". Quando o
+    /// backend retorna `vitaai://integrations/done`, o iOS abre o app e o
+    /// observer de `integrationOAuthCompleted` dismissa a sheet.
     func connectIntegration(_ connectorId: String) async {
         do {
             let data = try await api.startIntegrationOAuth(connectorId)
-            if let authUrl = data.authUrl, let url = URL(string: authUrl) {
-                await MainActor.run {
-                    UIApplication.shared.open(url)
-                }
-            }
+            guard let authUrl = data.authUrl, let url = URL(string: authUrl) else { return }
+            await MainActor.run { presentSafari(url: url) }
         } catch {
             toastMessage = "Erro ao conectar"
             toastType = .error
         }
+    }
+
+    @MainActor
+    private func presentSafari(url: URL) {
+        guard
+            let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+            let root = scene.windows.first?.rootViewController
+        else { return }
+        // If something is already on top (e.g. a sheet), present from that.
+        let presenter = root.presentedViewController ?? root
+        let config = SFSafariViewController.Configuration()
+        config.barCollapsingEnabled = true
+        let safari = SFSafariViewController(url: url, configuration: config)
+        safari.preferredControlTintColor = UIColor(VitaColors.accent)
+        safari.dismissButtonStyle = .cancel
+        safari.modalPresentationStyle = .pageSheet
+        presentedOAuthSafari = safari
+        presenter.present(safari, animated: true)
     }
 
     // MARK: - Connect Mannesoft portal with session
@@ -507,7 +556,7 @@ final class ConnectorsViewModel {
         return "+\(digits)"
     }
 
-    /// Considera stale quando a ultima extracao com dados foi > 12h atras.
+    /// Considera stale quando a última extração com dados foi > 12h atrás.
     /// Usuario ve card conectado mas com aviso amarelo — sinal pra suspeitar.
     private func isStale(_ isoDate: String?) -> Bool {
         guard let isoDate else { return false }
