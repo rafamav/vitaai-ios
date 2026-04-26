@@ -271,32 +271,8 @@ struct MainTabView: View {
 
                 }
             }
-            .overlay(alignment: .topTrailing) {
-                // MARK: - Notification Popout (fixed position below TopNav)
-                if showNotifPopout {
-                    VitaNotifPopout(
-                        onDismiss: {
-                            withAnimation(.spring(duration: 0.3, bounce: 0.12)) { showNotifPopout = false }
-                        },
-                        onSettingsTap: {
-                            withAnimation(.spring(duration: 0.3, bounce: 0.12)) { showNotifPopout = false }
-                            router.navigate(to: .notifications)
-                        },
-                        onNavigate: { route in
-                            withAnimation(.spring(duration: 0.3, bounce: 0.12)) { showNotifPopout = false }
-                            router.navigateToRoute(route)
-                        }
-                    )
-                    // Fixed offset: TopBar height (~56pt) + padding (16pt)
-                    .padding(.top, 72)
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .scale(scale: 0.88, anchor: .topTrailing)).combined(with: .offset(y: -12)),
-                        removal: .opacity.combined(with: .scale(scale: 0.88, anchor: .topTrailing)).combined(with: .offset(y: -12))
-                    ))
-                    .animation(.spring(duration: 0.3, bounce: 0.12), value: showNotifPopout)
-                    .zIndex(200)
-                }
-            }
+            // NotifPopout movido pro ZStack root (abaixo) pra ficar
+            // ACIMA do backdrop blur compartilhado.
 
             // TabBar — hidden in immersive mode (e.g. PDF fullscreen)
             if !isImmersiveMode {
@@ -320,6 +296,50 @@ struct MainTabView: View {
                 }
                 .ignoresSafeArea(.keyboard)
                 .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+
+            // MARK: - Backdrop blur (popouts ofuscam conteúdo)
+            // Rafael 2026-04-25: ao abrir notif/menu popout, fundo fica
+            // levemente ofuscado pra dar profundidade — padrão Apple
+            // Shortcuts / context menus. Tap dismissa qualquer popout.
+            if showMenuPopout || showNotifPopout {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.85)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                    .onTapGesture {
+                        withAnimation(.spring(duration: 0.25, bounce: 0)) {
+                            showMenuPopout = false
+                            showNotifPopout = false
+                        }
+                    }
+                    .zIndex(199)
+            }
+
+            // MARK: - Notification Popout (acima do backdrop blur)
+            if showNotifPopout {
+                VitaNotifPopout(
+                    onDismiss: {
+                        withAnimation(.spring(duration: 0.3, bounce: 0.12)) { showNotifPopout = false }
+                    },
+                    onSettingsTap: {
+                        withAnimation(.spring(duration: 0.3, bounce: 0.12)) { showNotifPopout = false }
+                        router.navigate(to: .notifications)
+                    },
+                    onNavigate: { route in
+                        withAnimation(.spring(duration: 0.3, bounce: 0.12)) { showNotifPopout = false }
+                        router.navigateToRoute(route)
+                    }
+                )
+                .padding(.top, 72) // TopBar height + padding
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .scale(scale: 0.88, anchor: .topTrailing)).combined(with: .offset(y: -12)),
+                    removal: .opacity.combined(with: .scale(scale: 0.88, anchor: .topTrailing)).combined(with: .offset(y: -12))
+                ))
+                .animation(.spring(duration: 0.3, bounce: 0.12), value: showNotifPopout)
+                .zIndex(200)
             }
 
             // MARK: - Menu Popout Overlay
