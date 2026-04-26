@@ -16,6 +16,7 @@ struct ProfileScreen: View {
     @Environment(\.appData) private var appData
     @State private var gamStats: GamificationStatsResponse?
     @State private var profile: ProfileResponse?
+    @State private var showEditSheet = false
 
     var body: some View {
         ScrollView(showsIndicators: false) {
@@ -46,8 +47,9 @@ struct ProfileScreen: View {
                 estatisticas
                     .padding(.horizontal, 14)
 
-                // EDITAR PERFIL glass button
-                Button(action: { onNavigateToConfiguracoes?() }) {
+                // EDITAR PERFIL glass button — abre VitaSheet (shell §5.2.4),
+                // NUNCA leva pra Configurações.
+                Button(action: { showEditSheet = true }) {
                     Text("Editar Perfil")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(VitaColors.accentLight.opacity(0.85))
@@ -79,6 +81,12 @@ struct ProfileScreen: View {
             ScreenLoadContext.finish(for: "Profile")
         }
         .trackScreen("Profile")
+        // vita-modals-ignore: EditProfileSheet já é um VitaSheet internamente (shell §5.10).
+        .sheet(isPresented: $showEditSheet) {
+            EditProfileSheet(initialProfile: profile) { updated in
+                profile = updated
+            }
+        }
     }
 
     // MARK: - Header (gear-only, sem chevron back, sem título redundante)

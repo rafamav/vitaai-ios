@@ -24,6 +24,12 @@ actor VitaAPI {
         try await client.get("profile")
     }
 
+    /// PATCH /api/profile — atualiza campos do perfil. Server resolve denorm de
+    /// university/state/lms a partir de universityId. Spec: openapi.yaml linha 6716.
+    func updateProfile(_ body: UpdateProfileRequest) async throws -> ProfileResponse {
+        try await client.patch("profile", body: body)
+    }
+
     // MARK: - Progress
 
     func getProgress() async throws -> ProgressResponse {
