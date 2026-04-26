@@ -89,21 +89,13 @@ struct DashboardScreen: View {
                 heroSection(viewModel: viewModel)
                     .padding(.top, 2)
 
-                // ═══ "Ferramentas de Estudo" ═══
-                // Mockup: font-size 10px, font-weight 600, letter-spacing 0.8px, color rgba(255,241,215,0.55)
-                Text("Ferramentas de Estudo")
-                    .font(.system(size: 10, weight: .semibold))
-                    .kerning(0.8)
-                    .textCase(.uppercase)
-                    .foregroundStyle(VitaColors.sectionLabel)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 12)
-                    .padding(.bottom, 12)
-                    .padding(.horizontal, 16)
-
                 // ═══ TOOLS GRID 2x2 ═══
+                // Label "Ferramentas de Estudo" removido (Rafael 2026-04-25): grid
+                // já é auto-explicativo, sem texto consome menos espaço e fica
+                // simétrico com Matérias/Agenda abaixo (mesmo top-pad 12, h-pad 16).
                 toolsGrid()
                     .padding(.horizontal, 16)
+                    .padding(.top, 12)
 
                 // ═══ MATÉRIAS ↔ AGENDA (swipe) ═══
                 MateriasAgendaWidget(

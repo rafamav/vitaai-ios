@@ -66,11 +66,14 @@ struct VitaNotifPopout: View {
 
     private var popoutContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack(spacing: 8) {
+            // Header — título nunca quebra, ações como ícones (texto não cabia em 78%
+            // da largura, "Notificações" estourava em 2 linhas — fix Rafael 2026-04-25).
+            HStack(spacing: 10) {
                 Text("Notificações")
                     .font(VitaTypography.titleMedium)
                     .foregroundStyle(VitaColors.textPrimary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
 
                 if unreadCount > 0 {
                     Text("\(unreadCount)")
@@ -87,30 +90,37 @@ struct VitaNotifPopout: View {
 
                 if unreadCount > 0 {
                     Button(action: { markAllRead() }) {
-                        Text("Marcar lidas")
-                            .font(VitaTypography.labelMedium)
+                        Image(systemName: "checkmark.circle")
+                            .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(VitaColors.accentHover.opacity(0.90))
+                            .frame(width: 28, height: 28)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Marcar todas como lidas")
                 }
 
                 if readCount > 0 {
                     Button(action: { clearAllRead() }) {
-                        Text("Limpar lidas")
-                            .font(VitaTypography.labelMedium)
+                        Image(systemName: "tray")
+                            .font(.system(size: 15, weight: .medium))
                             .foregroundStyle(VitaColors.dataRed.opacity(0.85))
+                            .frame(width: 28, height: 28)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel("Limpar lidas")
                 }
 
                 Button(action: { dismiss(); onSettingsTap() }) {
                     Image(systemName: "gearshape")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 15, weight: .medium))
                         .foregroundStyle(VitaColors.accent.opacity(0.65))
                         .frame(width: 28, height: 28)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Configurações de notificações")
             }
             .padding(.horizontal, 14)
             .padding(.top, 14)
