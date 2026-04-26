@@ -227,13 +227,15 @@ final class ConnectorsViewModel {
         _ = await (cal, drv, wa)
 
         // Spotify, Apple Health: load from unified /api/integrations
+        // Backend shape (canonical 2026-04-26): { providers: [{ name, status, ... }] }
         do {
             let data = try await api.getIntegrations()
-            for item in data.productivity {
-                switch item.id {
+            for item in data.providers {
+                switch item.name {
                 case "spotify":
                     spotify.status = connectionStatus(from: item.status)
                     spotify.lastSync = item.lastSyncAt.flatMap { formatRelativeTime($0) }
+                    if let email = item.providerAccountEmail { spotify.subtitle = email }
                 case "apple_health":
                     appleHealth.status = connectionStatus(from: item.status)
                     appleHealth.lastSync = item.lastSyncAt.flatMap { formatRelativeTime($0) }
@@ -241,6 +243,8 @@ final class ConnectorsViewModel {
                 }
             }
         } catch {
+            // Decoder failure here = silent UX bug (connector stays "Conectar"
+            // even with tokens in DB). Always surface in console.
             print("[Connectors] Integrations load failed: \(error)")
         }
     }

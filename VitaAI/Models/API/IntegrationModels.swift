@@ -2,31 +2,24 @@ import Foundation
 
 // MARK: - Unified Integrations API Models
 
+// Backend canonical shape (vitaai-web /api/integrations/route.ts):
+//   { providers: [{ name, displayName, connected, status, providerAccountEmail, lastSyncAt }] }
+// Updated 2026-04-26 — iOS used to expect { academic, productivity }, which
+// the backend stopped returning. Decoder failed silently → connectors stayed
+// "Conectar" forever even after OAuth tokens were saved in vita.user_integrations.
 struct IntegrationsResponse: Decodable {
-    let academic: [AcademicConnectorInfo]
-    let productivity: [ProductivityConnectorInfo]
+    let providers: [IntegrationProviderInfo]
 }
 
-struct AcademicConnectorInfo: Decodable {
-    let id: String
-    let provider: String
+struct IntegrationProviderInfo: Decodable, Identifiable {
     let name: String
-    let instanceUrl: String?
+    let displayName: String
+    let connected: Bool
     let status: String
+    let providerAccountEmail: String?
     let lastSyncAt: String?
-    let connectedAt: String?
-}
 
-struct ProductivityConnectorInfo: Decodable, Identifiable {
-    let id: String
-    let name: String
-    let icon: String
-    let description: String
-    let capabilities: [String]
-    let authType: String
-    let status: String
-    let lastSyncAt: String?
-    let connectedAt: String?
+    var id: String { name }
 }
 
 struct IntegrationOAuthResponse: Decodable {
