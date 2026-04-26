@@ -714,12 +714,16 @@ struct MainTabView: View {
                 onNavigateToAssinatura: { router.navigate(to: .paywall) },
                 onNavigateToDisciplinas: { router.navigate(to: .disciplinasConfig) },
                 onNavigateToPrivacyDocuments: { router.navigate(to: .privacyDocuments) },
+                onNavigateToExportData: { router.navigate(to: .exportData) },
                 onBack: { router.goBack() }
             )
         case .privacyDocuments:
             PrivacyDocumentsScreen(
-                onBack: { router.goBack() }
+                onBack: { router.goBack() },
+                onExportData: { router.navigate(to: .exportData) }
             )
+        case .exportData:
+            ExportDataScreen(onBack: { router.goBack() })
         case .disciplinasConfig:
             DisciplinasConfigScreen(onBack: { router.goBack() })
         case .qbank:

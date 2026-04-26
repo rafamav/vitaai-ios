@@ -17,6 +17,7 @@ struct ConfiguracoesScreen: View {
     var onNavigateToAssinatura:       (() -> Void)?
     var onNavigateToDisciplinas:      (() -> Void)?
     var onNavigateToPrivacyDocuments: (() -> Void)?
+    var onNavigateToExportData:       (() -> Void)?
     var onBack:                       (() -> Void)?
 
     @Environment(\.appContainer) private var appContainer
@@ -95,8 +96,8 @@ struct ConfiguracoesScreen: View {
                 }
                 .padding(.horizontal, 14)
 
-                // MARK: - Privacidade & Segurança — Shell §5.2.6
-                // ExportData + ActiveSessions pendentes de endpoint.
+                // MARK: - Privacidade & Segurança — Shell §5.2.6 + §5.2.8
+                // ActiveSessions pendente de endpoint backend (delegate NOVA).
                 settingsSectionLabel("Privacidade & Segurança")
                 VitaGlassCard {
                     VStack(spacing: 0) {
@@ -105,6 +106,13 @@ struct ConfiguracoesScreen: View {
                             label: "Privacidade de documentos",
                             desc: "O que coletamos, onde processamos, retenção",
                             action: { onNavigateToPrivacyDocuments?() }
+                        )
+                        rowDivider
+                        settingsRow(
+                            icon: "square.and.arrow.down",
+                            label: "Exportar meus dados",
+                            desc: "Baixar tudo (LGPD art. 18 V)",
+                            action: { onNavigateToExportData?() }
                         )
                         rowDivider
                         deleteAccountRow

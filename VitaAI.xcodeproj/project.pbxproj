@@ -224,6 +224,7 @@
 		9025A078FB032CE551E9E4BB /* AboutScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED0343F16BF93C40BA29E8D8 /* AboutScreen.swift */; };
 		904C58A03B729B59AF4101FE /* StudyOverviewResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88A5BA29C1A137A86F9A6AF9 /* StudyOverviewResponse.swift */; };
 		9255BF9F45EA8E29CAD0E8E9 /* View+GlassStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FBBCF3219680111FD841209 /* View+GlassStyle.swift */; };
+		93734B7529EAB73C1AE36F07 /* ExportDataScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34E2B4483BF38F2C168810A1 /* ExportDataScreen.swift */; };
 		93A239882DF96A737F37181D /* GlassTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B583FE6C84F4FFF2A9BFB75 /* GlassTextField.swift */; };
 		9498CF9FCCC1FF64AD017D5A /* TranscricaoScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87EA1E56084FA3D11CAD0F7E /* TranscricaoScreen.swift */; };
 		94CC00D0CF7ED87DB67D15BB /* PushManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C7EE91AF90098D6FB1DAD0 /* PushManager.swift */; };
@@ -436,6 +437,7 @@
 		3198A25AAF0B219D68DDB707 /* SimuladoHomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimuladoHomeScreen.swift; sourceTree = "<group>"; };
 		3277C8F9B81F4549160015AA /* StudyOverviewTranscricoes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudyOverviewTranscricoes.swift; sourceTree = "<group>"; };
 		330A738D52A76441153C62B0 /* TranscricaoAudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscricaoAudioPlayer.swift; sourceTree = "<group>"; };
+		34E2B4483BF38F2C168810A1 /* ExportDataScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExportDataScreen.swift; sourceTree = "<group>"; };
 		353A7FFE89EFB93AC800FEF8 /* NotchShape.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotchShape.swift; sourceTree = "<group>"; };
 		3557EFD9812981B1963CB519 /* SimuladoViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimuladoViewModel.swift; sourceTree = "<group>"; };
 		35FDE5D7A49D29E52AD38943 /* DashboardScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardScreen.swift; sourceTree = "<group>"; };
@@ -1387,6 +1389,7 @@
 				4B4661452712B846B5F555B7 /* ConnectionsScreen.swift */,
 				D22584DB23356B862FEDC41E /* DisciplinasConfigScreen.swift */,
 				D3B62E7CE87B36210A70F708 /* EditProfileSheet.swift */,
+				34E2B4483BF38F2C168810A1 /* ExportDataScreen.swift */,
 				3C615CE58F474E99F3FD2173 /* NotificationSettingsScreen.swift */,
 				6AD37FFFDD11FB731B7FEEB3 /* PrivacyDocumentsScreen.swift */,
 				D0AA34DA1F2E5FE7046BB9C1 /* ProfileScreen.swift */,
@@ -1793,6 +1796,7 @@
 				8107A559A4656C6B2522AA13 /* EstudosScreen.swift in Sources */,
 				0B365CDE13A4800E325112F4 /* EstudosViewModel.swift in Sources */,
 				4CD50558070536A9288C915A /* ExamUploadSheet.swift in Sources */,
+				93734B7529EAB73C1AE36F07 /* ExportDataScreen.swift in Sources */,
 				F26A1A794273B9DAC041774D /* ExtrasStep.swift in Sources */,
 				415661B3051F6F606DF8CDBD /* FaculdadeDisciplinasScreen.swift in Sources */,
 				81B66187877A6E96C341E66C /* FaculdadeDocumentosScreen.swift in Sources */,

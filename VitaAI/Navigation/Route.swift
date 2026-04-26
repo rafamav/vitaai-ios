@@ -53,6 +53,7 @@ enum Route: Hashable {
     case configuracoes
     case disciplinasConfig
     case privacyDocuments
+    case exportData
 
     // MARK: - Activity / Gamification
     case activityFeed

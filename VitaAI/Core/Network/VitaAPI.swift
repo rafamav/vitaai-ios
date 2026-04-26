@@ -30,6 +30,13 @@ actor VitaAPI {
         try await client.patch("profile", body: body)
     }
 
+    /// GET /api/user/export — LGPD art. 18 V (portabilidade). Retorna JSON com
+    /// TUDO que o usuário produziu (perfil, academic, study, qbank, etc).
+    /// Spec: openapi.yaml linha 7334. SLA legal: 30 dias.
+    func exportUserData() async throws -> Data {
+        try await client.downloadRaw("user/export")
+    }
+
     // MARK: - Progress
 
     func getProgress() async throws -> ProgressResponse {
