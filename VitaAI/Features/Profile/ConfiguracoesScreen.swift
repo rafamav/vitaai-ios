@@ -21,6 +21,7 @@ struct ConfiguracoesScreen: View {
     var onNavigateToExportData:       (() -> Void)?
     var onNavigateToFeedback:         (() -> Void)?
     var onNavigateToFocusSession:     (() -> Void)?
+    var onNavigateToReferral:         (() -> Void)?
     var onBack:                       (() -> Void)?
 
     // Sons + vibração persistem em UserDefaults via SoundManager/HapticManager.
@@ -71,6 +72,13 @@ struct ConfiguracoesScreen: View {
                             label: "Assinatura",
                             desc: "Vita Pro / Premium",
                             action: { onNavigateToAssinatura?() }
+                        )
+                        rowDivider
+                        settingsRow(
+                            icon: "gift",
+                            label: "Convide amigos",
+                            desc: "Ganhe 7 dias Pro grátis por amigo",
+                            action: { onNavigateToReferral?() }
                         )
                     }
                 }

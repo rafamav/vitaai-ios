@@ -104,6 +104,10 @@ struct AppRouter: View {
             }
         }
         .task(id: authManager.isLoggedIn) {
+            // First-launch pasteboard sniff (one-time) pra capturar referral
+            // que veio via App Store install (sem Universal Link tap).
+            ReferralCaptureService.shared.checkPasteboardForReferral()
+
             guard authManager.isLoggedIn else {
                 profileChecked = false
                 needsOnboarding = false
@@ -143,6 +147,10 @@ struct AppRouter: View {
                 needsOnboarding = false
             }
             profileChecked = true
+
+            // Auto-redeem referral pendente (Universal Link, pasteboard ou
+            // captura via vitaai://r/CODE). Idempotente, fire-and-forget.
+            await ReferralCaptureService.shared.redeemPendingIfAny(api: container.api)
         }
         .preferredColorScheme(.dark)
         .onOpenURL { url in
@@ -172,6 +180,15 @@ struct AppRouter: View {
             case .reviewToken(let token):
                 // App Store reviewer deep link — sign into demo account.
                 Task { await authManager.signInWithReviewToken(token) }
+            case .referralCode(let code, let source):
+                // Captura referral code (Universal Link /r/CODE ou vitaai://r/CODE).
+                // Persiste em UserDefaults pra ser consumido após auth + onboarding.
+                ReferralCaptureService.shared.captureCode(code: code, source: source)
+                if authManager.isLoggedIn && profileChecked && !needsOnboarding {
+                    // Já tá logado e onboarded — redime imediato.
+                    Task { await ReferralCaptureService.shared.redeemPendingIfAny(api: container.api) }
+                }
+                // Senão, AppRouter task chama redeemPendingIfAny após auth check.
             default: break
             }
         }
@@ -738,6 +755,7 @@ struct MainTabView: View {
                 onNavigateToExportData: { router.navigate(to: .exportData) },
                 onNavigateToFeedback: { router.navigate(to: .feedback) },
                 onNavigateToFocusSession: { router.navigate(to: .focusSession) },
+                onNavigateToReferral: { router.navigate(to: .referral) },
                 onBack: { router.goBack() }
             )
         case .privacyDocuments:
@@ -753,6 +771,8 @@ struct MainTabView: View {
             FeedbackScreen(onBack: { router.goBack() })
         case .focusSession:
             FocusSessionScreen(onBack: { router.goBack() })
+        case .referral:
+            ReferralScreen(onBack: { router.goBack() })
         case .disciplinasConfig:
             DisciplinasConfigScreen(onBack: { router.goBack() })
         case .qbank:

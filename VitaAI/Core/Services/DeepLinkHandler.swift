@@ -52,12 +52,24 @@ final class DeepLinkHandler {
         case unknown(URL)
         /// No deep link data present.
         case none
+        /// Referral code captured (Universal Link /r/CODE OR vitaai://r/CODE).
+        /// Stored in UserDefaults pra ser consumido após auth + onboarding.
+        case referralCode(code: String, source: String)
     }
 
     // MARK: - Parse
 
     func parse(url: URL?) -> DeepLinkResult {
         guard let url else { return .none }
+
+        // Universal Link https://vita-ai.cloud/r/CODE — captura referral
+        // ANTES de qualquer scheme check (universal link usa https, não vitaai://).
+        if let host = url.host, host.contains("vita-ai.cloud"),
+           url.pathComponents.count >= 3, url.pathComponents[1] == "r" {
+            let code = url.pathComponents[2].uppercased()
+            return .referralCode(code: code, source: "universal_link")
+        }
+
         guard url.scheme == scheme else {
             return .unknown(url)
         }
@@ -136,6 +148,11 @@ final class DeepLinkHandler {
 
         // Connections / Conectores
         case "connections": return .navigate(.connections)
+
+        // Referral via custom scheme: vitaai://r/CODE
+        case "r":
+            guard let codeRaw = pathSegments.first else { return .navigate(.referral) }
+            return .referralCode(code: codeRaw.uppercased(), source: "universal_link")
 
         // Settings sub-screens
         case "settings":

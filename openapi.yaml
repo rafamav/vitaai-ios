@@ -1942,6 +1942,38 @@ components:
         completed: { type: boolean }
         xpAwarded: { type: integer }
 
+    # ── Referrals ──
+    MyReferralResponse:
+      type: object
+      required: [code, isCustomized, shareUrl, rewards, totalInvited, totalQualified, totalDaysEarned]
+      properties:
+        code: { type: string }
+        isCustomized: { type: boolean }
+        shareUrl: { type: string }
+        rewards:
+          type: object
+          properties:
+            ownerDays: { type: integer }
+            invitedDays: { type: integer }
+        totalInvited: { type: integer }
+        totalQualified: { type: integer }
+        totalDaysEarned: { type: integer }
+        myProUntil: { type: string, format: date-time, nullable: true }
+        qualifiedFriends:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              qualifiedAt: { type: string, format: date-time }
+        pendingFriends:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              signedUpAt: { type: string, format: date-time }
+
     # ── Privacy Preferences ──
     PrivacyPreferences:
       type: object
@@ -8006,6 +8038,99 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '500':
           $ref: '#/components/responses/ServerError'
+
+  /api/referrals/me:
+    get:
+      tags: [social]
+      operationId: getMyReferral
+      summary: Meu código de referral + stats agregadas (auto-cria se primeira vez)
+      description: >
+        Retorna o código curto do user logado (lazy init na primeira chamada).
+        Reward: 7 dias Pro pro convidante, 14 dias pro convidado. Trigger:
+        convidado vincula portal + completa 1ª sessão de estudo.
+      responses:
+        '200':
+          description: Código + stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyReferralResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/referrals/redeem:
+    post:
+      tags: [social]
+      operationId: redeemReferralCode
+      summary: Vincular o user logado a um código (universal_link, pasteboard ou manual)
+      description: >
+        Idempotente. UNIQUE em invitedUserId — cada user pode redimir só 1
+        código uma vez. Source manual exige janela 7d pós-signup.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+                source:
+                  type: string
+                  enum: [universal_link, pasteboard, manual]
+                  default: universal_link
+      responses:
+        '200':
+          description: Vinculado com sucesso (reward virá no qualifyReferral)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  ownerName: { type: string, nullable: true }
+                  ownerCode: { type: string }
+                  invitedRewardDays: { type: integer }
+                  message: { type: string }
+        '400':
+          description: invalid_code | cannot_self_refer | window_expired | invalid_source
+        '409':
+          description: already_redeemed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/referrals/customize:
+    post:
+      tags: [social]
+      operationId: customizeReferralCode
+      summary: Trocar código de referral (1x apenas)
+      description: 4–12 chars [A-Z0-9-]. Valida palavras reservadas + uniqueness.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        '200':
+          description: Código atualizado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  code: { type: string }
+                  shareUrl: { type: string }
+        '400':
+          description: invalid_format | reserved
+        '409':
+          description: already_customized | taken
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/whatsapp/status:
     get:

@@ -57,6 +57,7 @@ enum Route: Hashable {
     case exportData
     case feedback
     case focusSession
+    case referral
 
     // MARK: - Activity / Gamification
     case activityFeed

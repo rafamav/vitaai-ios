@@ -76,6 +76,8 @@ Sources/VitaAPI/Models/CronPortalSilentSync200Response.swift
 Sources/VitaAPI/Models/CronPortalSilentSyncDevice200Response.swift
 Sources/VitaAPI/Models/CronPortalSilentSyncDeviceRequest.swift
 Sources/VitaAPI/Models/CronPortalSync200Response.swift
+Sources/VitaAPI/Models/CustomizeReferralCode200Response.swift
+Sources/VitaAPI/Models/CustomizeReferralCodeRequest.swift
 Sources/VitaAPI/Models/Dashboard.swift
 Sources/VitaAPI/Models/DashboardAgendaItem.swift
 Sources/VitaAPI/Models/DashboardHeroCard.swift
@@ -201,6 +203,10 @@ Sources/VitaAPI/Models/ModelError.swift
 Sources/VitaAPI/Models/MoveDocumentToFolder200Response.swift
 Sources/VitaAPI/Models/MoveDocumentToFolder200ResponseDocument.swift
 Sources/VitaAPI/Models/MoveDocumentToFolderRequest.swift
+Sources/VitaAPI/Models/MyReferralResponse.swift
+Sources/VitaAPI/Models/MyReferralResponsePendingFriendsInner.swift
+Sources/VitaAPI/Models/MyReferralResponseQualifiedFriendsInner.swift
+Sources/VitaAPI/Models/MyReferralResponseRewards.swift
 Sources/VitaAPI/Models/Note.swift
 Sources/VitaAPI/Models/Notification.swift
 Sources/VitaAPI/Models/OsceAttemptStart.swift
@@ -258,6 +264,8 @@ Sources/VitaAPI/Models/QBankProgress.swift
 Sources/VitaAPI/Models/QBankQuestion.swift
 Sources/VitaAPI/Models/QBankQuestionAlternativesInner.swift
 Sources/VitaAPI/Models/QBankSession.swift
+Sources/VitaAPI/Models/RedeemReferralCode200Response.swift
+Sources/VitaAPI/Models/RedeemReferralCodeRequest.swift
 Sources/VitaAPI/Models/RefreshAdminCatalogStatus200Response.swift
 Sources/VitaAPI/Models/RegisterPushToken200Response.swift
 Sources/VitaAPI/Models/RegisterPushTokenRequest.swift
@@ -403,6 +411,8 @@ docs/CronPortalSilentSync200Response.md
 docs/CronPortalSilentSyncDevice200Response.md
 docs/CronPortalSilentSyncDeviceRequest.md
 docs/CronPortalSync200Response.md
+docs/CustomizeReferralCode200Response.md
+docs/CustomizeReferralCodeRequest.md
 docs/Dashboard.md
 docs/DashboardAgendaItem.md
 docs/DashboardHeroCard.md
@@ -528,6 +538,10 @@ docs/ModelError.md
 docs/MoveDocumentToFolder200Response.md
 docs/MoveDocumentToFolder200ResponseDocument.md
 docs/MoveDocumentToFolderRequest.md
+docs/MyReferralResponse.md
+docs/MyReferralResponsePendingFriendsInner.md
+docs/MyReferralResponseQualifiedFriendsInner.md
+docs/MyReferralResponseRewards.md
 docs/Note.md
 docs/Notification.md
 docs/OsceAttemptStart.md
@@ -585,6 +599,8 @@ docs/QBankProgress.md
 docs/QBankQuestion.md
 docs/QBankQuestionAlternativesInner.md
 docs/QBankSession.md
+docs/RedeemReferralCode200Response.md
+docs/RedeemReferralCodeRequest.md
 docs/RefreshAdminCatalogStatus200Response.md
 docs/RegisterPushToken200Response.md
 docs/RegisterPushTokenRequest.md

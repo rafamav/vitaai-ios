@@ -104,6 +104,29 @@ actor VitaAPI {
         ])
     }
 
+    // MARK: - Referrals (Rafael 2026-04-26)
+
+    /// GET /api/referrals/me — meu código + stats. Lazy init na primeira chamada.
+    func getMyReferral() async throws -> MyReferralResponse {
+        try await client.get("referrals/me")
+    }
+
+    /// POST /api/referrals/redeem — vincula user logado a código.
+    func redeemReferralCode(code: String, source: RedeemReferralCodeRequest.Source = .universalLink) async throws -> RedeemReferralCode200Response {
+        try await client.post(
+            "referrals/redeem",
+            body: RedeemReferralCodeRequest(code: code, source: source)
+        )
+    }
+
+    /// POST /api/referrals/customize — trocar código (1x apenas).
+    func customizeReferralCode(code: String) async throws -> CustomizeReferralCode200Response {
+        try await client.post(
+            "referrals/customize",
+            body: CustomizeReferralCodeRequest(code: code)
+        )
+    }
+
     // MARK: - Achievements
 
     func getAchievements() async throws -> [BadgeWithStatus] {

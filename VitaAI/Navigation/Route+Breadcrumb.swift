@@ -72,6 +72,7 @@ extension Route {
         case .exportData:          return "Exportar meus dados"
         case .feedback:            return "Feedback"
         case .focusSession:        return "Foco"
+        case .referral:            return "Convide amigos"
 
         // MARK: - Fora do breadcrumb
         // Root tabs (represented by TabItem, not path)
