@@ -25,17 +25,22 @@ struct LoginScreen: View {
         let h = UIScreen.main.bounds.height
         let p = progress
 
-        // Vita: starts huge at very bottom (barely visible head), shrinks and rises to center
-        let mascotSize: CGFloat = 340 - 230 * p
-        let mascotY = h * (0.98 - 0.58 * p)
+        // Vita: starts HUGE peeking from below the screen edge (~25% of head visible,
+        // eyes hidden, no idle motion — looks like it's sleeping). As user drags up,
+        // it shrinks, rises to center, eyes fade in and progressively widen.
+        let mascotSize: CGFloat = 620 - 510 * p
+        let mascotY = h * (1.18 - 0.78 * p)
 
-        // State: sleeping -> waking -> awake, tap = happy
+        // State: sleeping -> waking -> awake, tap = happy.
+        // Lower waking threshold so eyes start opening AS SOON AS the drag begins.
         let mascotState: VitaMascotState = {
             if vitaTapped { return .happy }
-            if p > 0.5 { return .awake }
-            if p > 0.1 { return .waking }
+            if p > 0.55 { return .awake }
+            if p > 0.04 { return .waking }
             return .sleeping
         }()
+        // Freeze idle motion + hide eyes while sleeping (peeking under the screen).
+        let mascotIdle = mascotState != .sleeping
 
         ZStack {
             // Dark starry background
@@ -50,7 +55,7 @@ struct LoginScreen: View {
                 .ignoresSafeArea()
 
             // Mascot
-            VitaMascot(state: mascotState, size: mascotSize, showStaff: false)
+            VitaMascot(state: mascotState, size: mascotSize, showStaff: false, idleEnabled: mascotIdle)
                 .offset(x: vitaDragX)
                 .position(x: w / 2, y: mascotY)
                 .onTapGesture {
@@ -113,11 +118,11 @@ struct LoginScreen: View {
             // Reveal headline
             if p > 0.6 {
                 VStack(spacing: 8) {
-                    Text("Conhe\u{00E7}a o Vita.")
+                    Text("Conhe\u{00E7}a Vita")
                         .font(.system(size: 38, weight: .light, design: .serif))
                         .foregroundStyle(.white.opacity(0.9))
 
-                    Text("O futuro dos seus estudos\ncome\u{00E7}a agora.")
+                    Text("O futuro dos seus estudos\ncome\u{00E7}a agora")
                         .font(.system(size: 18, weight: .regular))
                         .foregroundStyle(.white.opacity(0.5))
                         .multilineTextAlignment(.center)
@@ -176,16 +181,27 @@ struct LoginScreen: View {
 
                     Spacer().frame(height: 16)
 
-                    (Text("Ao continuar voc\u{00EA} concorda com os ")
-                        .foregroundColor(VitaColors.textTertiary) +
-                    Text("Termos de Uso")
-                        .foregroundColor(VitaColors.textSecondary)
-                        .underline() +
-                    Text(" e ")
-                        .foregroundColor(VitaColors.textTertiary) +
-                    Text("Pol\u{00ED}tica de Privacidade")
-                        .foregroundColor(VitaColors.textSecondary)
-                        .underline())
+                    // Legal links — Link opens Safari externally (App Store gold standard
+                    // for Terms/Privacy). HStack avoids tap propagation to background drag
+                    // gesture that was logging the user in by accident.
+                    VStack(spacing: 4) {
+                        Text("Ao continuar voc\u{00EA} concorda com os")
+                            .foregroundColor(VitaColors.textTertiary)
+                        HStack(spacing: 4) {
+                            Link(destination: URL(string: "https://vita-ai.cloud/terms")!) {
+                                Text("Termos de Uso")
+                                    .foregroundColor(VitaColors.textSecondary)
+                                    .underline()
+                            }
+                            Text("e")
+                                .foregroundColor(VitaColors.textTertiary)
+                            Link(destination: URL(string: "https://vita-ai.cloud/privacy")!) {
+                                Text("Pol\u{00ED}tica de Privacidade")
+                                    .foregroundColor(VitaColors.textSecondary)
+                                    .underline()
+                            }
+                        }
+                    }
                     .font(VitaTypography.labelSmall)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)

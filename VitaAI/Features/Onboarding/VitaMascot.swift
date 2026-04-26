@@ -55,6 +55,10 @@ struct OrbMascot: View {
     // screens where the bounce competes with the user's task — e.g. the
     // Transcrição recorder where the orb needs to look focused, not excited.
     var bounceEnabled: Bool = true
+    // When false, ALL idle animations stop (float, breath, head tilt, drift,
+    // pulse, blink) AND eyes are hidden. Used by LoginScreen pre-drag state
+    // where the orb is meant to look "asleep, hiding under the screen edge".
+    var idleEnabled: Bool = true
 
     @State private var floatY: CGFloat = 0
     @State private var glowIntensity: Double = 0.3
@@ -414,6 +418,10 @@ struct OrbMascot: View {
             eyeView.rotationEffect(.degrees(-eyeAngle))
         }
         .offset(x: eyeLookX, y: -size * 0.02)
+        // idleEnabled=false (LoginScreen pre-drag) → orb is "asleep, hidden",
+        // eyes must be fully invisible. Smoothly fades back in as drag begins.
+        .opacity(idleEnabled ? 1 : 0)
+        .animation(.easeInOut(duration: 0.4), value: idleEnabled)
     }
 
     private var eyeView: some View {
@@ -476,19 +484,25 @@ struct OrbMascot: View {
 
     // MARK: - Animations
     private func startAnimations() {
-        withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true)) { floatY = -8 }
+        // Subtle background rotations + glow always on (sells "alive" even when idle off).
         withAnimation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true)) {
             glowIntensity = state == .sleeping ? 0.2 : 0.55
         }
         withAnimation(.linear(duration: 12).repeatForever(autoreverses: false)) { sparklePhase = .pi * 2 }
-        withAnimation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true)) { breathScale = 1.025 }
         withAnimation(.linear(duration: 20).repeatForever(autoreverses: false)) { ringRotation = .pi * 2 }
         withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) { auraHue = 1.0 }
-        withAnimation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true)) { eyeAngle = 5 }
+
+        // Idle motion — only when idleEnabled (LoginScreen passes false to "freeze" the orb).
+        if idleEnabled {
+            withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true)) { floatY = -8 }
+            withAnimation(.easeInOut(duration: 3.5).repeatForever(autoreverses: true)) { breathScale = 1.025 }
+            withAnimation(.easeInOut(duration: 4.0).repeatForever(autoreverses: true)) { eyeAngle = 5 }
+        }
 
         loopTask?.cancel()
         loopTask = Task { @MainActor in
             await withTaskGroup(of: Void.self) { group in
+                guard self.idleEnabled else { return }
                 group.addTask { await self.eyeLookLoop() }
                 group.addTask { await self.blinkLoop() }
                 if self.bounceEnabled {
@@ -650,9 +664,10 @@ struct VitaMascot: View {
     var state: VitaMascotState = .awake
     var size: CGFloat = 120
     var showStaff: Bool = false
+    var idleEnabled: Bool = true
 
     var body: some View {
-        OrbMascot(palette: .vita, state: state, size: size)
+        OrbMascot(palette: .vita, state: state, size: size, idleEnabled: idleEnabled)
     }
 }
 
