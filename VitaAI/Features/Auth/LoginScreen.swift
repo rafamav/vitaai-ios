@@ -157,18 +157,9 @@ struct LoginScreen: View {
                             .scaleEffect(1.2)
                         Spacer().frame(height: 40)
                     } else {
-                        SocialAuthButton(
-                            provider: .apple,
-                            label: "Continuar com Apple",
-                            isLoading: loadingProvider == .apple
-                        ) {
-                            loadingProvider = .apple
-                            authManager.signInWithApple()
-                        }
-                        .padding(.horizontal, 36)
-
-                        Spacer().frame(height: 12)
-
+                        // Google first (Rafael preference — favored login path).
+                        // Apple HIG 4.8 requires Sign-in-with-Apple to *exist* when
+                        // 3rd-party providers are present, not to be at the top.
                         SocialAuthButton(
                             provider: .google,
                             label: "Continuar com Google",
@@ -176,6 +167,18 @@ struct LoginScreen: View {
                         ) {
                             loadingProvider = .google
                             authManager.signInWithGoogle()
+                        }
+                        .padding(.horizontal, 36)
+
+                        Spacer().frame(height: 12)
+
+                        SocialAuthButton(
+                            provider: .apple,
+                            label: "Continuar com Apple",
+                            isLoading: loadingProvider == .apple
+                        ) {
+                            loadingProvider = .apple
+                            authManager.signInWithApple()
                         }
                         .padding(.horizontal, 36)
                     }

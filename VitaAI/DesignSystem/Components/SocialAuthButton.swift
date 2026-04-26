@@ -61,7 +61,9 @@ struct SocialAuthButton: View {
                 .onChanged { _ in isPressed = true }
                 .onEnded { _ in isPressed = false }
         )
-        .vitaSoftGlow(intensity: provider == .apple ? .strong : .medium)
+        // Both providers now wear the strong halo — Google is the favored
+        // primary path; equalizing keeps the pair balanced.
+        .vitaSoftGlow(intensity: .strong)
     }
 
     @ViewBuilder
