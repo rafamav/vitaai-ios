@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0012CF26026608C508A9C1BC /* VitaSpeakingMascot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1607B6497620C74D50F34E /* VitaSpeakingMascot.swift */; };
 		00142409474FF0AB0A8600EC /* OsceSessionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40A681B65A29A68135987794 /* OsceSessionView.swift */; };
 		00BA6439DC936CB28EB48BAD /* Route.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80ED0B424F1E28E60CE3578A /* Route.swift */; };
 		0189CC418D541011EF5C3CDC /* SyncProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1ACF21598F20E4035C39378 /* SyncProgress.swift */; };
@@ -486,6 +487,7 @@
 		48AF609190131E981412AE60 /* QBankExplanationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QBankExplanationSheet.swift; sourceTree = "<group>"; };
 		4933995BB48420650CBF71C3 /* LeaderboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeaderboardViewModel.swift; sourceTree = "<group>"; };
 		494024FF2D4D0CEA176A7144 /* FsrsScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FsrsScheduler.swift; sourceTree = "<group>"; };
+		4A1607B6497620C74D50F34E /* VitaSpeakingMascot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitaSpeakingMascot.swift; sourceTree = "<group>"; };
 		4B2FF894ECCB56BF0B38F9FB /* FaculdadeHomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaculdadeHomeScreen.swift; sourceTree = "<group>"; };
 		4B4661452712B846B5F555B7 /* ConnectionsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionsScreen.swift; sourceTree = "<group>"; };
 		4C4DE24CBF4DF36D7893CE6A /* VitaAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitaAPI.swift; sourceTree = "<group>"; };
@@ -896,6 +898,7 @@
 				13E0DDDF5D64EFF6ABD99CAB /* VitaNotifPopout.swift */,
 				97AA77471D1E0F51EB5563A9 /* VitaScreenSkeleton.swift */,
 				6B97080B4329AB9C409C8FD0 /* VitaShimmer.swift */,
+				4A1607B6497620C74D50F34E /* VitaSpeakingMascot.swift */,
 				AE820FA12745A79A71139683 /* VitaStreakBadge.swift */,
 				592B63FA996C5A6E62A174DE /* VitaSubTabBar.swift */,
 				A78C90E33A5261C25C9E8957 /* VitaToast.swift */,
@@ -2048,6 +2051,7 @@
 				B7545C352B063EC286B9E005 /* VitaPaywallScreen.swift in Sources */,
 				565FCC65F6614F51FEEF10B1 /* VitaScreenSkeleton.swift in Sources */,
 				B985632F939BA9B9F5168C3E /* VitaShimmer.swift in Sources */,
+				0012CF26026608C508A9C1BC /* VitaSpeakingMascot.swift in Sources */,
 				2DE96EAC5177EC1C69E8CC7B /* VitaStreakBadge.swift in Sources */,
 				DA66288AA1EC6878F4986357 /* VitaSubTabBar.swift in Sources */,
 				9AE097D3E925663AE412A837 /* VitaTabBar.swift in Sources */,
