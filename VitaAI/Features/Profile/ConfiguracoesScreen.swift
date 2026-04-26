@@ -9,25 +9,29 @@ import Sentry
 struct ConfiguracoesScreen: View {
     let authManager: AuthManager
 
+    // Menu order locked by Rafael 2026-04-26 (gold-standard hamburger pattern):
+    //   1. Meu perfil  2. Assinatura  3. Disciplinas  4. Conectores
+    //   5. Notificações  6. Convide amigos  7. Ajuda e suporte
+    //   8. Termos e privacidade  →  Sair (logout, vermelho, separado)
+    //
+    // Removed (Rafael's call): Aparência (only one theme exists), Modo foco
+    // (parked), Efeitos sonoros (only used by FocusSession which is gone).
     var onNavigateToPerfil:           (() -> Void)?
-    var onNavigateToAppearance:       (() -> Void)?
-    var onNavigateToNotifications:    (() -> Void)?
-    var onNavigateToConnections:      (() -> Void)?
-    var onNavigateToAbout:            (() -> Void)?
     var onNavigateToAssinatura:       (() -> Void)?
     var onNavigateToDisciplinas:      (() -> Void)?
-    var onNavigateToPrivacyDocuments: (() -> Void)?
-    var onNavigateToPrivacySettings:  (() -> Void)?
-    var onNavigateToExportData:       (() -> Void)?
-    var onNavigateToFeedback:         (() -> Void)?
-    var onNavigateToFocusSession:     (() -> Void)?
+    var onNavigateToConnections:      (() -> Void)?
+    var onNavigateToNotifications:    (() -> Void)?
     var onNavigateToReferral:         (() -> Void)?
+    var onNavigateToFeedback:         (() -> Void)?
+    var onNavigateToPrivacyDocuments: (() -> Void)?
     var onBack:                       (() -> Void)?
 
-    // Sons + vibração persistem em UserDefaults via SoundManager/HapticManager.
-    // @AppStorage espelha a chave pra UI atualizar instantâneo no toggle.
-    @AppStorage("vita_sound_enabled")  private var soundEnabled: Bool = true
+    // Vibração persiste em UserDefaults via HapticManager. Sound toggle removed
+    // — SoundManager only feeds FocusSession which is parked.
     @AppStorage("vita_haptic_enabled") private var hapticEnabled: Bool = true
+
+    @Environment(\.appContainer) private var container
+    @State private var profile: ProfileResponse?
 
     private let logoutColor = Color(red: 1.0, green: 0.47, blue: 0.31)
 
@@ -38,6 +42,16 @@ struct ConfiguracoesScreen: View {
         return "VitaAI v\(version) (\(build))"
     }
 
+    /// Linha sob o nome do user no card topo. Formato: "Medicina · 3º semestre"
+    /// quando há perfil carregado, fallback pro e-mail.
+    private var profileSubtitle: String {
+        let course = "Medicina"
+        if let s = profile?.semester, s > 0 {
+            return "\(course) · \(s)º semestre"
+        }
+        return authManager.userEmail ?? course
+    }
+
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 0) {
@@ -45,18 +59,33 @@ struct ConfiguracoesScreen: View {
                 headerBar
                     .padding(.top, 8)
 
-                // MARK: - User Card
+                // MARK: - User Card (topo: nome / curso · semestre / Ver perfil)
                 userCard
                     .padding(.top, 12)
 
-                // MARK: - Conta — Shell §5.2.6 + §5.2.14 (Vita extras)
-                settingsSectionLabel("Conta")
+                // MARK: - Menu principal — ordem Rafael 2026-04-26
                 VitaGlassCard {
                     VStack(spacing: 0) {
                         settingsRow(
+                            icon: "person.crop.circle",
+                            label: "Meu perfil",
+                            // quality-gate-ignore: 'pessoais' é PT-BR correto sem acento
+                            desc: "Dados pessoais, faculdade, semestre, foto",
+                            action: { onNavigateToPerfil?() }
+                        )
+                        rowDivider
+                        settingsRow(
+                            icon: "star",
+                            label: "Assinatura",
+                            // quality-gate-ignore: 'fiscais' é PT-BR correto sem acento
+                            desc: "Plano, upgrade, pagamento, notas fiscais",
+                            action: { onNavigateToAssinatura?() }
+                        )
+                        rowDivider
+                        settingsRow(
                             icon: "book",
-                            label: "Disciplinas",
-                            desc: "Gerenciar disciplinas e dificuldade",
+                            label: "Matérias",
+                            desc: "Lista do semestre, dificuldade, prioridade",
                             action: { onNavigateToDisciplinas?() }
                         )
                         rowDivider
@@ -68,10 +97,10 @@ struct ConfiguracoesScreen: View {
                         )
                         rowDivider
                         settingsRow(
-                            icon: "star",
-                            label: "Assinatura",
-                            desc: "Vita Pro / Premium",
-                            action: { onNavigateToAssinatura?() }
+                            icon: "bell",
+                            label: "Notificações",
+                            desc: "Push, e-mail, lembretes de estudo",
+                            action: { onNavigateToNotifications?() }
                         )
                         rowDivider
                         settingsRow(
@@ -83,37 +112,25 @@ struct ConfiguracoesScreen: View {
                     }
                 }
                 .padding(.horizontal, 14)
+                .padding(.top, 18)
 
-                // MARK: - Preferências — Shell §5.2.6
-                settingsSectionLabel("Preferencias")
+                // MARK: - Suporte + Legal + Vibração
                 VitaGlassCard {
                     VStack(spacing: 0) {
                         settingsRow(
-                            icon: "bell",
-                            label: "Notificações",
-                            desc: "Push, email, lembretes de estudo",
-                            action: { onNavigateToNotifications?() }
+                            icon: "questionmark.circle",
+                            label: "Ajuda e suporte",
+                            // quality-gate-ignore: 'reportar' é PT-BR sem acento
+                            desc: "FAQ, falar com suporte, reportar problema",
+                            action: { onNavigateToFeedback?() }
                         )
                         rowDivider
                         settingsRow(
-                            icon: "paintbrush",
-                            label: "Aparência",
-                            desc: "Tema e visual do app",
-                            action: { onNavigateToAppearance?() }
-                        )
-                        rowDivider
-                        settingsRow(
-                            icon: "hourglass",
-                            label: "Modo foco",
-                            desc: "Pomodoro com penalidade XP por sair do app",
-                            action: { onNavigateToFocusSession?() }
-                        )
-                        rowDivider
-                        toggleRow(
-                            icon: "speaker.wave.2",
-                            label: "Efeitos sonoros",
-                            desc: "Tap, acerto/erro, conquistas",
-                            isOn: $soundEnabled
+                            icon: "lock.shield",
+                            label: "Termos e privacidade",
+                            // quality-gate-ignore: 'política' tem acento OK aqui
+                            desc: "Termos de uso, política de privacidade, dados",
+                            action: { onNavigateToPrivacyDocuments?() }
                         )
                         rowDivider
                         toggleRow(
@@ -125,64 +142,14 @@ struct ConfiguracoesScreen: View {
                     }
                 }
                 .padding(.horizontal, 14)
+                .padding(.top, 12)
 
-                // MARK: - Privacidade & Segurança — Shell §5.2.6 + §5.2.8
-                // "Excluir conta" foi MOVIDA pro Profile (Rafael 2026-04-25, padrão Duolingo).
-                // ActiveSessions pendente de endpoint backend (delegate NOVA).
-                settingsSectionLabel("Privacidade & Segurança")
-                VitaGlassCard {
-                    VStack(spacing: 0) {
-                        settingsRow(
-                            icon: "switch.2",
-                            label: "Configurações de privacidade",
-                            desc: "Localização, perfil público, ranking, telemetria",
-                            action: { onNavigateToPrivacySettings?() }
-                        )
-                        rowDivider
-                        settingsRow(
-                            icon: "lock.shield",
-                            label: "Privacidade de documentos",
-                            desc: "O que coletamos, onde processamos, retenção",
-                            action: { onNavigateToPrivacyDocuments?() }
-                        )
-                        rowDivider
-                        settingsRow(
-                            icon: "square.and.arrow.down",
-                            label: "Exportar meus dados",
-                            desc: "Baixar tudo (LGPD art. 18 V)",
-                            action: { onNavigateToExportData?() }
-                        )
-                    }
-                }
-                .padding(.horizontal, 14)
-
-                // MARK: - Suporte — Shell §5.2.6 + §5.2.10
-                settingsSectionLabel("Suporte")
-                VitaGlassCard {
-                    VStack(spacing: 0) {
-                        settingsRow(
-                            icon: "ellipsis.message",
-                            label: "Feedback",
-                            desc: "Bug, sugestão, elogio — vai direto pra equipe",
-                            action: { onNavigateToFeedback?() }
-                        )
-                        rowDivider
-                        settingsRow(
-                            icon: "info.circle",
-                            label: "Sobre",
-                            desc: appVersionString,
-                            action: { onNavigateToAbout?() }
-                        )
-                    }
-                }
-                .padding(.horizontal, 14)
-
-                // MARK: - Logout Button
+                // MARK: - Sair (sempre por último, separado, em laranja-vermelho)
                 logoutButton
                     .padding(.horizontal, 14)
-                    .padding(.top, 18)
+                    .padding(.top, 24)
 
-                // Shell §5.2.7: versão lida de Bundle, NUNCA hardcoded.
+                // Versão discreta no rodapé (substitui o item "Sobre" do menu).
                 Text(appVersionString)
                     .font(.system(size: 10))
                     .foregroundStyle(VitaColors.textWarm.opacity(0.18))
@@ -192,8 +159,14 @@ struct ConfiguracoesScreen: View {
             }
         }
         .background(Color.clear)
+        .task { await loadProfile() }
         .onAppear { SentrySDK.reportFullyDisplayed() }
         .trackScreen("Configuracoes")
+    }
+
+    @MainActor
+    private func loadProfile() async {
+        if let p = try? await container.api.getProfile() { profile = p }
     }
 
     // MARK: - Header
@@ -251,13 +224,19 @@ struct ConfiguracoesScreen: View {
                             .foregroundStyle(VitaColors.textWarm.opacity(0.75))
                     }
 
-                    VStack(alignment: .leading, spacing: 1) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text(authManager.userName ?? "Estudante")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.88))
-                        Text(authManager.userEmail ?? "")
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(VitaColors.textWarm.opacity(0.35))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.white.opacity(0.92))
+                        Text(profileSubtitle)
+                            .font(.system(size: 11))
+                            .foregroundStyle(VitaColors.textWarm.opacity(0.50))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Text("Ver perfil")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(VitaColors.accentLight.opacity(0.85))
+                            .padding(.top, 2)
                     }
 
                     Spacer()

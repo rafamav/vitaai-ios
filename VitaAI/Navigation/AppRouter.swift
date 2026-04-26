@@ -189,6 +189,18 @@ struct AppRouter: View {
                     Task { await ReferralCaptureService.shared.redeemPendingIfAny(api: container.api) }
                 }
                 // Senão, AppRouter task chama redeemPendingIfAny após auth check.
+            case .sharedAudioImport(let importId):
+                // VitaAIShare extension copiou áudio pro App Group. Navega pra
+                // Transcrição e posta notification que TranscricaoViewModel consome
+                // (chamando SharedImportStore.find + LocalStore.save + upload R2).
+                router.selectedTab = .estudos
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    router.navigate(to: .transcricao)
+                    NotificationCenter.default.post(
+                        name: .shareAudioImported,
+                        object: importId
+                    )
+                }
             default: break
             }
         }
@@ -364,6 +376,7 @@ struct MainTabView: View {
                 VitaMenuPopout(
                     userName: authManager.userName,
                     userImageURL: authManager.userImage.flatMap(URL.init(string:)),
+                    notificationCount: pushManager.unreadNotificationCount,
                     onProfile: { router.navigateFromMenu(to: .profile) },
                     onNotifications: { showMenuPopout = false; showNotifPopout = true },
                     onAgenda: { router.navigateFromMenu(to: .agenda) },
@@ -741,21 +754,20 @@ struct MainTabView: View {
                 onNavigateToAchievements: { router.navigate(to: .achievements) }
             )
         case .configuracoes:
+            // Menu hamburguer — ordem Rafael 2026-04-26 (gold-standard).
+            // Removed from menu: Aparência, Modo foco, Sobre, Privacy Settings
+            // (consolidado em PrivacyDocumentsScreen), Export Data (idem).
+            // Routes ainda existem caso outras telas precisem (focusSession, etc).
             ConfiguracoesScreen(
                 authManager: container.authManager,
                 onNavigateToPerfil: { router.navigate(to: .profile) },
-                onNavigateToAppearance: { router.navigate(to: .appearance) },
-                onNavigateToNotifications: { router.navigate(to: .notifications) },
-                onNavigateToConnections: { router.navigate(to: .connections) },
-                onNavigateToAbout: { router.navigate(to: .about) },
                 onNavigateToAssinatura: { router.navigate(to: .paywall) },
                 onNavigateToDisciplinas: { router.navigate(to: .disciplinasConfig) },
-                onNavigateToPrivacyDocuments: { router.navigate(to: .privacyDocuments) },
-                onNavigateToPrivacySettings: { router.navigate(to: .privacySettings) },
-                onNavigateToExportData: { router.navigate(to: .exportData) },
-                onNavigateToFeedback: { router.navigate(to: .feedback) },
-                onNavigateToFocusSession: { router.navigate(to: .focusSession) },
+                onNavigateToConnections: { router.navigate(to: .connections) },
+                onNavigateToNotifications: { router.navigate(to: .notifications) },
                 onNavigateToReferral: { router.navigate(to: .referral) },
+                onNavigateToFeedback: { router.navigate(to: .feedback) },
+                onNavigateToPrivacyDocuments: { router.navigate(to: .privacyDocuments) },
                 onBack: { router.goBack() }
             )
         case .privacyDocuments:
