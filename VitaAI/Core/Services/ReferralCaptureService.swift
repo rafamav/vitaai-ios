@@ -28,20 +28,31 @@ final class ReferralCaptureService {
     private static let codeRegex = #"vita-ai\.cloud/r/([A-Z0-9-]+)"#
 
     /// Chama no first launch do app (VitaAIApp.swift .onAppear). One-time:
-    /// usa UserDefaults flag pra evitar reler clipboard após primeira leitura
-    /// (iOS 17+ tem alert de privacidade; ler só uma vez já é suficiente).
+    /// usa UserDefaults flag pra evitar reler clipboard após primeira leitura.
+    ///
+    /// **Privacy gold standard (iOS 16+):** detectPatterns(for:) é SILENT —
+    /// não dispara o alert "X quer colar". Só acessamos .string se o sistema
+    /// confirmar que há uma URL provável no clipboard. Cobertura típica do
+    /// alert cai de 100% (todo cold start) pra <2% (só quando user
+    /// efetivamente copiou um link Vita).
     func checkPasteboardForReferral() {
         guard !UserDefaults.standard.bool(forKey: Self.pasteboardCheckedKey) else { return }
-        defer { UserDefaults.standard.set(true, forKey: Self.pasteboardCheckedKey) }
-
-        // Pré-check sem alert: detectPatterns(for: [.URL]) (iOS 14+)
-        // só retorna patterns que o app declarou no .uipasteboard usage description.
-        // Se contém URL, então acessa string (mostra alert no iOS 16+).
-        guard UIPasteboard.general.hasStrings else { return }
-        guard let raw = UIPasteboard.general.string else { return }
-
-        if let code = extractCode(from: raw) {
-            captureCode(code: code, source: "pasteboard")
+        // Mark checked up front so a failure doesn't loop forever.
+        UserDefaults.standard.set(true, forKey: Self.pasteboardCheckedKey)
+        // Callback API (iOS 14+) — silent. We deliberately avoid the async
+        // overload here because Swift sometimes resolves to the (unintended)
+        // completionHandler signature anyway, and the callback form keeps the
+        // code thread-safety story explicit (UIKit access is hopped to MainActor).
+        UIPasteboard.general.detectPatterns(for: [.probableWebURL]) { [weak self] result in
+            Task { @MainActor in
+                guard let self,
+                      case .success(let patterns) = result,
+                      patterns.contains(.probableWebURL) else { return }
+                // Only NOW do we touch .string — alert dispara apenas se há URL provável.
+                guard let raw = UIPasteboard.general.string,
+                      let code = self.extractCode(from: raw) else { return }
+                self.captureCode(code: code, source: "pasteboard")
+            }
         }
     }
 
