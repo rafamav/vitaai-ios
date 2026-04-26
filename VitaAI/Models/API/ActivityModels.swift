@@ -105,11 +105,19 @@ struct ActivityFeedItem: Decodable, Identifiable {
 }
 
 // MARK: - Leaderboard
+//
+// 2026-04-25: backend ganhou scope=user|university × period=weekly|monthly|all.
+// User entries têm streak; university entries têm studentCount + state + city.
+
+enum LeaderboardScope: String, Codable {
+    case user, university
+}
 
 struct LeaderboardEntry: Decodable, Identifiable {
-    var id: String { oderId ?? "\(rank)-\(name)" }
+    var id: String { universityId ?? oderId ?? "\(rank)-\(name)" }
     var oderId: String?
     var rank: Int = 0
+    var scope: LeaderboardScope = .user
     var name: String = ""
     var xp: Int = 0
     var streak: Int = 0
@@ -117,12 +125,19 @@ struct LeaderboardEntry: Decodable, Identifiable {
     var isCurrentUser: Bool = false
     var initials: String = ""
 
+    // University-only fields (scope=university). Nil em scope=user.
+    var universityId: String?
+    var state: String?
+    var city: String?
+    var studentCount: Int?
+
     // Compat
     var displayName: String { name }
     var isMe: Bool { isCurrentUser }
 
     private enum CodingKeys: String, CodingKey {
         case oderId = "userId"
-        case rank, name, xp, streak, level, isCurrentUser, initials
+        case rank, scope, name, xp, streak, level, isCurrentUser, initials
+        case universityId, state, city, studentCount
     }
 }

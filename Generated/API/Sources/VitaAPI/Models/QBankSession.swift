@@ -12,32 +12,60 @@ public struct QBankSession: Sendable, Codable, Hashable {
     public var id: String?
     public var title: String?
     public var questionCount: Int?
+    public var totalQuestions: Int?
+    public var currentIndex: Int?
     public var answeredCount: Int?
+    public var answeredQuestions: Int?
     public var correctCount: Int?
+    public var correctAnswers: Int?
     public var score: Double?
     public var createdAt: Date?
     public var finishedAt: Date?
+    /** Discipline label to display in the \"Sessões Recentes\" cell. Either the user's filter when the session was created, or the first topic's discipline slug. Added 2026-04-17.  */
+    public var disciplineTitle: String?
+    /** Topic label to display in the \"Sessões Recentes\" cell. Either the first filter topic's title, or the first question's first topic title. Added 2026-04-17.  */
+    public var topicTitle: String?
+    /** Full list of discipline labels the session was scoped to (derived from `filters.disciplineSlugs` at creation time). The session `title` is a compact \"First +N\" summary for display; this field is the source of truth when the client needs every discipline. Added 2026-04-17b.  */
+    public var disciplineTitles: [String]?
+    /** Ordered list of question IDs for this session. Returned only by POST /api/qbank/sessions (session creation). Not persisted or returned by GET — clients must cache locally after creation. Added 2026-04-19 to support Android QBank session navigation.  */
+    public var questionIds: [Int]?
 
-    public init(id: String? = nil, title: String? = nil, questionCount: Int? = nil, answeredCount: Int? = nil, correctCount: Int? = nil, score: Double? = nil, createdAt: Date? = nil, finishedAt: Date? = nil) {
+    public init(id: String? = nil, title: String? = nil, questionCount: Int? = nil, totalQuestions: Int? = nil, currentIndex: Int? = nil, answeredCount: Int? = nil, answeredQuestions: Int? = nil, correctCount: Int? = nil, correctAnswers: Int? = nil, score: Double? = nil, createdAt: Date? = nil, finishedAt: Date? = nil, disciplineTitle: String? = nil, topicTitle: String? = nil, disciplineTitles: [String]? = nil, questionIds: [Int]? = nil) {
         self.id = id
         self.title = title
         self.questionCount = questionCount
+        self.totalQuestions = totalQuestions
+        self.currentIndex = currentIndex
         self.answeredCount = answeredCount
+        self.answeredQuestions = answeredQuestions
         self.correctCount = correctCount
+        self.correctAnswers = correctAnswers
         self.score = score
         self.createdAt = createdAt
         self.finishedAt = finishedAt
+        self.disciplineTitle = disciplineTitle
+        self.topicTitle = topicTitle
+        self.disciplineTitles = disciplineTitles
+        self.questionIds = questionIds
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case title
         case questionCount
+        case totalQuestions
+        case currentIndex
         case answeredCount
+        case answeredQuestions
         case correctCount
+        case correctAnswers
         case score
         case createdAt
         case finishedAt
+        case disciplineTitle
+        case topicTitle
+        case disciplineTitles
+        case questionIds
     }
 
     // Encodable protocol methods
@@ -47,11 +75,19 @@ public struct QBankSession: Sendable, Codable, Hashable {
         try container.encodeIfPresent(id, forKey: .id)
         try container.encodeIfPresent(title, forKey: .title)
         try container.encodeIfPresent(questionCount, forKey: .questionCount)
+        try container.encodeIfPresent(totalQuestions, forKey: .totalQuestions)
+        try container.encodeIfPresent(currentIndex, forKey: .currentIndex)
         try container.encodeIfPresent(answeredCount, forKey: .answeredCount)
+        try container.encodeIfPresent(answeredQuestions, forKey: .answeredQuestions)
         try container.encodeIfPresent(correctCount, forKey: .correctCount)
+        try container.encodeIfPresent(correctAnswers, forKey: .correctAnswers)
         try container.encodeIfPresent(score, forKey: .score)
         try container.encodeIfPresent(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(finishedAt, forKey: .finishedAt)
+        try container.encodeIfPresent(disciplineTitle, forKey: .disciplineTitle)
+        try container.encodeIfPresent(topicTitle, forKey: .topicTitle)
+        try container.encodeIfPresent(disciplineTitles, forKey: .disciplineTitles)
+        try container.encodeIfPresent(questionIds, forKey: .questionIds)
     }
 }
 

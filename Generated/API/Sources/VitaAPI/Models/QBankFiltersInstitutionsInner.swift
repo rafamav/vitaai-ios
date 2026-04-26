@@ -11,15 +11,27 @@ public struct QBankFiltersInstitutionsInner: Sendable, Codable, Hashable {
 
     public var id: Int?
     public var name: String?
+    public var slug: String?
+    public var state: String?
+    public var isResidence: Bool?
+    public var count: Int?
 
-    public init(id: Int? = nil, name: String? = nil) {
+    public init(id: Int? = nil, name: String? = nil, slug: String? = nil, state: String? = nil, isResidence: Bool? = nil, count: Int? = nil) {
         self.id = id
         self.name = name
+        self.slug = slug
+        self.state = state
+        self.isResidence = isResidence
+        self.count = count
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case id
         case name
+        case slug
+        case state
+        case isResidence
+        case count
     }
 
     // Encodable protocol methods
@@ -28,6 +40,10 @@ public struct QBankFiltersInstitutionsInner: Sendable, Codable, Hashable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(id, forKey: .id)
         try container.encodeIfPresent(name, forKey: .name)
+        try container.encodeIfPresent(slug, forKey: .slug)
+        try container.encodeIfPresent(state, forKey: .state)
+        try container.encodeIfPresent(isResidence, forKey: .isResidence)
+        try container.encodeIfPresent(count, forKey: .count)
     }
 }
 

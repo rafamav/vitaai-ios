@@ -7,14 +7,18 @@
 
 import Foundation
 
+/** Evaluations bucketed by state. Clients MUST respect the server&#39;s bucketing and never cross-mix pending↔overdue based on local date math — time zones will drift.  - &#x60;pending&#x60;  → actionable: submitted&#x3D;false AND (date IS NULL OR date&gt;&#x3D;now) - &#x60;completed&#x60;→ history:    submitted&#x3D;true - &#x60;overdue&#x60;  → historical: submitted&#x3D;false AND date&lt;now. UI should de-emphasize   (collapsed, muted, no primary CTA) — student can&#39;t act on it anymore.  Hero card of /api/dashboard NEVER includes overdue — only pending with date&gt;&#x3D;now.  */
 public struct TrabalhosResponse: Sendable, Codable, Hashable {
 
-    public var pending: [Trabalho]?
-    public var completed: [Trabalho]?
-    public var overdue: [Trabalho]?
-    public var total: Int?
+    /** A fazer (deadline ahead or no deadline) */
+    public var pending: [TrabalhoItem]
+    /** Entregues (history) */
+    public var completed: [TrabalhoItem]
+    /** Vencidos sem entrega. Display as muted history — no primary CTA. */
+    public var overdue: [TrabalhoItem]
+    public var total: Int
 
-    public init(pending: [Trabalho]? = nil, completed: [Trabalho]? = nil, overdue: [Trabalho]? = nil, total: Int? = nil) {
+    public init(pending: [TrabalhoItem], completed: [TrabalhoItem], overdue: [TrabalhoItem], total: Int) {
         self.pending = pending
         self.completed = completed
         self.overdue = overdue
@@ -32,10 +36,10 @@ public struct TrabalhosResponse: Sendable, Codable, Hashable {
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(pending, forKey: .pending)
-        try container.encodeIfPresent(completed, forKey: .completed)
-        try container.encodeIfPresent(overdue, forKey: .overdue)
-        try container.encodeIfPresent(total, forKey: .total)
+        try container.encode(pending, forKey: .pending)
+        try container.encode(completed, forKey: .completed)
+        try container.encode(overdue, forKey: .overdue)
+        try container.encode(total, forKey: .total)
     }
 }
 

@@ -7,11 +7,10 @@
 
 import Foundation
 
+/** Call-to-action label rendered inside the card (e.g. \&quot;Revisar agora\&quot;, \&quot;Praticar\&quot;). Tap target is the whole card, governed by &#x60;action&#x60;.  */
 public struct DashboardHeroCardCta: Sendable, Codable, Hashable {
 
-    /** CTA button copy (e.g. \"Estudar agora\", \"Revisar flashcards\") */
     public var text: String
-    /** Optional SF Symbol / Material icon name */
     public var icon: String?
 
     public init(text: String, icon: String? = nil) {

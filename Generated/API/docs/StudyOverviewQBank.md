@@ -4,7 +4,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **totalAnswered** | **Int** |  | 
-**accuracy** | **Double** | 0..1 | 
+**accuracy** | **Float** |  | 
 **sessionsThisWeek** | **Int** |  | 
 **lastSessionAt** | **Date** |  | [optional] 
 

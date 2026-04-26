@@ -7,14 +7,13 @@
 
 import Foundation
 
+/** One card of the dashboard hero carousel.  HERO RULES (backend-enforced, see src/app/api/dashboard/route.ts): - NEVER shows overdue evaluations. Filter is applied at DB query time   (submitted&#x3D;false AND date&gt;now). - &#x60;label&#x60; text MUST reflect the source evaluation&#39;s &#x60;type&#x60;:   exam→\&quot;PROVA\&quot;, assignment→\&quot;TRABALHO\&quot;, quiz→\&quot;QUIZ\&quot;,   seminar→\&quot;APRESENTAÇÃO\&quot;, participation→\&quot;PARTICIPAÇÃO\&quot;.   Client trusts server label — never re-derive from title text. - &#x60;title&#x60; for assignments is the verbatim portal title (e.g. \&quot;AD1 — PNAISARI\&quot;).   Only exams get the synthesized \&quot;Prova de {subject}\&quot; pattern.  */
 public struct DashboardHeroCard: Sendable, Codable, Hashable {
 
     public enum ModelType: String, Sendable, Codable, CaseIterable {
         case exam = "exam"
         case revision = "revision"
         case streak = "streak"
-        case gradeAlert = "grade_alert"
-        case deadline = "deadline"
     }
     public enum LabelTone: String, Sendable, Codable, CaseIterable {
         case danger = "danger"
@@ -23,12 +22,12 @@ public struct DashboardHeroCard: Sendable, Codable, Hashable {
         case accent = "accent"
         case neutral = "neutral"
     }
-    /** Semantic type for analytics and routing. DO NOT use in client to decide label/cta/background — those come from their own fields. Clients should only branch on `type` for routing (e.g. grade_alert opens disciplineDetail).  */
+    /** Semantic bucket of the card. 'exam' is used for any evaluation (including assignment/quiz/seminar/participation) — the differentiation lives in `label`.  */
     public var type: ModelType
-    /** Short uppercase label rendered above the title (e.g. \"PROVA\", \"RISCO DE REPROVAR\"). Fully server-driven so clients don't duplicate copy.  */
-    public var label: String
-    /** Semantic tone for the label color. Clients map this to their own design tokens (VitaColors on iOS, Compose colors on Android). Never send raw hex from backend — backend speaks semantics, clients speak pixels.  */
-    public var labelTone: LabelTone
+    /** Human-readable category label. For evaluation cards matches the source evaluation's type: PROVA/TRABALHO/QUIZ/APRESENTAÇÃO/PARTICIPAÇÃO. For other card types: REVISÃO, STREAK, etc.  */
+    public var label: String?
+    /** Visual tone of the label pill. danger=overdue soon (<=3d), warning=normal upcoming, info=informational. */
+    public var labelTone: LabelTone?
     public var title: String
     public var subtitle: String
     public var pills: [DashboardHeroCardPillsInner]
@@ -36,11 +35,9 @@ public struct DashboardHeroCard: Sendable, Codable, Hashable {
     /** 0-100, higher = more urgent */
     public var urgency: Int
     public var cta: DashboardHeroCardCta
-    public var backgroundImage: DashboardHeroCardBackground
-    /** Only present when type=grade_alert. Exposes the weighted grade-risk model so clients can show the \"why\" and Vita (coach IA) can reason without confusing absolute scores with weighted performance.  */
-    public var gradeAlertMeta: GradeAlertMeta?
+    public var backgroundImage: DashboardHeroCardBackgroundImage
 
-    public init(type: ModelType, label: String, labelTone: LabelTone, title: String, subtitle: String, pills: [DashboardHeroCardPillsInner], action: DashboardHeroCardAction, urgency: Int, cta: DashboardHeroCardCta, backgroundImage: DashboardHeroCardBackground, gradeAlertMeta: GradeAlertMeta? = nil) {
+    public init(type: ModelType, label: String? = nil, labelTone: LabelTone? = nil, title: String, subtitle: String, pills: [DashboardHeroCardPillsInner], action: DashboardHeroCardAction, urgency: Int, cta: DashboardHeroCardCta, backgroundImage: DashboardHeroCardBackgroundImage) {
         self.type = type
         self.label = label
         self.labelTone = labelTone
@@ -51,7 +48,6 @@ public struct DashboardHeroCard: Sendable, Codable, Hashable {
         self.urgency = urgency
         self.cta = cta
         self.backgroundImage = backgroundImage
-        self.gradeAlertMeta = gradeAlertMeta
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
@@ -65,7 +61,6 @@ public struct DashboardHeroCard: Sendable, Codable, Hashable {
         case urgency
         case cta
         case backgroundImage
-        case gradeAlertMeta
     }
 
     // Encodable protocol methods
@@ -73,8 +68,8 @@ public struct DashboardHeroCard: Sendable, Codable, Hashable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(type, forKey: .type)
-        try container.encode(label, forKey: .label)
-        try container.encode(labelTone, forKey: .labelTone)
+        try container.encodeIfPresent(label, forKey: .label)
+        try container.encodeIfPresent(labelTone, forKey: .labelTone)
         try container.encode(title, forKey: .title)
         try container.encode(subtitle, forKey: .subtitle)
         try container.encode(pills, forKey: .pills)
@@ -82,7 +77,6 @@ public struct DashboardHeroCard: Sendable, Codable, Hashable {
         try container.encode(urgency, forKey: .urgency)
         try container.encode(cta, forKey: .cta)
         try container.encode(backgroundImage, forKey: .backgroundImage)
-        try container.encodeIfPresent(gradeAlertMeta, forKey: .gradeAlertMeta)
     }
 }
 

@@ -9,6 +9,10 @@ import Foundation
 
 public struct QBankProgress: Sendable, Codable, Hashable {
 
+    public enum Scope: String, Sendable, Codable, CaseIterable {
+        case global = "global"
+        case enrolled = "enrolled"
+    }
     public var totalAvailable: Int?
     public var totalAnswered: Int?
     public var totalCorrect: Int?
@@ -16,8 +20,14 @@ public struct QBankProgress: Sendable, Codable, Hashable {
     public var accuracy: Double?
     public var byDifficulty: [JSONValue]?
     public var byTopic: [JSONValue]?
+    /** \"global\" when totals reflect the whole catalogue (stage-scoped), \"enrolled\" when the `disciplineSlugs[]` query param was supplied. Added 2026-04-17.  */
+    public var scope: Scope?
+    /** Echo of the `disciplineSlugs[]` query param used to filter this response. Empty array when `scope = \"global\"`. Added 2026-04-17.  */
+    public var scopedSlugs: [String]?
+    /** Echo of the original `disciplineSlugs[]` query param BEFORE server-side resolution. Differs from `scopedSlugs` when enrolled slugs are resolved to canonical qbank slugs (e.g. anatomia-medica-i -> anatomia). Added 2026-04-17c.  */
+    public var requestedSlugs: [String]?
 
-    public init(totalAvailable: Int? = nil, totalAnswered: Int? = nil, totalCorrect: Int? = nil, totalAnswers: Int? = nil, accuracy: Double? = nil, byDifficulty: [JSONValue]? = nil, byTopic: [JSONValue]? = nil) {
+    public init(totalAvailable: Int? = nil, totalAnswered: Int? = nil, totalCorrect: Int? = nil, totalAnswers: Int? = nil, accuracy: Double? = nil, byDifficulty: [JSONValue]? = nil, byTopic: [JSONValue]? = nil, scope: Scope? = nil, scopedSlugs: [String]? = nil, requestedSlugs: [String]? = nil) {
         self.totalAvailable = totalAvailable
         self.totalAnswered = totalAnswered
         self.totalCorrect = totalCorrect
@@ -25,6 +35,9 @@ public struct QBankProgress: Sendable, Codable, Hashable {
         self.accuracy = accuracy
         self.byDifficulty = byDifficulty
         self.byTopic = byTopic
+        self.scope = scope
+        self.scopedSlugs = scopedSlugs
+        self.requestedSlugs = requestedSlugs
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
@@ -35,6 +48,9 @@ public struct QBankProgress: Sendable, Codable, Hashable {
         case accuracy
         case byDifficulty
         case byTopic
+        case scope
+        case scopedSlugs
+        case requestedSlugs
     }
 
     // Encodable protocol methods
@@ -48,6 +64,9 @@ public struct QBankProgress: Sendable, Codable, Hashable {
         try container.encodeIfPresent(accuracy, forKey: .accuracy)
         try container.encodeIfPresent(byDifficulty, forKey: .byDifficulty)
         try container.encodeIfPresent(byTopic, forKey: .byTopic)
+        try container.encodeIfPresent(scope, forKey: .scope)
+        try container.encodeIfPresent(scopedSlugs, forKey: .scopedSlugs)
+        try container.encodeIfPresent(requestedSlugs, forKey: .requestedSlugs)
     }
 }
 

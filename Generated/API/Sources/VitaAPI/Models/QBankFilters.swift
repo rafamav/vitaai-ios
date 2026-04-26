@@ -10,16 +10,20 @@ import Foundation
 public struct QBankFilters: Sendable, Codable, Hashable {
 
     public var institutions: [QBankFiltersInstitutionsInner]?
-    public var topics: [QBankFiltersInstitutionsInner]?
-    public var years: [Int]?
-    public var difficulties: [String]?
+    public var topics: [QBankFiltersTopicsInner]?
+    /** [DEPRECATED 2026-04-17b] Catalog view from qbank_topics.disciplineSlug + vita.disciplines. Use GET /api/subjects instead — QBank must filter by the student's actual enrolled subjects, not the universal MedSimple catalog. This field stays for fallback during iOS/Android migration and may be removed in 2026-05.  */
+    @available(*, deprecated, message: "This property is deprecated.")
+    public var disciplines: [QBankFiltersDisciplinesInner]?
+    public var years: [QBankFiltersYearsInner]?
+    public var difficulties: [QBankFiltersDifficultiesInner]?
     public var totalQuestions: Int?
     public var totalAllStages: Int?
     public var stage: String?
 
-    public init(institutions: [QBankFiltersInstitutionsInner]? = nil, topics: [QBankFiltersInstitutionsInner]? = nil, years: [Int]? = nil, difficulties: [String]? = nil, totalQuestions: Int? = nil, totalAllStages: Int? = nil, stage: String? = nil) {
+    public init(institutions: [QBankFiltersInstitutionsInner]? = nil, topics: [QBankFiltersTopicsInner]? = nil, disciplines: [QBankFiltersDisciplinesInner]? = nil, years: [QBankFiltersYearsInner]? = nil, difficulties: [QBankFiltersDifficultiesInner]? = nil, totalQuestions: Int? = nil, totalAllStages: Int? = nil, stage: String? = nil) {
         self.institutions = institutions
         self.topics = topics
+        self.disciplines = disciplines
         self.years = years
         self.difficulties = difficulties
         self.totalQuestions = totalQuestions
@@ -30,6 +34,7 @@ public struct QBankFilters: Sendable, Codable, Hashable {
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case institutions
         case topics
+        case disciplines
         case years
         case difficulties
         case totalQuestions
@@ -43,6 +48,7 @@ public struct QBankFilters: Sendable, Codable, Hashable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(institutions, forKey: .institutions)
         try container.encodeIfPresent(topics, forKey: .topics)
+        try container.encodeIfPresent(disciplines, forKey: .disciplines)
         try container.encodeIfPresent(years, forKey: .years)
         try container.encodeIfPresent(difficulties, forKey: .difficulties)
         try container.encodeIfPresent(totalQuestions, forKey: .totalQuestions)

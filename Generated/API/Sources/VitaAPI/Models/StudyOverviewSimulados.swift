@@ -10,11 +10,11 @@ import Foundation
 public struct StudyOverviewSimulados: Sendable, Codable, Hashable {
 
     public var totalAttempts: Int
-    public var avgScore: Double?
-    public var lastScore: Double?
+    public var avgScore: Float?
+    public var lastScore: Float?
     public var lastAt: Date?
 
-    public init(totalAttempts: Int, avgScore: Double? = nil, lastScore: Double? = nil, lastAt: Date? = nil) {
+    public init(totalAttempts: Int, avgScore: Float? = nil, lastScore: Float? = nil, lastAt: Date? = nil) {
         self.totalAttempts = totalAttempts
         self.avgScore = avgScore
         self.lastScore = lastScore

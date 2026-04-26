@@ -7,31 +7,58 @@
 
 import Foundation
 
+/** Linha de ranking. &#x60;scope&#x3D;user&#x60; retorna &#x60;name&#x60; do aluno + streak. &#x60;scope&#x3D;university&#x60; retorna &#x60;name&#x60; da faculdade (shortName quando existe), &#x60;studentCount&#x60;, &#x60;state&#x60;, &#x60;city&#x60;.  */
 public struct LeaderboardEntry: Sendable, Codable, Hashable {
 
+    public enum Scope: String, Sendable, Codable, CaseIterable {
+        case user = "user"
+        case university = "university"
+    }
     public var rank: Int?
+    /** Tipo da linha. Default \"user\" (retrocompat). */
+    public var scope: Scope?
     public var name: String?
     public var xp: Int?
+    /** Apenas em scope=user. Em scope=university é 0. */
     public var streak: Int?
+    /** scope=user — true se for o user logado. scope=university — true se o user logado pertence a essa faculdade.  */
     public var isCurrentUser: Bool?
     public var initials: String?
+    /** Apenas em scope=university. */
+    public var universityId: String?
+    /** Apenas em scope=university (UF da instituição). */
+    public var state: String?
+    /** Apenas em scope=university. */
+    public var city: String?
+    /** Apenas em scope=university (alunos somados pra esse XP). */
+    public var studentCount: Int?
 
-    public init(rank: Int? = nil, name: String? = nil, xp: Int? = nil, streak: Int? = nil, isCurrentUser: Bool? = nil, initials: String? = nil) {
+    public init(rank: Int? = nil, scope: Scope? = nil, name: String? = nil, xp: Int? = nil, streak: Int? = nil, isCurrentUser: Bool? = nil, initials: String? = nil, universityId: String? = nil, state: String? = nil, city: String? = nil, studentCount: Int? = nil) {
         self.rank = rank
+        self.scope = scope
         self.name = name
         self.xp = xp
         self.streak = streak
         self.isCurrentUser = isCurrentUser
         self.initials = initials
+        self.universityId = universityId
+        self.state = state
+        self.city = city
+        self.studentCount = studentCount
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case rank
+        case scope
         case name
         case xp
         case streak
         case isCurrentUser
         case initials
+        case universityId
+        case state
+        case city
+        case studentCount
     }
 
     // Encodable protocol methods
@@ -39,11 +66,16 @@ public struct LeaderboardEntry: Sendable, Codable, Hashable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(rank, forKey: .rank)
+        try container.encodeIfPresent(scope, forKey: .scope)
         try container.encodeIfPresent(name, forKey: .name)
         try container.encodeIfPresent(xp, forKey: .xp)
         try container.encodeIfPresent(streak, forKey: .streak)
         try container.encodeIfPresent(isCurrentUser, forKey: .isCurrentUser)
         try container.encodeIfPresent(initials, forKey: .initials)
+        try container.encodeIfPresent(universityId, forKey: .universityId)
+        try container.encodeIfPresent(state, forKey: .state)
+        try container.encodeIfPresent(city, forKey: .city)
+        try container.encodeIfPresent(studentCount, forKey: .studentCount)
     }
 }
 

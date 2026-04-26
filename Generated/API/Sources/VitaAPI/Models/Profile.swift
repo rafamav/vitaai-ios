@@ -19,9 +19,12 @@ public struct Profile: Sendable, Codable, Hashable {
     public var highSchoolYear: Int?
     public var examBoard: String?
     public var studyGoalId: String?
+    /** Short display name of the user's university (e.g. \"ULBRA Porto Alegre\"). Resolved via LEFT JOIN universities on user_profiles.universityId. */
     public var university: String?
+    /** 2-letter state code (e.g. \"RS\") from the linked universities row. */
     public var universityState: String?
     public var universityId: String?
+    /** Portal type the university uses (canvas, mannesoft, moodle, sigaa, totvs...). Resolved from universities.portalType. */
     public var universityLms: String?
     public var subjects: [JSONValue]?
     public var stats: JSONValue?

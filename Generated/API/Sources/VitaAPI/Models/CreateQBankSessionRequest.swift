@@ -14,17 +14,24 @@ public struct CreateQBankSessionRequest: Sendable, Codable, Hashable {
     public var years: [Int]?
     public var difficulties: [String]?
     public var topicIds: [Int]?
+    /** [PREFERRED 2026-04-17b] Filter questions by the student's academic_subjects.id. Backend resolves each subjectId → disciplineSlug (via academic_subjects.disciplineSlug or fuzzy match on canonicalName) and filters qbank_questions accordingly. This is the SOT path — client should pass subjects the student is actually enrolled in, not catalog slugs.  */
+    public var subjectIds: [String]?
+    /** [DEPRECATED] Direct filter by MedSimple catalog slug. Kept for fallback when student has no academic_subjects (no portal connected yet). Prefer subjectIds.  */
+    @available(*, deprecated, message: "This property is deprecated.")
+    public var disciplineSlugs: [String]?
     public var onlyResidence: Bool?
     public var stage: String?
     public var onlyUnanswered: Bool?
     public var title: String?
 
-    public init(questionCount: Int? = nil, institutionIds: [Int]? = nil, years: [Int]? = nil, difficulties: [String]? = nil, topicIds: [Int]? = nil, onlyResidence: Bool? = nil, stage: String? = nil, onlyUnanswered: Bool? = nil, title: String? = nil) {
+    public init(questionCount: Int? = nil, institutionIds: [Int]? = nil, years: [Int]? = nil, difficulties: [String]? = nil, topicIds: [Int]? = nil, subjectIds: [String]? = nil, disciplineSlugs: [String]? = nil, onlyResidence: Bool? = nil, stage: String? = nil, onlyUnanswered: Bool? = nil, title: String? = nil) {
         self.questionCount = questionCount
         self.institutionIds = institutionIds
         self.years = years
         self.difficulties = difficulties
         self.topicIds = topicIds
+        self.subjectIds = subjectIds
+        self.disciplineSlugs = disciplineSlugs
         self.onlyResidence = onlyResidence
         self.stage = stage
         self.onlyUnanswered = onlyUnanswered
@@ -37,6 +44,8 @@ public struct CreateQBankSessionRequest: Sendable, Codable, Hashable {
         case years
         case difficulties
         case topicIds
+        case subjectIds
+        case disciplineSlugs
         case onlyResidence
         case stage
         case onlyUnanswered
@@ -52,6 +61,8 @@ public struct CreateQBankSessionRequest: Sendable, Codable, Hashable {
         try container.encodeIfPresent(years, forKey: .years)
         try container.encodeIfPresent(difficulties, forKey: .difficulties)
         try container.encodeIfPresent(topicIds, forKey: .topicIds)
+        try container.encodeIfPresent(subjectIds, forKey: .subjectIds)
+        try container.encodeIfPresent(disciplineSlugs, forKey: .disciplineSlugs)
         try container.encodeIfPresent(onlyResidence, forKey: .onlyResidence)
         try container.encodeIfPresent(stage, forKey: .stage)
         try container.encodeIfPresent(onlyUnanswered, forKey: .onlyUnanswered)

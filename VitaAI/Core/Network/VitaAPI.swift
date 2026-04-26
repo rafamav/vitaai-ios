@@ -49,9 +49,57 @@ actor VitaAPI {
         try await client.post("activity", body: LogActivityRequest(action: action, metadata: metadata))
     }
 
-    func getLeaderboard(period: String = "weekly", limit: Int = 20) async throws -> [LeaderboardEntry] {
+    /// GET /api/leaderboard?scope=user|university&period=weekly|monthly|all
+    /// Default scope=user, period=weekly. Spec: openapi.yaml /api/leaderboard.
+    func getLeaderboard(
+        scope: LeaderboardScope = .user,
+        period: String = "weekly",
+        limit: Int = 20
+    ) async throws -> [LeaderboardEntry] {
         try await client.get("leaderboard", queryItems: [
+            URLQueryItem(name: "scope", value: scope.rawValue),
             URLQueryItem(name: "period", value: period),
+            URLQueryItem(name: "limit", value: String(limit)),
+        ])
+    }
+
+    // MARK: - Privacy Preferences
+
+    /// GET /api/user/privacy-preferences
+    func getPrivacyPreferences() async throws -> PrivacyPreferences {
+        try await client.get("user/privacy-preferences")
+    }
+
+    /// PATCH /api/user/privacy-preferences (parcial — só campos enviados)
+    func updatePrivacyPreferences(_ body: UpdatePrivacyPreferencesRequest) async throws -> PrivacyPreferences {
+        try await client.patch("user/privacy-preferences", body: body)
+    }
+
+    // MARK: - Focus Session (Pomodoro)
+
+    /// POST /api/study/focus/session — inicia sessão
+    func startFocusSession(plannedDurationMinutes: Int, subjectId: String? = nil) async throws -> StartFocusSession200Response {
+        try await client.post(
+            "study/focus/session",
+            body: StartFocusSessionRequest(plannedDurationMinutes: plannedDurationMinutes, subjectId: subjectId)
+        )
+    }
+
+    /// POST /api/study/focus/session/{id}/end — finaliza, calcula XP
+    func endFocusSession(
+        id: String,
+        completed: Bool,
+        leaks: [EndFocusSessionRequestLeaksInner] = []
+    ) async throws -> EndFocusSession200Response {
+        try await client.post(
+            "study/focus/session/\(id)/end",
+            body: EndFocusSessionRequest(completed: completed, leaks: leaks.isEmpty ? nil : leaks)
+        )
+    }
+
+    /// GET /api/study/focus/sessions?limit=20 — histórico
+    func getFocusSessions(limit: Int = 20) async throws -> [FocusSession] {
+        try await client.get("study/focus/sessions", queryItems: [
             URLQueryItem(name: "limit", value: String(limit)),
         ])
     }

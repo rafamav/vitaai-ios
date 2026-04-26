@@ -10,12 +10,11 @@ import Foundation
 public struct StudyOverviewQBank: Sendable, Codable, Hashable {
 
     public var totalAnswered: Int
-    /** 0..1 */
-    public var accuracy: Double
+    public var accuracy: Float
     public var sessionsThisWeek: Int
     public var lastSessionAt: Date?
 
-    public init(totalAnswered: Int, accuracy: Double, sessionsThisWeek: Int, lastSessionAt: Date? = nil) {
+    public init(totalAnswered: Int, accuracy: Float, sessionsThisWeek: Int, lastSessionAt: Date? = nil) {
         self.totalAnswered = totalAnswered
         self.accuracy = accuracy
         self.sessionsThisWeek = sessionsThisWeek

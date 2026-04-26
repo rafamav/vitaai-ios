@@ -10,16 +10,21 @@ import Foundation
 public struct MarkNotificationsReadRequest: Sendable, Codable, Hashable {
 
     public var ids: [String]?
+    /** Mark all notifications as read (camelCase form) */
+    public var markAll: Bool?
+    /** snake_case alias accepted for clients that auto-encode body keys (iOS HTTPClient) */
     public var markAll: Bool?
 
-    public init(ids: [String]? = nil, markAll: Bool? = nil) {
+    public init(ids: [String]? = nil, markAll: Bool? = nil, markAll: Bool? = nil) {
         self.ids = ids
+        self.markAll = markAll
         self.markAll = markAll
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case ids
         case markAll
+        case markAll = "mark_all"
     }
 
     // Encodable protocol methods
@@ -27,6 +32,7 @@ public struct MarkNotificationsReadRequest: Sendable, Codable, Hashable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encodeIfPresent(ids, forKey: .ids)
+        try container.encodeIfPresent(markAll, forKey: .markAll)
         try container.encodeIfPresent(markAll, forKey: .markAll)
     }
 }

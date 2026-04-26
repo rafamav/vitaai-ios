@@ -14,16 +14,28 @@ public struct Transcription: Sendable, Codable, Hashable {
     public var status: String?
     public var fileName: String?
     public var fileSize: Int?
+    public var duration: String?
+    public var durationSeconds: Double?
+    public var discipline: String?
+    public var disciplineSlug: String?
+    public var folderId: String?
+    public var favorite: Bool? = false
     public var error: String?
     public var createdAt: Date?
     public var updatedAt: Date?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, fileName: String? = nil, fileSize: Int? = nil, error: String? = nil, createdAt: Date? = nil, updatedAt: Date? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, fileName: String? = nil, fileSize: Int? = nil, duration: String? = nil, durationSeconds: Double? = nil, discipline: String? = nil, disciplineSlug: String? = nil, folderId: String? = nil, favorite: Bool? = false, error: String? = nil, createdAt: Date? = nil, updatedAt: Date? = nil) {
         self.id = id
         self.title = title
         self.status = status
         self.fileName = fileName
         self.fileSize = fileSize
+        self.duration = duration
+        self.durationSeconds = durationSeconds
+        self.discipline = discipline
+        self.disciplineSlug = disciplineSlug
+        self.folderId = folderId
+        self.favorite = favorite
         self.error = error
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -35,6 +47,12 @@ public struct Transcription: Sendable, Codable, Hashable {
         case status
         case fileName
         case fileSize
+        case duration
+        case durationSeconds
+        case discipline
+        case disciplineSlug
+        case folderId
+        case favorite
         case error
         case createdAt
         case updatedAt
@@ -49,6 +67,12 @@ public struct Transcription: Sendable, Codable, Hashable {
         try container.encodeIfPresent(status, forKey: .status)
         try container.encodeIfPresent(fileName, forKey: .fileName)
         try container.encodeIfPresent(fileSize, forKey: .fileSize)
+        try container.encodeIfPresent(duration, forKey: .duration)
+        try container.encodeIfPresent(durationSeconds, forKey: .durationSeconds)
+        try container.encodeIfPresent(discipline, forKey: .discipline)
+        try container.encodeIfPresent(disciplineSlug, forKey: .disciplineSlug)
+        try container.encodeIfPresent(folderId, forKey: .folderId)
+        try container.encodeIfPresent(favorite, forKey: .favorite)
         try container.encodeIfPresent(error, forKey: .error)
         try container.encodeIfPresent(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(updatedAt, forKey: .updatedAt)

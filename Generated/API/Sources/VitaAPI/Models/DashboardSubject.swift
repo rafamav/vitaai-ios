@@ -16,13 +16,49 @@ public struct DashboardSubject: Sendable, Codable, Hashable {
     public var vitaScore: Double?
     /** tier label: bronze, silver, gold, diamond */
     public var vitaTier: String?
+    public var subjectId: String?
+    public var professor: String?
+    /** cursando | aprovado | reprovado | etc */
+    public var status: String?
+    public var grade1: Double?
+    public var grade2: Double?
+    public var grade3: Double?
+    public var finalGrade: Double?
+    /** 0-100 percent */
+    public var attendance: Double?
+    public var absences: Int?
+    public var workload: Int?
+    public var semester: String?
+    /** Canonical catalog slug from vita.disciplines. */
+    public var disciplineSlug: String?
+    /** Canonical name from vita.disciplines (joined). */
+    public var canonicalName: String?
+    /** Catalog area (basica, clinica, cirurgica, etc.). */
+    public var area: String?
+    /** Icon slug from vita.disciplines. */
+    public var icon: String?
 
-    public init(name: String? = nil, shortName: String? = nil, difficulty: String? = nil, vitaScore: Double? = nil, vitaTier: String? = nil) {
+    public init(name: String? = nil, shortName: String? = nil, difficulty: String? = nil, vitaScore: Double? = nil, vitaTier: String? = nil, subjectId: String? = nil, professor: String? = nil, status: String? = nil, grade1: Double? = nil, grade2: Double? = nil, grade3: Double? = nil, finalGrade: Double? = nil, attendance: Double? = nil, absences: Int? = nil, workload: Int? = nil, semester: String? = nil, disciplineSlug: String? = nil, canonicalName: String? = nil, area: String? = nil, icon: String? = nil) {
         self.name = name
         self.shortName = shortName
         self.difficulty = difficulty
         self.vitaScore = vitaScore
         self.vitaTier = vitaTier
+        self.subjectId = subjectId
+        self.professor = professor
+        self.status = status
+        self.grade1 = grade1
+        self.grade2 = grade2
+        self.grade3 = grade3
+        self.finalGrade = finalGrade
+        self.attendance = attendance
+        self.absences = absences
+        self.workload = workload
+        self.semester = semester
+        self.disciplineSlug = disciplineSlug
+        self.canonicalName = canonicalName
+        self.area = area
+        self.icon = icon
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
@@ -31,6 +67,21 @@ public struct DashboardSubject: Sendable, Codable, Hashable {
         case difficulty
         case vitaScore
         case vitaTier
+        case subjectId
+        case professor
+        case status
+        case grade1
+        case grade2
+        case grade3
+        case finalGrade
+        case attendance
+        case absences
+        case workload
+        case semester
+        case disciplineSlug
+        case canonicalName
+        case area
+        case icon
     }
 
     // Encodable protocol methods
@@ -42,6 +93,21 @@ public struct DashboardSubject: Sendable, Codable, Hashable {
         try container.encodeIfPresent(difficulty, forKey: .difficulty)
         try container.encodeIfPresent(vitaScore, forKey: .vitaScore)
         try container.encodeIfPresent(vitaTier, forKey: .vitaTier)
+        try container.encodeIfPresent(subjectId, forKey: .subjectId)
+        try container.encodeIfPresent(professor, forKey: .professor)
+        try container.encodeIfPresent(status, forKey: .status)
+        try container.encodeIfPresent(grade1, forKey: .grade1)
+        try container.encodeIfPresent(grade2, forKey: .grade2)
+        try container.encodeIfPresent(grade3, forKey: .grade3)
+        try container.encodeIfPresent(finalGrade, forKey: .finalGrade)
+        try container.encodeIfPresent(attendance, forKey: .attendance)
+        try container.encodeIfPresent(absences, forKey: .absences)
+        try container.encodeIfPresent(workload, forKey: .workload)
+        try container.encodeIfPresent(semester, forKey: .semester)
+        try container.encodeIfPresent(disciplineSlug, forKey: .disciplineSlug)
+        try container.encodeIfPresent(canonicalName, forKey: .canonicalName)
+        try container.encodeIfPresent(area, forKey: .area)
+        try container.encodeIfPresent(icon, forKey: .icon)
     }
 }
 
