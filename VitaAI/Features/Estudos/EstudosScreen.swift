@@ -129,7 +129,7 @@ private struct EstudosContent: View {
                 sessoesSection
                     .padding(.horizontal, 16)
 
-                Spacer().frame(height: 120) // Tab bar clearance (Liquid Glass 2026-04-25)
+                // Sem clearance: passa por trás da TabBar Liquid Glass.
             }
             .padding(.top, 8)
         }

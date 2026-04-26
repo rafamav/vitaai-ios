@@ -107,7 +107,8 @@ struct DashboardScreen: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
 
-                Spacer().frame(height: 120) // Tab bar clearance
+                // Sem clearance: conteúdo rola até a borda do screen,
+                // passa por trás da TabBar Liquid Glass (Rafael 2026-04-25).
             }
         }
         .trackedScroll()

@@ -78,7 +78,7 @@ struct ProgressoScreen: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 120)
+            // Sem padding-bottom: passa por trás da TabBar Liquid Glass.
         }
     }
 
