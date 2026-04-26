@@ -67,6 +67,15 @@ struct ProfileScreen: View {
                 .padding(.horizontal, 14)
                 .padding(.top, 18)
 
+                // ZONA DE RISCO — Excluir conta. Padrão Duolingo (Rafael 2026-04-25):
+                // ação destrutiva irreversível mora ATRÁS do perfil pessoal, não em
+                // settings de app. Reduz superfície de erro acidental.
+                sectionLabel("Zona de risco")
+                    .padding(.top, 28)
+                DeleteAccountSection(authManager: authManager)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+
                 Spacer().frame(height: 120)
             }
         }

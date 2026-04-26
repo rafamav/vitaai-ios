@@ -259,6 +259,7 @@
 		A6663CFEF3202C1548440144 /* DashboardXp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BAB7AFA757139E38FAB0C32 /* DashboardXp.swift */; };
 		A8FDB522F11FC791CD275E72 /* View+SwipeBack.swift in Sources */ = {isa = PBXBuildFile; fileRef = 843A2E9941511F28FB5D2340 /* View+SwipeBack.swift */; };
 		A9660EB0D2F93B27F63FD890 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 071FF1B45D3A3121280AE457 /* Localizable.strings */; };
+		AA841E39A8258C18E7E3B0BA /* DeleteAccountSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1768D4D8F5D3A15C1D85A0B0 /* DeleteAccountSection.swift */; };
 		AACBB25B332EACA274CF03CF /* ToolManagerScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = D30C48B3D976E3A1CEC73E13 /* ToolManagerScreen.swift */; };
 		AB5E17E4F0F9AA2DE930CD50 /* MindMapListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CCBA0525E7D5E4B0760C954 /* MindMapListView.swift */; };
 		ABCF443F15D77668548C5FA6 /* SimuladoModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 66A4311D514BAEFE6D0D895C /* SimuladoModels.swift */; };
@@ -401,6 +402,7 @@
 		166B2EDD46994090902659D5 /* WelcomeStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeStep.swift; sourceTree = "<group>"; };
 		16B4E6171DD72A7B7AC4F27C /* SubjectColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubjectColors.swift; sourceTree = "<group>"; };
 		16B6F86F91AABF4862EB5F25 /* PlannerViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerViewModel.swift; sourceTree = "<group>"; };
+		1768D4D8F5D3A15C1D85A0B0 /* DeleteAccountSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeleteAccountSection.swift; sourceTree = "<group>"; };
 		17E3D63AD574133541620DA8 /* VitaModals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitaModals.swift; sourceTree = "<group>"; };
 		18071D7DB89A34DE11E9EE5E /* QBankShared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QBankShared.swift; sourceTree = "<group>"; };
 		195A69CD6776A957B920D6E0 /* TranscricaoProfessorSignals.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscricaoProfessorSignals.swift; sourceTree = "<group>"; };
@@ -1400,6 +1402,7 @@
 				61FD27599EBCAC8F56A1C348 /* AppearanceScreen.swift */,
 				CFB516FEEE3F8C5A3FB28626 /* ConfiguracoesScreen.swift */,
 				4B4661452712B846B5F555B7 /* ConnectionsScreen.swift */,
+				1768D4D8F5D3A15C1D85A0B0 /* DeleteAccountSection.swift */,
 				D22584DB23356B862FEDC41E /* DisciplinasConfigScreen.swift */,
 				D3B62E7CE87B36210A70F708 /* EditProfileSheet.swift */,
 				34E2B4483BF38F2C168810A1 /* ExportDataScreen.swift */,
@@ -1793,6 +1796,7 @@
 				A6663CFEF3202C1548440144 /* DashboardXp.swift in Sources */,
 				121FE0E771F45319232ABC3D /* Date+Helpers.swift in Sources */,
 				1A1850D9E459E7057DAE1755 /* DeepLinkHandler.swift in Sources */,
+				AA841E39A8258C18E7E3B0BA /* DeleteAccountSection.swift in Sources */,
 				6F7810541D6057351972B7EE /* DisciplinasConfigScreen.swift in Sources */,
 				4EC22DBEB710EFC14A84DF7D /* DisciplineCircleButton.swift in Sources */,
 				152C448FBAF7D17BB14C6F9E /* DisciplineDetailScreen.swift in Sources */,

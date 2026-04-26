@@ -21,13 +21,6 @@ struct ConfiguracoesScreen: View {
     var onNavigateToFeedback:         (() -> Void)?
     var onBack:                       (() -> Void)?
 
-    @Environment(\.appContainer) private var appContainer
-
-    @State private var showDeleteAlert: Bool = false
-    @State private var deleteConfirmInput: String = ""
-    @State private var isDeletingAccount: Bool = false
-    @State private var deleteErrorMessage: String?
-
     // Sons + vibração persistem em UserDefaults via SoundManager/HapticManager.
     // @AppStorage espelha a chave pra UI atualizar instantâneo no toggle.
     @AppStorage("vita_sound_enabled")  private var soundEnabled: Bool = true
@@ -117,6 +110,7 @@ struct ConfiguracoesScreen: View {
                 .padding(.horizontal, 14)
 
                 // MARK: - Privacidade & Segurança — Shell §5.2.6 + §5.2.8
+                // "Excluir conta" foi MOVIDA pro Profile (Rafael 2026-04-25, padrão Duolingo).
                 // ActiveSessions pendente de endpoint backend (delegate NOVA).
                 settingsSectionLabel("Privacidade & Segurança")
                 VitaGlassCard {
@@ -134,8 +128,6 @@ struct ConfiguracoesScreen: View {
                             desc: "Baixar tudo (LGPD art. 18 V)",
                             action: { onNavigateToExportData?() }
                         )
-                        rowDivider
-                        deleteAccountRow
                     }
                 }
                 .padding(.horizontal, 14)
@@ -178,43 +170,6 @@ struct ConfiguracoesScreen: View {
         .background(Color.clear)
         .onAppear { SentrySDK.reportFullyDisplayed() }
         .trackScreen("Configuracoes")
-        // vita-modals-ignore: SwiftUI .alert nativo é necessário aqui — TextField input ("Digite DELETAR") não cabe no VitaAlert (2 botões fixos)
-        .alert("Excluir conta permanentemente", isPresented: $showDeleteAlert) {
-            TextField("Digite DELETAR", text: $deleteConfirmInput)
-                .textInputAutocapitalization(.characters)
-                .autocorrectionDisabled()
-            Button("Cancelar", role: .cancel) {
-                deleteConfirmInput = ""
-            }
-            Button("Excluir tudo", role: .destructive) {
-                Task { await performAccountDeletion() }
-            }
-            .disabled(deleteConfirmInput.trimmingCharacters(in: .whitespaces).uppercased() != "DELETAR")
-        } message: {
-            Text("Isto apaga PERMANENTEMENTE sua conta, notas, flashcards, conexoes de portal, assinaturas e todo historico. Acao IRREVERSIVEL. Digite DELETAR para confirmar.")
-        }
-        // vita-modals-ignore: SwiftUI .alert nativo (mensagem dinâmica, OK only) — VitaAlert é destrutivo 2 botões
-        .alert("Erro ao excluir", isPresented: .init(
-            get: { deleteErrorMessage != nil },
-            set: { if !$0 { deleteErrorMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) { deleteErrorMessage = nil }
-        } message: {
-            Text(deleteErrorMessage ?? "")
-        }
-    }
-
-    private func performAccountDeletion() async {
-        guard !isDeletingAccount else { return }
-        isDeletingAccount = true
-        defer { isDeletingAccount = false }
-        do {
-            _ = try await appContainer.api.deleteUserData()
-            deleteConfirmInput = ""
-            authManager.logout()
-        } catch {
-            deleteErrorMessage = "Nao foi possivel excluir agora. Tente novamente ou entre em contato com suporte."
-        }
     }
 
     // MARK: - Header
@@ -344,56 +299,6 @@ struct ConfiguracoesScreen: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-    }
-
-    // MARK: - Delete Account Row
-
-    private var deleteAccountRow: some View {
-        Button(action: {
-            deleteConfirmInput = ""
-            showDeleteAlert = true
-        }) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(logoutColor.opacity(0.08))
-                        .frame(width: 34, height: 34)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(logoutColor.opacity(0.18), lineWidth: 1)
-                        )
-                    Image(systemName: "trash")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(logoutColor.opacity(0.85))
-                }
-
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Excluir conta permanentemente")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(logoutColor.opacity(0.85))
-                    Text("Apaga todos os dados. Acao irreversivel.")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(VitaColors.textWarm.opacity(0.35))
-                }
-
-                Spacer()
-
-                if isDeletingAccount {
-                    ProgressView()
-                        .controlSize(.small)
-                        .tint(logoutColor.opacity(0.8))
-                } else {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(logoutColor.opacity(0.4))
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 13)
-        }
-        .buttonStyle(.plain)
-        .disabled(isDeletingAccount)
-        .accessibilityIdentifier("deleteAccountRow")
     }
 
     // MARK: - Section Label
