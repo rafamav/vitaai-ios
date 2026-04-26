@@ -32,6 +32,14 @@ struct TranscricaoEntry: Identifiable {
         return s == "transcribed" || s == "completed" || s == "ready"
     }
 
+    /// Backend marca status="failed" quando upload trava ou Whisper desiste
+    /// (sweeper /api/cron/studio-stuck-sweeper, ou erro na transcribe pipeline).
+    /// UI mostra badge "Falhou" + ação Tentar de novo / Remover.
+    var hasFailed: Bool {
+        let s = status?.lowercased() ?? ""
+        return s == "failed" || s == "error"
+    }
+
     /// Parse createdAt ISO string into Date for grouping
     var parsedDate: Date? {
         guard let str = createdAt ?? date else { return nil }
@@ -312,6 +320,7 @@ actor TranscricaoClient {
         language: String = "pt",
         discipline: String? = nil,
         liveTranscript: String = "",
+        liveWords: [WhisperWord] = [],
         durationSeconds: Int = 0
     ) -> AsyncThrowingStream<TranscricaoSSEEvent, Error> {
         AsyncThrowingStream { continuation in
@@ -353,6 +362,7 @@ actor TranscricaoClient {
                                     sourceId: uploadInfo.sourceId,
                                     r2Key: uploadInfo.r2Key,
                                     transcript: liveTranscript,
+                                    words: liveWords,
                                     language: language,
                                     discipline: discipline,
                                     durationSeconds: durationSeconds,
@@ -469,6 +479,7 @@ actor TranscricaoClient {
         sourceId: String,
         r2Key: String,
         transcript: String,
+        words: [WhisperWord] = [],
         language: String,
         discipline: String?,
         durationSeconds: Int,
@@ -489,6 +500,11 @@ actor TranscricaoClient {
         }
         if durationSeconds > 0 { body["durationSeconds"] = durationSeconds }
         if fileSize > 0 { body["fileSize"] = fileSize }
+        // Word-level timestamps capturados do WhisperLiveKit no streaming.
+        // Backend salva em metadata.words[] pra tela de detail renderizar karaoke.
+        if !words.isEmpty {
+            body["liveWords"] = words.map { ["word": $0.word, "start": $0.start, "end": $0.end] }
+        }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"

@@ -14,6 +14,9 @@ struct TranscricaoRecorderArea: View {
     let onToggle: () -> Void
     let onPauseResume: () -> Void
     let onDiscard: () -> Void
+    /// Importar áudio existente (m4a/mp3/wav) — abre fileImporter da Apple.
+    /// Sem popout: o picker da Apple É a UI. Por isso o chip não tem chevron.down.
+    let onImportAudio: () -> Void
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var showDiscardConfirm = false
@@ -132,8 +135,12 @@ struct TranscricaoRecorderArea: View {
                 )
             }
 
-            // 3 chips compactos lado a lado (Rafael 2026-04-24): Disciplina /
-            // Idioma / Modo. Auto-sized, centralizados, não competem com o orb.
+            // 4 chips compactos lado a lado (Rafael 2026-04-26): Disciplina /
+            // Idioma / Modo / Importar. Mesma silhueta visual — Importar abre
+            // fileImporter da Apple (sem popout, o picker é a UI nativa).
+            // HStack centralizado (não ScrollView) — Rafael 2026-04-26: chips
+            // ficavam leading-aligned no scroll. lineLimit(1) + fixedSize em
+            // Cloud e Importar protegem contra quebra em iPhones menores.
             HStack(spacing: 8) {
                     TranscricaoDisciplinePicker(
                         selected: $selectedDiscipline,
@@ -171,6 +178,8 @@ struct TranscricaoRecorderArea: View {
                             Text(transcribeWithAI ? "Cloud" : "Local")
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(Color.white.opacity(0.80))
+                                .lineLimit(1)
+                                .fixedSize()
                             Image(systemName: "chevron.down")
                                 .font(.system(size: 8, weight: .medium))
                                 .foregroundStyle(Color.white.opacity(0.30))
@@ -184,6 +193,36 @@ struct TranscricaoRecorderArea: View {
                         )
                         .contentShape(Capsule())
                     }
+                    .disabled(isRecording)
+                    .opacity(isRecording ? 0.5 : 1)
+
+                    // Importar áudio — mesma silhueta dos chips Auto/PT/Cloud,
+                    // sem chevron.down porque abre fileImporter da Apple
+                    // direto (UI nativa do picker).
+                    Button(action: {
+                        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                        onImportAudio()
+                    }) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "square.and.arrow.down")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(VitaColors.accent)
+                            Text("Importar")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Color.white.opacity(0.80))
+                                .lineLimit(1)
+                                .fixedSize()
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.03))
+                                .overlay(Capsule().stroke(VitaColors.accent.opacity(0.18), lineWidth: 0.5))
+                        )
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
                     .disabled(isRecording)
                     .opacity(isRecording ? 0.5 : 1)
             }
@@ -380,9 +419,19 @@ struct TranscricaoRecordingsListSection: View {
     var onFavorite: ((TranscricaoEntry) -> Void)? = nil
     /// Long press → renomear. Abre alert inline sem precisar entrar no detail.
     var onRename: ((TranscricaoEntry, String) -> Void)? = nil
+    /// Renomear pasta (long-press → "Renomear"). Backend: PATCH /api/studio/folders/:id
+    var onRenameFolder: ((VitaAPI.StudioFolder, String) -> Void)? = nil
+    /// Excluir pasta (long-press → "Excluir"). Gravações dentro vão pra "Sem pasta".
+    /// Backend: DELETE /api/studio/folders/:id
+    var onDeleteFolder: ((VitaAPI.StudioFolder) -> Void)? = nil
+    /// Compartilhar pasta — abre share sheet com texto resumindo gravações.
+    var onShareFolder: ((VitaAPI.StudioFolder) -> Void)? = nil
 
     @State private var renamingRec: TranscricaoEntry? = nil
     @State private var renameValue: String = ""
+    @State private var renamingFolder: VitaAPI.StudioFolder? = nil
+    @State private var renameFolderValue: String = ""
+    @State private var deletingFolder: VitaAPI.StudioFolder? = nil
 
     private var filteredRecordings: [TranscricaoEntry] {
         var items = recordings
@@ -663,6 +712,43 @@ struct TranscricaoRecordingsListSection: View {
             }
             .disabled(renameValue.trimmingCharacters(in: .whitespaces).isEmpty)
         }
+        // vita-modals-ignore: TextField inline no .alert — VitaAlert não suporta input de texto
+        .alert(
+            "Renomear pasta",
+            isPresented: Binding(
+                get: { renamingFolder != nil },
+                set: { if !$0 { renamingFolder = nil } }
+            )
+        ) {
+            TextField("Nome da pasta", text: $renameFolderValue)
+            Button("Cancelar", role: .cancel) { renamingFolder = nil }
+            Button("Salvar") {
+                let trimmed = renameFolderValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                if let folder = renamingFolder, !trimmed.isEmpty, trimmed != folder.name {
+                    onRenameFolder?(folder, trimmed)
+                }
+                renamingFolder = nil
+            }
+            .disabled(renameFolderValue.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+        .vitaAlert(
+            isPresented: Binding(
+                get: { deletingFolder != nil },
+                set: { if !$0 { deletingFolder = nil } }
+            ),
+            title: "Excluir pasta?",
+            message: deletingFolder.map { f in
+                "A pasta \"\(f.name)\" será apagada. As gravações dentro voltam pra \"Todas\" — nada é deletado."
+            },
+            destructiveLabel: "Excluir pasta",
+            cancelLabel: "Cancelar",
+            onConfirm: {
+                if let folder = deletingFolder {
+                    onDeleteFolder?(folder)
+                }
+                deletingFolder = nil
+            }
+        )
     }
 
     /// Scroll horizontal de chips — Todas / ⭐ Favoritas / 📁 Pastas / + Nova.
@@ -692,29 +778,36 @@ struct TranscricaoRecordingsListSection: View {
                         icon: folder.icon ?? "folder.fill",
                         isSelected: listView == .folder(id: folder.id)
                     ) { listView = .folder(id: folder.id) }
+                    .contextMenu {
+                        Button {
+                            renameFolderValue = folder.name
+                            renamingFolder = folder
+                        } label: {
+                            Label("Renomear", systemImage: "pencil")
+                        }
+                        Button {
+                            onShareFolder?(folder)
+                        } label: {
+                            Label("Compartilhar", systemImage: "square.and.arrow.up")
+                        }
+                        Divider()
+                        Button(role: .destructive) {
+                            deletingFolder = folder
+                        } label: {
+                            Label("Excluir", systemImage: "trash")
+                        }
+                    }
                 }
 
-                // CTA "Nova pasta" — mesmo shell visual dos chips inactive,
-                // mas com ícone "+" e label gold. Sem dash (consistente).
-                Button(action: onCreateFolder) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 11, weight: .semibold))
-                        Text("Nova pasta")
-                            .font(.system(size: 12, weight: .semibold))
-                            .lineLimit(1)
-                    }
-                    .foregroundStyle(VitaColors.accentLight)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(
-                        Capsule().fill(VitaColors.accent.opacity(0.10))
-                    )
-                    .overlay(
-                        Capsule().strokeBorder(VitaColors.accent.opacity(0.30), lineWidth: 0.8)
-                    )
-                }
-                .buttonStyle(.plain)
+                // "+" pra criar pasta — mesmo style dos chips Todas/Favoritas/
+                // folders. Só ícone, sem label "Nova pasta" (Rafael 2026-04-26).
+                // Visual idêntico aos outros chips inactive.
+                viewChip(
+                    label: nil,
+                    icon: "plus",
+                    isSelected: false,
+                    action: onCreateFolder
+                )
             }
             .padding(.horizontal, 16)
         }
@@ -722,7 +815,7 @@ struct TranscricaoRecordingsListSection: View {
     }
 
     private func viewChip(
-        label: String,
+        label: String?,
         icon: String,
         isSelected: Bool,
         action: @escaping () -> Void
@@ -731,12 +824,14 @@ struct TranscricaoRecordingsListSection: View {
             UIImpactFeedbackGenerator(style: .soft).impactOccurred()
             withAnimation(.easeInOut(duration: 0.18)) { action() }
         }) {
-            HStack(spacing: 6) {
+            HStack(spacing: label == nil ? 0 : 6) {
                 Image(systemName: icon)
                     .font(.system(size: 11, weight: .semibold))
-                Text(label)
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
+                if let label {
+                    Text(label)
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                }
             }
             // Foreground: accentLight quando selecionado (não preto opaco),
             // textWarm 0.65 quando inactive — sutil mas legível.
@@ -786,7 +881,8 @@ struct TealGlassRecordingCard: View {
     let recording: TranscricaoEntry
 
     private var displayStatus: RecordingStatus {
-        recording.isTranscribed ? .transcribed : .pending
+        if recording.hasFailed { return .failed }
+        return recording.isTranscribed ? .transcribed : .pending
     }
 
     /// Sempre retorna uma string — se LLM não classificou ou disciplina vazia,

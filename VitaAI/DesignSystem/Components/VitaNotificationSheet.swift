@@ -28,6 +28,10 @@ struct VitaNotification: Identifiable, Decodable {
         case "reminder", "studyPlan": return "\u{23F0}"
         case "deadline": return "\u{23F3}"
         case "vitaInsight": return "\u{1F4A1}"
+        case "transcriptionReady": return "\u{1F3A7}"
+        case "transcriptionFailed", "uploadFailed": return "\u{26A0}\u{FE0F}"
+        case "portalCookieExpired": return "\u{1F510}"
+        case "quotaWarning": return "\u{1F4E6}"
         default: return "\u{1F514}"
         }
     }
@@ -48,6 +52,10 @@ struct VitaNotification: Identifiable, Decodable {
         case "reminder", "studyPlan": return "alarm.fill"
         case "deadline": return "hourglass"
         case "vitaInsight": return "lightbulb.fill"
+        case "transcriptionReady": return "waveform.circle.fill"
+        case "transcriptionFailed", "uploadFailed": return "exclamationmark.circle.fill"
+        case "portalCookieExpired": return "lock.rotation"
+        case "quotaWarning": return "externaldrive.badge.exclamationmark"
         default: return "bell.fill"
         }
     }

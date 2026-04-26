@@ -37,6 +37,9 @@ enum RecordingStatus {
     case transcribed
     case pending
     case recording
+    /// Upload travou ou Whisper desistiu — backend marcou status="failed".
+    /// UI: badge vermelho "Falhou" + ação Tentar de novo / Remover.
+    case failed
 }
 
 // MARK: - Status Badge
@@ -54,6 +57,9 @@ struct TranscricaoStatusBadge: View {
                     .scaleEffect(0.5)
                     .tint(foregroundColor)
                     .frame(width: 9, height: 9)
+            } else if status == .failed {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .font(.system(size: 9, weight: .bold))
             } else {
                 Circle().fill(foregroundColor).frame(width: 6, height: 6)
             }
@@ -81,6 +87,7 @@ struct TranscricaoStatusBadge: View {
         case .transcribed: return "Transcrito"
         case .pending:     return "Processando"
         case .recording:   return "Gravando"
+        case .failed:      return "Falhou"
         }
     }
 
@@ -89,6 +96,7 @@ struct TranscricaoStatusBadge: View {
         case .transcribed: return VitaColors.accentLight
         case .pending:     return VitaColors.accentLight.opacity(0.70)
         case .recording:   return TealColors.badgeRecording.opacity(0.85)
+        case .failed:      return VitaColors.dataRed
         }
     }
 
@@ -97,6 +105,7 @@ struct TranscricaoStatusBadge: View {
         case .transcribed: return VitaColors.accent.opacity(0.08)
         case .pending:     return VitaColors.accent.opacity(0.06)
         case .recording:   return TealColors.badgeRecording.opacity(0.10)
+        case .failed:      return VitaColors.dataRed.opacity(0.10)
         }
     }
 
@@ -105,6 +114,7 @@ struct TranscricaoStatusBadge: View {
         case .transcribed: return VitaColors.accent.opacity(0.22)
         case .pending:     return VitaColors.accent.opacity(0.18)
         case .recording:   return TealColors.badgeRecording.opacity(0.20)
+        case .failed:      return VitaColors.dataRed.opacity(0.30)
         }
     }
 }

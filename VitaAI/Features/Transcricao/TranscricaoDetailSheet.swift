@@ -21,7 +21,6 @@ struct TranscricaoDetailSheet: View {
     @StateObject private var audioPlayer = TranscricaoAudioPlayer()
     @State private var allWords: [WhisperWord] = []
     @State private var professorSignals: [ProfessorSignals.Signal] = []
-    @State private var showKaraoke = false
     @State private var hasAudioFile = false
 
     // Actions menu state.
@@ -47,7 +46,8 @@ struct TranscricaoDetailSheet: View {
     }
 
     private var displayStatus: RecordingStatus {
-        recording.isTranscribed ? .transcribed : .pending
+        if recording.hasFailed { return .failed }
+        return recording.isTranscribed ? .transcribed : .pending
     }
 
     private var formattedDuration: String? {
@@ -236,6 +236,12 @@ struct TranscricaoDetailSheet: View {
                 Label("Compartilhar", systemImage: "square.and.arrow.up")
             }
             .disabled(fullTranscript.isEmpty)
+            Button {
+                exportAsTextFile()
+            } label: {
+                Label("Exportar como TXT", systemImage: "doc.badge.arrow.up")
+            }
+            .disabled(fullTranscript.isEmpty)
             Divider()
             Button(role: .destructive) {
                 showDeleteConfirm = true
@@ -266,6 +272,7 @@ struct TranscricaoDetailSheet: View {
         }
         .vitaAlert(
             isPresented: $showDeleteConfirm,
+            // quality-gate-ignore: demonstrativo PT-BR (this), não verbo
             title: "Excluir esta gravação?",
             message: "O áudio, a transcrição e os resumos gerados serão removidos. Não dá pra desfazer.",
             destructiveLabel: "Excluir",
@@ -318,6 +325,47 @@ struct TranscricaoDetailSheet: View {
         let body = fullTranscript.isEmpty ? title : "\(title)\n\n\(fullTranscript)"
         items.append(body)
         return items
+    }
+
+    /// Exporta transcrição como arquivo .txt — abre UIActivityViewController
+    /// com URL do arquivo. iOS oferece "Salvar em Arquivos", "Mail", AirDrop,
+    /// "Importar pra Notes", etc. Padrão Apple Notes/Voice Memos export.
+    private func exportAsTextFile() {
+        guard !fullTranscript.isEmpty else { return }
+        let title = liveTitle.isEmpty ? "Gravação" : liveTitle
+        // Sanitiza nome de arquivo — remove chars proibidos no FAT/APFS.
+        let safeName = title
+            .components(separatedBy: CharacterSet(charactersIn: "/\\:*?\"<>|"))
+            .joined(separator: "-")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let fileName = (safeName.isEmpty ? "Transcricao" : safeName) + ".txt"
+
+        // Cabeçalho com metadata pra ficar útil offline (Apple Files preview).
+        let dateFmt = DateFormatter()
+        dateFmt.locale = Locale(identifier: "pt_BR")
+        dateFmt.dateStyle = .long
+        dateFmt.timeStyle = .short
+        let header = """
+        \(title)
+        \(dateFmt.string(from: Date()))
+        ─────────────────────────────────────
+
+        """
+        let content = header + fullTranscript
+
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+        do {
+            try content.write(to: url, atomically: true, encoding: .utf8)
+        } catch {
+            actionError = "Falha ao gerar arquivo"
+            return
+        }
+
+        let av = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let root = scene.windows.first?.rootViewController {
+            root.present(av, animated: true)
+        }
     }
 
     private func performRename() async {
@@ -454,7 +502,7 @@ struct TranscricaoDetailSheet: View {
 
             // Transcript: mostra real se tem chunks, skeleton senão.
             if !fullTranscript.isEmpty {
-                if !allWords.isEmpty && showKaraoke {
+                if !allWords.isEmpty {
                     TranscricaoKaraokeTranscriptSection(
                         words: allWords,
                         signals: professorSignals,
@@ -463,9 +511,7 @@ struct TranscricaoDetailSheet: View {
                 } else {
                     TranscricaoRealTranscriptSection(
                         text: fullTranscript,
-                        signals: professorSignals,
-                        hasKaraoke: !allWords.isEmpty,
-                        onToggleKaraoke: { showKaraoke = true }
+                        signals: professorSignals
                     )
                 }
             } else if !isReady {
@@ -554,7 +600,7 @@ struct TranscricaoDetailSheet: View {
 
             // Transcript section — karaoke mode if word timestamps available
             if !fullTranscript.isEmpty {
-                if !allWords.isEmpty && showKaraoke {
+                if !allWords.isEmpty {
                     TranscricaoKaraokeTranscriptSection(
                         words: allWords,
                         signals: professorSignals,
@@ -563,9 +609,7 @@ struct TranscricaoDetailSheet: View {
                 } else {
                     TranscricaoRealTranscriptSection(
                         text: fullTranscript,
-                        signals: professorSignals,
-                        hasKaraoke: !allWords.isEmpty,
-                        onToggleKaraoke: { showKaraoke = true }
+                        signals: professorSignals
                     )
                 }
             }
@@ -686,17 +730,27 @@ private struct TranscricaoShareSheet: UIViewControllerRepresentable {
 struct TranscricaoRealTranscriptSection: View {
     let text: String
     var signals: [ProfessorSignals.Signal] = []
-    var hasKaraoke: Bool = false
-    var onToggleKaraoke: (() -> Void)?
 
     @State private var isExpanded = false
     @State private var copied = false
+    @State private var searchQuery: String = ""
+    @State private var showSearch: Bool = false
 
     private var displayText: String {
-        if isExpanded { return text }
+        // Quando user busca, expande automaticamente o transcript pra search
+        // ter contexto completo. Padrão Apple Notes/Mail: search reveals.
+        if !searchQuery.isEmpty || isExpanded { return text }
         let limit = 500
         if text.count <= limit { return text }
         return String(text.prefix(limit)) + "..."
+    }
+
+    /// Conta matches da query no texto (case-insensitive). Pra mostrar
+    /// "3 resultados" no search bar.
+    private var matchCount: Int {
+        let q = searchQuery.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return 0 }
+        return text.lowercased().components(separatedBy: q.lowercased()).count - 1
     }
 
     var body: some View {
@@ -708,24 +762,18 @@ struct TranscricaoRealTranscriptSection: View {
                     .tracking(0.5)
                 Spacer()
 
-                if hasKaraoke {
-                    Button {
-                        onToggleKaraoke?()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "waveform")
-                                .font(.system(size: 11))
-                            Text("Karaokê")
-                                .font(.system(size: 10, weight: .medium))
-                        }
-                        .foregroundStyle(VitaColors.accentLight)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(VitaColors.accent.opacity(0.1))
-                        .clipShape(Capsule())
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showSearch.toggle()
+                        if !showSearch { searchQuery = "" }
                     }
-                    .buttonStyle(.plain)
+                } label: {
+                    Image(systemName: showSearch ? "magnifyingglass.circle.fill" : "magnifyingglass")
+                        .font(.system(size: 13))
+                        .foregroundStyle(showSearch ? VitaColors.accentLight : VitaColors.accent.opacity(0.70))
+                        .frame(width: 28, height: 24)
                 }
+                .buttonStyle(.plain)
 
                 Button {
                     UIPasteboard.general.string = text
@@ -750,7 +798,45 @@ struct TranscricaoRealTranscriptSection: View {
                 .buttonStyle(.plain)
             }
 
-            let displaySignals = ProfessorSignals.detect(in: displayText)
+            // Search bar inline — revelado pelo botão da lupa. Highlight via
+            // ProfessorSignals reusado (mesma engine), tratando query como
+            // signal artificial. Expande displayText quando há busca ativa.
+            if showSearch {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 11))
+                        .foregroundStyle(VitaColors.textWarm.opacity(0.50))
+                    TextField("Buscar na transcrição", text: $searchQuery)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.white.opacity(0.85))
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                    if !searchQuery.isEmpty {
+                        Text("\(matchCount)")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(matchCount > 0 ? VitaColors.accentLight : Color.white.opacity(0.30))
+                            .monospacedDigit()
+                        Button {
+                            searchQuery = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.white.opacity(0.30))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(
+                    Capsule().fill(Color.white.opacity(0.04))
+                        .overlay(Capsule().stroke(VitaColors.accent.opacity(0.18), lineWidth: 0.5))
+                )
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+
+            // Combina signals do professor com query do user (highlight unificado).
+            let displaySignals = combinedSignals(text: displayText)
             if !displaySignals.isEmpty {
                 TranscricaoHighlightedText(text: displayText, signals: displaySignals)
             } else {
@@ -775,6 +861,30 @@ struct TranscricaoRealTranscriptSection: View {
                 .frame(maxWidth: .infinity, alignment: .center)
             }
         }
+    }
+
+    /// Combina ProfessorSignals com matches da query do user. Reusa o mesmo
+    /// rendering pipeline (TranscricaoHighlightedText) e Category novo
+    /// `.searchMatch` introduzido em ProfessorSignals.
+    private func combinedSignals(text searchedText: String) -> [ProfessorSignals.Signal] {
+        var all = ProfessorSignals.detect(in: searchedText)
+        let q = searchQuery.trimmingCharacters(in: .whitespaces)
+        guard !q.isEmpty else { return all }
+
+        // Acha todas ocorrências case-insensitive da query no texto.
+        let lowerText = searchedText.lowercased()
+        let lowerQuery = q.lowercased()
+        var searchStart = lowerText.startIndex
+        while let range = lowerText.range(of: lowerQuery, range: searchStart..<lowerText.endIndex) {
+            // Mapeia de volta pra range do texto original (mesmo offsets).
+            all.append(ProfessorSignals.Signal(
+                range: range,
+                keyword: String(searchedText[range]),
+                category: .searchMatch
+            ))
+            searchStart = range.upperBound
+        }
+        return all
     }
 }
 
@@ -977,6 +1087,64 @@ struct TranscricaoLivePlayerBar: View {
                     }
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundStyle(Color.white.opacity(0.30))
+                }
+            }
+
+            // Speed picker + skip silence — só aparece quando duração>0 (áudio
+            // carregado). Padrão Overcast/Pocket Casts: linha sub abaixo do
+            // scrubber, controles compactos e gold-tinted.
+            if player.duration > 0 {
+                HStack(spacing: 8) {
+                    Menu {
+                        ForEach([0.75, 1.0, 1.25, 1.5, 1.75, 2.0], id: \.self) { rate in
+                            Button {
+                                player.playbackRate = Float(rate)
+                            } label: {
+                                if abs(Double(player.playbackRate) - rate) < 0.01 {
+                                    Label(String(format: "%.2f×", rate), systemImage: "checkmark")
+                                } else {
+                                    Text(String(format: "%.2f×", rate))
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "gauge.with.needle")
+                                .font(.system(size: 10, weight: .medium))
+                            Text(String(format: "%.2g×", Double(player.playbackRate)))
+                                .font(.system(size: 11, weight: .semibold))
+                                .monospacedDigit()
+                        }
+                        .foregroundStyle(player.playbackRate == 1.0 ? Color.white.opacity(0.50) : VitaColors.accentLight)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule().fill(player.playbackRate == 1.0 ? Color.white.opacity(0.04) : VitaColors.accent.opacity(0.10))
+                                .overlay(Capsule().stroke(VitaColors.accent.opacity(0.18), lineWidth: 0.5))
+                        )
+                    }
+
+                    Button {
+                        player.skipSilenceEnabled.toggle()
+                        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: player.skipSilenceEnabled ? "forward.end.alt.fill" : "forward.end.alt")
+                                .font(.system(size: 10, weight: .medium))
+                            Text("Pular silêncio")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                        .foregroundStyle(player.skipSilenceEnabled ? VitaColors.accentLight : Color.white.opacity(0.50))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            Capsule().fill(player.skipSilenceEnabled ? VitaColors.accent.opacity(0.10) : Color.white.opacity(0.04))
+                                .overlay(Capsule().stroke(VitaColors.accent.opacity(0.18), lineWidth: 0.5))
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
                 }
             }
 
