@@ -34,6 +34,14 @@ final class AppDataManager {
     var transcricoesList: [TranscricaoEntry] = []
     var trabalhosResponse: TrabalhosResponse?
 
+    /// Per-discipline prefetched data — populated on boot via
+    /// `prewarmDisciplines(ids:)`. Disciplina aberta consome desses caches em
+    /// vez de bater na API. Rafael (2026-04-26): "paginas individuais ainda
+    /// demoram pra abrir, nao colocamos tudo no SSE wrapper goldstandard".
+    var progress: ProgressResponse?
+    var documentsBySubject: [String: [VitaDocument]] = [:]
+    var foldersBySubject: [String: [MaterialFolder]] = [:]
+
     /// Subjects sorted by VitaScore descending (highest risk first)
     var subjectsByPriority: [DashboardSubject] {
         dashboardSubjects.sorted { ($0.vitaScore ?? 0) > ($1.vitaScore ?? 0) }
@@ -192,7 +200,38 @@ final class AppDataManager {
         async let si: () = refreshSimulados()
         async let tr: () = refreshTranscricoes()
         async let tb: () = refreshTrabalhos()
-        _ = await (p, g, s, d, en, fc, qb, si, tr, tb)
+        async let pr: () = refreshProgress()
+        _ = await (p, g, s, d, en, fc, qb, si, tr, tb, pr)
+        // Tertiary prefetch — disciplinas individuais. Depende de enrolled
+        // já estar populado, daí roda DEPOIS do gather acima.
+        await prewarmDisciplines(ids: enrolledDisciplines.map { $0.id })
+    }
+
+    private func refreshProgress() async {
+        if let resp = try? await api.getProgress() {
+            progress = resp
+        }
+    }
+
+    /// Prewarmiza docs + folders pra cada disciplina passada (paralelo).
+    /// Chamado uma vez no boot com ids do semestre atual; DisciplineDetail
+    /// abre instant lendo `documentsBySubject[id]` + `foldersBySubject[id]`.
+    /// Boot cost: ~8 disciplinas × 2 endpoints = 16 requests paralelos.
+    func prewarmDisciplines(ids: [String]) async {
+        guard !ids.isEmpty else { return }
+        await withTaskGroup(of: (String, [VitaDocument]?, [MaterialFolder]?).self) { group in
+            for id in ids {
+                group.addTask { [api] in
+                    async let docs: [VitaDocument]? = try? await api.getDocuments(subjectId: id)
+                    async let folders: [MaterialFolder]? = try? await api.listSubjectFolders(subjectId: id)
+                    return (id, await docs, await folders)
+                }
+            }
+            for await (id, docs, folders) in group {
+                if let docs { documentsBySubject[id] = docs }
+                if let folders { foldersBySubject[id] = folders }
+            }
+        }
     }
 
     private func refreshFlashcards() async {

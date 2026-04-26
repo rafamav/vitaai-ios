@@ -215,32 +215,28 @@ final class DisciplineDetailViewModel {
             difficulty = cached.difficulty
         }
 
-        // Prefer AppDataManager cache when hot (user came from Dashboard/Faculdade
-        // which already hydrated it). Falls back to direct API calls when the
-        // cache is cold (deep-link, push-notification-open, fresh install).
+        // Prefer AppDataManager cache when hot. Boot prewarm hidrata 7 dos 8
+        // domínios necessários — DisciplineDetail abre instant pós-boot. Cache
+        // miss vira API call (deep-link, push-open, fresh install).
         let cachedGrades = dataManager?.gradesResponse
         let cachedSchedule = dataManager?.classSchedule ?? []
         let cachedEvals = dataManager?.academicEvaluations ?? []
         let agendaFromCache: AgendaResponse? = cachedSchedule.isEmpty
             ? nil
             : AgendaResponse(schedule: cachedSchedule, evaluations: cachedEvals)
+        let cachedProgress = dataManager?.progress
+        let cachedDecks = dataManager?.flashcardDecks ?? []
+        let cachedTrabalhos = dataManager?.trabalhosResponse
+        let cachedDocs = dataManager?.documentsBySubject[disciplineId]
+        let cachedFolders = dataManager?.foldersBySubject[disciplineId]
 
-        async let progressTask: ProgressResponse? = try? api.getProgress()
+        async let progressTask: ProgressResponse? = cachedProgress != nil ? cachedProgress : (try? api.getProgress())
         async let gradesTask: GradesCurrentResponse? = cachedGrades != nil ? cachedGrades : (try? api.getGradesCurrent())
-        // 2026-04-23: api.getExams() removido — rota legacy 404, provas ativas
-        // vivem em academic_evaluations (fetched via progress.upcomingExams já filtrado
-        // por type='exam' após PR #156).
-        // summary=true: metadata + totalCards + dueCount only, no cards[] array.
-        // Drops payload from ~5.6MB to 182KB and removes one of the biggest
-        // contributors to DisciplineDetail TTFD. See
-        // incidents/vitaai/2026-04-21_flashcards-list-slow-duplicate-requests.md
-        async let decksTask: [FlashcardDeckEntry]? = try? api.getFlashcardDecks(deckLimit: 1000, summary: true)
-        // Filter by subjectId server-side — was nil (all user docs, 100s of MB of PDFs).
-        // This endpoint's payload was the #1 DisciplineDetail TTFD bottleneck.
-        async let docsTask: [VitaDocument]? = try? api.getDocuments(subjectId: disciplineId)
+        async let decksTask: [FlashcardDeckEntry]? = !cachedDecks.isEmpty ? cachedDecks : (try? api.getFlashcardDecks(deckLimit: 1000, summary: true))
+        async let docsTask: [VitaDocument]? = cachedDocs != nil ? cachedDocs : (try? api.getDocuments(subjectId: disciplineId))
         async let agendaTask: AgendaResponse? = agendaFromCache != nil ? agendaFromCache : (try? api.getAgenda())
-        async let trabalhosTask: TrabalhosResponse? = try? api.getTrabalhos()
-        async let foldersTask: [MaterialFolder]? = try? api.listSubjectFolders(subjectId: disciplineId)
+        async let trabalhosTask: TrabalhosResponse? = cachedTrabalhos != nil ? cachedTrabalhos : (try? api.getTrabalhos())
+        async let foldersTask: [MaterialFolder]? = cachedFolders != nil ? cachedFolders : (try? api.listSubjectFolders(subjectId: disciplineId))
 
         let (progressResponse, gradesResponse, decks, docs, agenda, trabalhosResp, foldersResp) = await (
             progressTask,
