@@ -284,18 +284,8 @@ struct MainTabView: View {
                     .toolbar(.hidden, for: .navigationBar)
                     .enableSwipeBack(router: router)
 
-                    // Chat overlay — sits in content area (below top bar, above tab bar)
-                    if showChat {
-                        VitaChatScreen(
-                            onClose: {
-                                withAnimation(.easeInOut(duration: 0.25)) { showChat = false }
-                                chatInitialPrompt = nil
-                            },
-                            initialPrompt: chatInitialPrompt
-                        )
-                            .padding(.bottom, 80) // space for tab bar
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    }
+                    // VitaChatScreen movido pro ZStack root (abaixo) pra ficar
+                    // ACIMA do backdrop blur global. Rafael 2026-04-27.
 
                 }
             }
@@ -326,11 +316,13 @@ struct MainTabView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
-            // MARK: - Backdrop blur (popouts ofuscam conteúdo)
+            // MARK: - Backdrop blur (popouts/chat ofuscam conteúdo)
             // Rafael 2026-04-25: ao abrir notif/menu popout, fundo fica
             // levemente ofuscado pra dar profundidade — padrão Apple
             // Shortcuts / context menus. Tap dismissa qualquer popout.
-            if showMenuPopout || showNotifPopout {
+            // 2026-04-27: showChat também ativa o backdrop — Rafael quer
+            // "tudo fora do VitaChat com o efeito do menu hamburguer".
+            if showMenuPopout || showNotifPopout || showChat {
                 Rectangle()
                     .fill(.ultraThinMaterial)
                     .opacity(0.85)
@@ -340,9 +332,27 @@ struct MainTabView: View {
                         withAnimation(.spring(duration: 0.45, bounce: 0.15)) {
                             showMenuPopout = false
                             showNotifPopout = false
+                            // showChat NÃO dismissa via tap-out (Rafael não pediu)
                         }
                     }
                     .zIndex(199)
+            }
+
+            // MARK: - VitaChat overlay (acima do backdrop, abaixo dos popouts hambúrguer)
+            // Movido pro ZStack root (Rafael 2026-04-27): app inteiro atrás
+            // fica ofuscado pelo backdrop blur quando chat aberto.
+            if showChat {
+                VitaChatScreen(
+                    onClose: {
+                        withAnimation(.easeInOut(duration: 0.25)) { showChat = false }
+                        chatInitialPrompt = nil
+                    },
+                    initialPrompt: chatInitialPrompt
+                )
+                .padding(.top, 60)    // espaço pra TopBar continuar visível atrás
+                .padding(.bottom, 80) // espaço pra TabBar continuar visível atrás
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(199)
             }
 
             // MARK: - Notification Popout (acima do backdrop blur)

@@ -62,10 +62,13 @@ struct VitaInputPopout: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            // Tap-outside dismiss (scrim transparente — não overlay visual)
-            // vita-modals-ignore: scrim transparente p/ tap-outside, não overlay visual
-            Color.black.opacity(0.001)
+            // Backdrop blur idêntico ao do hamburguer (AppRouter:333-346) —
+            // ofusca chat atrás dando profundidade. Tap dismissa.
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .opacity(0.85)
                 .ignoresSafeArea()
+                .transition(.opacity)
                 .onTapGesture { dismissAnimated() }
 
             popoutContent
@@ -159,12 +162,12 @@ struct VitaInputPopout: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 6)
 
-            // Attachment chips — pills horizontais
+            // Attachment chips — pills horizontais. Áudio removido (Rafael
+            // 2026-04-27: "ja temos no vitachat" — mic button no input bar).
             HStack(spacing: 8) {
                 attachChip(icon: "photo",  label: "Foto")    { showPhotoPicker = true }
                 attachChip(icon: "camera", label: "Câmera")  { showCamera = true }
                 attachChip(icon: "doc",    label: "Arquivo") { showPhotoPicker = true }
-                attachChip(icon: "mic",    label: "Áudio")   { dismissAnimated() }
             }
             .padding(.horizontal, 14)
             .padding(.bottom, 14)
@@ -214,30 +217,34 @@ struct VitaInputPopout: View {
         Button {
             handleTileTap(tile)
         } label: {
+            // Ícone topo-leading + label bottom-leading. Rafael 2026-04-27:
+            // "pros de cima precisa de um texto bonito, os de baixo não".
+            // Fase 2: SF Symbol vira hero image AI; label permanece overlay.
             VStack(alignment: .leading, spacing: 0) {
                 Image(systemName: tile.icon)
-                    .font(.system(size: 28, weight: .regular))
+                    .font(.system(size: 26, weight: .regular))
                     .foregroundStyle(VitaColors.accent)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.top, 14)
                     .padding(.leading, 14)
 
-                Spacer(minLength: 6)
+                Spacer(minLength: 0)
 
                 Text(tile.label)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(VitaColors.textPrimary)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 14)
                     .padding(.bottom, 12)
             }
-            .aspectRatio(16.0/9.0, contentMode: .fit)
+            .aspectRatio(1, contentMode: .fit)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .glassCard(cornerRadius: 18)
         .accessibilityIdentifier("popout_tile_\(tile.id)")
+        .accessibilityLabel(tile.label)
     }
 
     // MARK: - Attachment chip — pill com glassCard cornerRadius 12
@@ -247,21 +254,18 @@ struct VitaInputPopout: View {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             action()
         } label: {
-            HStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(VitaColors.accent.opacity(0.85))
-                Text(label)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(VitaColors.textPrimary.opacity(0.85))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
+            // Só ícone — Rafael 2026-04-27 "nao precisa de texto em nenhum
+            // daqueles blocos". Label fica em accessibility pra VoiceOver.
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(VitaColors.accent.opacity(0.95))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .glassCard(cornerRadius: 12)
+        .accessibilityLabel(label)
         .accessibilityIdentifier("popout_attach_\(label.lowercased())")
     }
 
