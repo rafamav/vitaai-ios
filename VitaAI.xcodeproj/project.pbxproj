@@ -19,6 +19,7 @@
 		033497D017ECDF16FF61BCFF /* FsrsScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 494024FF2D4D0CEA176A7144 /* FsrsScheduler.swift */; };
 		038CF9875303C71EF60A4FB6 /* ProfileScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0AA34DA1F2E5FE7046BB9C1 /* ProfileScreen.swift */; };
 		03963891743F4D270820E40D /* VitaNotifPopout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13E0DDDF5D64EFF6ABD99CAB /* VitaNotifPopout.swift */; };
+		AEDC8F21EEC4438C9CEFE39C /* VitaInputPopout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F0814AEA834FDFB2394178 /* VitaInputPopout.swift */; };
 		03B1902B188BAD5462614042 /* QBankTopicsContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 397968757A48BEB929ACE86C /* QBankTopicsContent.swift */; };
 		042B3027A14F3834E0DCBC54 /* PdfToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6EFEEFBA17AF37F355A4848 /* PdfToolbar.swift */; };
 		06E94FB9C41A0031FD9D8556 /* DisciplineFolderCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E7557D01511F8DFA457E786 /* DisciplineFolderCard.swift */; };
@@ -426,6 +427,7 @@
 		1130013BF0504A0F42C04360 /* VitaAmbientBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitaAmbientBackground.swift; sourceTree = "<group>"; };
 		1130D9D84A3608728A01845E /* PdfStudyStatsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PdfStudyStatsSheet.swift; sourceTree = "<group>"; };
 		13E0DDDF5D64EFF6ABD99CAB /* VitaNotifPopout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitaNotifPopout.swift; sourceTree = "<group>"; };
+		88F0814AEA834FDFB2394178 /* VitaInputPopout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitaInputPopout.swift; sourceTree = "<group>"; };
 		14D816167F3CB6613AC61137 /* VitaDomain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitaDomain.swift; sourceTree = "<group>"; };
 		158B571AED8E5DD5541607CA /* HapticManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticManager.swift; sourceTree = "<group>"; };
 		15E0C6EC1605F0F66DD545CD /* StudyOverviewQBank.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudyOverviewQBank.swift; sourceTree = "<group>"; };
@@ -958,6 +960,7 @@
 				37569ED0C0303F076543301E /* VitaInput.swift */,
 				C84201C4AE38526C62B3DFD1 /* VitaMarkdown.swift */,
 				9F70F963371379D809067BD4 /* VitaMenuPopout.swift */,
+				88F0814AEA834FDFB2394178 /* VitaInputPopout.swift */,
 				17E3D63AD574133541620DA8 /* VitaModals.swift */,
 				EEC63CEAFB878B94BBCE32D8 /* VitaNotificationSheet.swift */,
 				13E0DDDF5D64EFF6ABD99CAB /* VitaNotifPopout.swift */,
@@ -2175,6 +2178,7 @@
 				EDD8F6E728065C3FF6BDE691 /* VitaMarkdown.swift in Sources */,
 				66989C425ACDD32B3EC1261F /* VitaMascot.swift in Sources */,
 				864F5D154DF68734D7D8BDBB /* VitaMenuPopout.swift in Sources */,
+				AEDC8F21EEC4438C9CEFE39C /* VitaInputPopout.swift in Sources */,
 				6823BE1A2916D6A4CF41FB8B /* VitaModals.swift in Sources */,
 				03963891743F4D270820E40D /* VitaNotifPopout.swift in Sources */,
 				FACCA6465651D4C1C22EE0C0 /* VitaNotificationSheet.swift in Sources */,

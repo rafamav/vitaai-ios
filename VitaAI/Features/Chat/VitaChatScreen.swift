@@ -15,6 +15,8 @@ struct VitaChatScreen: View {
     var initialPrompt: String? = nil
     @State private var viewModel: ChatViewModel?
     @State private var showVoiceMode: Bool = false
+    @State private var showPlusPopout: Bool = false
+    @Namespace private var plusNS
     @FocusState private var isInputFocused: Bool
 
     var body: some View {
@@ -116,7 +118,15 @@ struct VitaChatScreen: View {
                 }
 
                 // Input bar
-                ChatInput(viewModel: viewModel, isInputFocused: $isInputFocused)
+                ChatInput(
+                    viewModel: viewModel,
+                    isInputFocused: $isInputFocused,
+                    namespace: plusNS,
+                    isPlusPopoutOpen: showPlusPopout,
+                    onPlusTap: {
+                        withAnimation(VitaModalTokens.openSpring) { showPlusPopout = true }
+                    }
+                )
             }
             .ignoresSafeArea(.keyboard)
 
@@ -124,6 +134,29 @@ struct VitaChatScreen: View {
             if viewModel.showHistory {
                 HistoryPanel(viewModel: viewModel)
                     .transition(.move(edge: .leading))
+            }
+
+            // Backdrop blur para VitaInputPopout — idêntico ao backdrop do hamburguer (AppRouter:333)
+            if showPlusPopout {
+                Rectangle()
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.85)
+                    .ignoresSafeArea()
+                    .transition(.opacity)
+                    .onTapGesture {
+                        withAnimation(VitaModalTokens.openSpring) { showPlusPopout = false }
+                    }
+                    .zIndex(199)
+
+                VitaInputPopout(
+                    viewModel: viewModel,
+                    namespace: plusNS,
+                    onDismiss: {
+                        withAnimation(VitaModalTokens.openSpring) { showPlusPopout = false }
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(200)
             }
         }
     }
@@ -736,12 +769,14 @@ private struct TypingDots: View {
 private struct ChatInput: View {
     let viewModel: ChatViewModel
     var isInputFocused: FocusState<Bool>.Binding
+    var namespace: Namespace.ID
+    var isPlusPopoutOpen: Bool = false
+    var onPlusTap: () -> Void = {}
 
     @State private var isListening: Bool = false
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showCamera: Bool = false
     @State private var isLoadingImage: Bool = false
-    @State private var showPlusSheet: Bool = false
 
     private var canSend: Bool {
         let hasText = !viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -759,9 +794,9 @@ private struct ChatInput: View {
             }
 
             HStack(spacing: 10) {
-                // Vita+ — opens quick-actions sheet (replaced paperclip in Phase 1)
+                // Vita+ — opens VitaInputPopout (D4 anchored, substitui .sheet UIKit)
                 Button {
-                    showPlusSheet = true
+                    onPlusTap()
                 } label: {
                     Image(systemName: "plus.circle.fill")
                         .font(.system(size: 22, weight: .medium))
@@ -771,6 +806,8 @@ private struct ChatInput: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Vita+")
+                // matchedGeometry: popout cresce DESTE botão — só é source quando popout fechado
+                .matchedGeometryEffect(id: "plus_popout_origin", in: namespace, isSource: !isPlusPopoutOpen)
 
                 // Text input — tipografia mais legível (14pt) + placeholder em PT
                 TextField(
@@ -873,9 +910,7 @@ private struct ChatInput: View {
                 showCamera = false
             }
         }
-        .sheet(isPresented: $showPlusSheet) {
-            VitaPlusSheet(viewModel: viewModel)
-        }
+        // VitaInputPopout substituiu .sheet — estado gerenciado em VitaChatScreen
     }
 }
 

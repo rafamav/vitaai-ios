@@ -38,7 +38,7 @@ import SwiftUI
 
 // MARK: - Shared tokens
 
-private enum VitaModalTokens {
+enum VitaModalTokens {
     static let cornerRadius: CGFloat = 20
     static let goldTint = Color(red: 1.0, green: 0.824, blue: 0.549).opacity(0.06)
     static let borderColor = Color(red: 200/255, green: 160/255, blue: 80/255).opacity(0.22)
