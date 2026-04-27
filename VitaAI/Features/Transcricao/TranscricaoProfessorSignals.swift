@@ -17,13 +17,14 @@ enum ProfessorSignals {
         case attention     // "prestem atenção", "anotem isso"
         case emphasis      // "muito importante", "fundamental"
         case memorize      // "memorizar", "decorar"
+        case searchMatch   // busca do usuário
 
         var icon: String {
             switch self {
             case .examDirect: return "exclamationmark.triangle.fill"
             case .attention: return "eye.fill"
             case .emphasis: return "star.fill"
-            case .memorize: return "brain.head.profile"
+            case .memorize: return "brain.head.profile"            case .searchMatch: return "magnifyingglass"
             }
         }
 
@@ -32,7 +33,7 @@ enum ProfessorSignals {
             case .examDirect: return VitaColors.dataRed
             case .attention: return VitaColors.accentLight
             case .emphasis: return Color(red: 1.0, green: 0.85, blue: 0.3)
-            case .memorize: return VitaColors.dataIndigo
+            case .memorize: return VitaColors.dataIndigo            case .searchMatch: return VitaColors.accent
             }
         }
     }

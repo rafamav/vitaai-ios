@@ -213,6 +213,9 @@ private struct TranscricaoContent: View {
                                     },
                                     onDiscard: {
                                         viewModel.discardRecording()
+                                    },
+                                    onImportAudio: {
+                                        // Phase 1: file importer — handled by showFileImporter state
                                     }
                                 )
                             }

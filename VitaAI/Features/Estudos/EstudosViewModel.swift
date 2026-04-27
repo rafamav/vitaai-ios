@@ -176,7 +176,7 @@ final class EstudosViewModel {
                     id: card.id, title: card.title, subtitle: card.subtitle,
                     dueCount: 0, deckId: card.action.id ?? "",
                     type: card.type.rawValue, urgency: card.urgency,
-                    ctaText: card.cta.text, labelTone: (card.labelTone?.rawValue) ?? "info",
+                    ctaText: card.cta.text, labelTone: (card.labelTone.rawValue) ?? "info",
                     subjectName: card.pills.first?.text ?? ""
                 )
             }

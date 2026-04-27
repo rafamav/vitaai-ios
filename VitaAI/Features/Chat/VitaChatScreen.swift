@@ -133,7 +133,7 @@ struct VitaChatScreen: View {
 
 private struct ChatHeader: View {
     var onHistory: () -> Void
-    var onNewConversation: () -> Void
+    var onNewConversation: () -> Void = {}
     let onClose: () -> Void
     var title: String? = nil
 

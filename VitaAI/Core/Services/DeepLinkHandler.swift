@@ -4,6 +4,8 @@ extension Notification.Name {
     /// Posted when an integration OAuth flow completes via deep link callback.
     /// Object is the provider name string (e.g. "google_calendar").
     static let integrationOAuthCompleted = Notification.Name("integrationOAuthCompleted")
+    /// Posted when VitaAIShare extension imports an audio file for transcription.
+    static let shareAudioImported = Notification.Name("shareAudioImported")
 }
 
 // MARK: - DeepLinkHandler
@@ -55,6 +57,8 @@ final class DeepLinkHandler {
         /// Referral code captured (Universal Link /r/CODE OR vitaai://r/CODE).
         /// Stored in UserDefaults pra ser consumido após auth + onboarding.
         case referralCode(code: String, source: String)
+        /// Share Extension imported audio — navigate to transcricao and process.
+        case sharedAudioImport(String)
     }
 
     // MARK: - Parse

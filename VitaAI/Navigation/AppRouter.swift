@@ -247,7 +247,6 @@ struct MainTabView: View {
                         level: container.gamificationEvents.currentLevel,
                         xpProgress: container.gamificationEvents.currentXpProgress,
                         xpToast: container.gamificationEvents.xpToast,
-                        notificationCount: pushManager.unreadNotificationCount,
                         onAvatarTap: { router.selectedTab = .progresso },
                         onMenuTap: {
                             withAnimation(.spring(duration: 0.5, bounce: 0.18)) { showNotifPopout = false }
@@ -376,7 +375,6 @@ struct MainTabView: View {
                 VitaMenuPopout(
                     userName: authManager.userName,
                     userImageURL: authManager.userImage.flatMap(URL.init(string:)),
-                    notificationCount: pushManager.unreadNotificationCount,
                     onProfile: { router.navigateFromMenu(to: .profile) },
                     onNotifications: { showMenuPopout = false; showNotifPopout = true },
                     onAgenda: { router.navigateFromMenu(to: .agenda) },
