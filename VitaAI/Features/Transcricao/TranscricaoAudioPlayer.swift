@@ -15,6 +15,20 @@ final class TranscricaoAudioPlayer: ObservableObject {
     /// Current word index for karaoke sync (nil if no word timestamps)
     @Published var activeWordIndex: Int?
 
+    /// Playback rate (1.0 normal, 1.25, 1.5, 2.0). Persistido por sessão —
+    /// padrão de podcast app (Apple Podcasts, Overcast, Pocket Casts).
+    @Published var playbackRate: Float = 1.0 {
+        didSet { player?.rate = isPlaying ? playbackRate : 0 }
+    }
+
+    /// Skip silence — pula trechos onde não há fala. Implementação leve via
+    /// detector de palavra atual: se não há palavra ativa por >1.2s, salta
+    /// pra próxima word.start. Sem reanalise do audio (custaria GPU+RAM).
+    @Published var skipSilenceEnabled: Bool = false
+
+    /// Última palavra ativa (pra detectar gap de silêncio entre palavras).
+    private var lastActiveWordTime: Double = 0
+
     private var player: AVPlayer?
     private var timeObserver: Any?
     private var statusObserver: NSKeyValueObservation?
@@ -177,6 +191,8 @@ final class TranscricaoAudioPlayer: ObservableObject {
             player.pause()
         } else {
             player.play()
+            // AVPlayer.play() reset rate pra 1.0 sempre — reaplica o user prefs.
+            player.rate = playbackRate
         }
         isPlaying.toggle()
     }
@@ -197,6 +213,21 @@ final class TranscricaoAudioPlayer: ObservableObject {
         player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
         currentTime = time
         activeWordIndex = index
+        if !isPlaying {
+            player.play()
+            isPlaying = true
+        }
+    }
+
+    /// Seek absoluto em segundos (0..duration). Usado pelos timestamps clicáveis
+    /// no início de cada segmento da transcrição (Plaud/Otter pattern).
+    func seekToTime(_ seconds: Double) {
+        guard let player, duration > 0 else { return }
+        let clamped = max(0, min(seconds, duration))
+        let target = CMTime(seconds: clamped, preferredTimescale: 600)
+        player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
+        currentTime = clamped
+        updateActiveWord(at: clamped)
         if !isPlaying {
             player.play()
             isPlaying = true
@@ -224,6 +255,20 @@ final class TranscricaoAudioPlayer: ObservableObject {
         }
         if let b = best, words[b].end >= time - 0.1 {
             activeWordIndex = b
+            lastActiveWordTime = time
+        } else if skipSilenceEnabled, isPlaying, let b = best, b + 1 < words.count {
+            // Skip silence: se não há palavra ativa há >1.2s e tem palavra
+            // próxima, salta pra ela. Heurística simples sem reanalise de
+            // audio (zero custo CPU/GPU). Padrão Overcast/Pocket Casts.
+            let gap = time - lastActiveWordTime
+            let nextStart = words[b + 1].start
+            if gap > 1.2, nextStart > time + 0.5 {
+                let target = CMTime(seconds: nextStart, preferredTimescale: 600)
+                player?.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
+                currentTime = nextStart
+                activeWordIndex = b + 1
+                lastActiveWordTime = nextStart
+            }
         }
     }
 

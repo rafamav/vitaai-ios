@@ -20,6 +20,7 @@ struct TranscricaoDetailSheet: View {
 
     @StateObject private var audioPlayer = TranscricaoAudioPlayer()
     @State private var allWords: [WhisperWord] = []
+    @State private var allSegments: [WhisperSegment] = []
     @State private var professorSignals: [ProfessorSignals.Signal] = []
     @State private var hasAudioFile = false
 
@@ -505,6 +506,7 @@ struct TranscricaoDetailSheet: View {
                 if !allWords.isEmpty {
                     TranscricaoKaraokeTranscriptSection(
                         words: allWords,
+                        segments: allSegments,
                         signals: professorSignals,
                         player: audioPlayer
                     )
@@ -603,6 +605,7 @@ struct TranscricaoDetailSheet: View {
                 if !allWords.isEmpty {
                     TranscricaoKaraokeTranscriptSection(
                         words: allWords,
+                        segments: allSegments,
                         signals: professorSignals,
                         player: audioPlayer
                     )
@@ -650,6 +653,7 @@ struct TranscricaoDetailSheet: View {
             // Extract all words from segments for karaoke
             if let segments = detail.metadata?.segments {
                 allWords = segments.flatMap { $0.words ?? [] }
+                allSegments = segments
             }
 
             // Detect professor signals in transcript
@@ -1169,12 +1173,21 @@ struct TranscricaoLivePlayerBar: View {
 
 struct TranscricaoKaraokeTranscriptSection: View {
     let words: [WhisperWord]
+    let segments: [WhisperSegment]
     let signals: [ProfessorSignals.Signal]
     @ObservedObject var player: TranscricaoAudioPlayer
     @State private var copied = false
 
     private var fullText: String {
         words.map(\.word).joined(separator: " ")
+    }
+
+    /// Formato [mm:ss] tipo Otter/Plaud — clicável pra pular áudio.
+    private static func formatTimestamp(_ seconds: Double) -> String {
+        let total = max(0, Int(seconds))
+        let m = total / 60
+        let s = total % 60
+        return String(format: "%d:%02d", m, s)
     }
 
     var body: some View {
@@ -1214,17 +1227,56 @@ struct TranscricaoKaraokeTranscriptSection: View {
                 .buttonStyle(.plain)
             }
 
-            TranscricaoKaraokeText(
-                words: words,
-                signals: signals,
-                activeWordIndex: player.activeWordIndex,
-                isPlaying: player.isPlaying,
-                onTapWord: { index in
-                    player.seekToWord(at: index)
-                }
-            )
+            // Render segment-by-segment com timestamp clicável tipo Otter/Plaud.
+            // Pra gravação de 1 segment só, fica 1 timestamp no topo.
+            VStack(alignment: .leading, spacing: 12) {
+                ForEach(Array(segments.enumerated()), id: \.offset) { idx, seg in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        // Timestamp clicável — Otter/Plaud pattern: tap pula áudio.
+                        Button {
+                            player.seekToTime(seg.start)
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        } label: {
+                            Text("[\(Self.formatTimestamp(seg.start))]")
+                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(VitaColors.accentLight.opacity(0.85))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(VitaColors.accent.opacity(0.10))
+                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                        }
+                        .buttonStyle(.plain)
 
-            Text("Toque em qualquer palavra para pular o áudio")
+                        // Words deste segment (subset do words flat global,
+                        // pra activeWordIndex continuar batendo).
+                        let segWords = seg.words ?? []
+                        if !segWords.isEmpty {
+                            // Indices globais das words deste segment.
+                            let globalStartIdx = words.firstIndex(where: {
+                                $0.start == segWords.first!.start && $0.word == segWords.first!.word
+                            }) ?? 0
+
+                            TranscricaoKaraokeText(
+                                words: segWords,
+                                signals: signals,
+                                activeWordIndex: player.activeWordIndex.map { $0 - globalStartIdx },
+                                isPlaying: player.isPlaying,
+                                onTapWord: { localIdx in
+                                    player.seekToWord(at: globalStartIdx + localIdx)
+                                }
+                            )
+                        } else {
+                            // Fallback: segment sem words por algum motivo
+                            Text(seg.text)
+                                .font(.system(size: 13))
+                                .foregroundStyle(Color.white.opacity(0.55))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+            }
+
+            Text("Toque na palavra ou no timestamp pra pular o áudio")
                 .font(.system(size: 9))
                 .foregroundStyle(Color.white.opacity(0.25))
                 .frame(maxWidth: .infinity, alignment: .center)

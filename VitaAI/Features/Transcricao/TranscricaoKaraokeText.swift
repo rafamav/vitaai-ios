@@ -100,6 +100,9 @@ private struct WrappingHStack: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassCard(cornerRadius: 12)
+        // Suaviza transição entre palavra ativa N e N+1 (antes era hard-cut a cada 50ms,
+        // dava sensação de "indo aos saltos"). Easing curto = highlight respira.
+        .animation(.easeOut(duration: 0.18), value: activeWordIndex)
     }
 
     private func signalColor(for wordIndex: Int) -> Color {
