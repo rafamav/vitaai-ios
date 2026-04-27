@@ -20,6 +20,12 @@ enum QBankMode: String, CaseIterable {
     var displayName: String { self == .pratica ? "Prática" : "Simulado" }
 }
 
+enum QBankTopicsSortOrder: String, CaseIterable {
+    case byQuestions
+    case alphabetical
+    var displayName: String { self == .byQuestions ? "Mais questões" : "A → Z" }
+}
+
 struct QBankUiState {
     // Navigation
     var activeScreen: QBankScreen = .home
@@ -42,6 +48,7 @@ struct QBankUiState {
     // Tap em qualquer nível da árvore inicia sessão imediata com defaults.
     var topicsDiscipline: QBankDiscipline? = nil
     var topicsExpandedNodeIds: Set<Int> = []
+    var topicsSortOrder: QBankTopicsSortOrder = .byQuestions
 
     /// Backend catalog of ALL available disciplines (47 slugs). Kept separate
     /// from `filters.disciplines` (which holds the student's enrolled subjects).

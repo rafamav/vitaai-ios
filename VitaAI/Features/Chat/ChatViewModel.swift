@@ -267,6 +267,36 @@ final class ChatViewModel {
         }
     }
 
+    // MARK: - Quick Actions (VitaPlusSheet)
+
+    private var cachedQuickActions: QuickActionsResponse?
+    private var quickActionsCacheTime: Date = .distantPast
+
+    /// Fetch quick actions from backend.
+    /// Client-side cache TTL driven by response.ttlSeconds (server-authoritative).
+    func fetchQuickActions() async throws -> QuickActionsResponse {
+        if let cached = cachedQuickActions {
+            let ttl = TimeInterval(cached.ttlSeconds)
+            if Date().timeIntervalSince(quickActionsCacheTime) < ttl {
+                return cached
+            }
+        }
+        let response: QuickActionsResponse = try await api.getChatQuickActions()
+        cachedQuickActions = response
+        quickActionsCacheTime = Date()
+        return response
+    }
+
+    /// Send a quick action prompt, optionally with a tool hint for the backend.
+    /// Phase 1: toolHint is logged but not sent — streamChat does not support it yet.
+    func sendQuickAction(prompt: String, toolHint: String? = nil) async {
+        if let toolHint {
+            NSLog("[ChatViewModel] Quick action with toolHint: %@", toolHint)
+        }
+        inputText = prompt
+        await send()
+    }
+
     // MARK: - Helpers
 
     /// Strips "[MEMORIA: ...]" tags from the end of AI responses (system prompt artifact)

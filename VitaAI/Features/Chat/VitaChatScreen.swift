@@ -35,12 +35,14 @@ struct VitaChatScreen: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .overlay(alignment: .top) {
-            // Top gold glow line
-            Rectangle()
-                .fill(VitaColors.glassBorder)
-                .frame(height: 1)
-        }
+        // Borda D4 estática — gold MUITO sutil pra não competir com o glow
+        // animado do input "Pergunte ao Vita". Apenas 1 shadow pra elevar.
+        .clipShape(RoundedRectangle(cornerRadius: 24))
+        .overlay(
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(VitaColors.glassBorder, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.30), radius: 14, x: 0, y: 6)
         .onAppear {
             if viewModel == nil {
                 viewModel = ChatViewModel(
@@ -49,6 +51,11 @@ struct VitaChatScreen: View {
                 )
             }
             viewModel?.newConversation()
+            // Pre-load history em background ao abrir VitaChat — usuário não
+            // espera 2-3s quando clica no menu de histórico depois
+            if let vm = viewModel {
+                Task { await vm.loadHistory() }
+            }
             if let initialImageData {
                 viewModel?.setImageAttachment(data: initialImageData)
                 // Focus the input so Rafael can type a question immediately over the attached image.
@@ -88,6 +95,12 @@ struct VitaChatScreen: View {
                             }
                         }
                     },
+                    onNewConversation: {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.newConversation()
+                        }
+                    },
                     onClose: onClose,
                     // Show "Pergunte ao Vita" title when opened from PDF viewer scanner
                     // (initialImageData attached) — gives the user clear context that this
@@ -120,11 +133,12 @@ struct VitaChatScreen: View {
 
 private struct ChatHeader: View {
     var onHistory: () -> Void
+    var onNewConversation: () -> Void
     let onClose: () -> Void
     var title: String? = nil
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 8) {
             // Hamburger — opens conversation history
             Button(action: onHistory) {
                 Image(systemName: "line.3.horizontal")
@@ -147,12 +161,12 @@ private struct ChatHeader: View {
 
             Spacer()
 
-            // Close — exits chat. D4 carved button: glass background + gold border + accent X.
-            Button(action: onClose) {
-                Image(systemName: "xmark")
+            // Nova conversa — square.and.pencil glass D4 (Rafael 2026-04-26)
+            Button(action: onNewConversation) {
+                Image(systemName: "square.and.pencil")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(VitaColors.accentHover)
-                    .frame(width: 36, height: 36)
+                    .foregroundColor(VitaColors.textPrimary)
+                    .frame(width: 32, height: 32)
                     .background(
                         Circle()
                             .fill(.ultraThinMaterial)
@@ -160,9 +174,27 @@ private struct ChatHeader: View {
                     )
                     .overlay(
                         Circle()
-                            .stroke(VitaColors.accentHover.opacity(0.35), lineWidth: 1)
+                            .stroke(VitaColors.glassBorder, lineWidth: 1)
                     )
-                    .shadow(color: .black.opacity(0.25), radius: 4, x: 0, y: 2)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Nova conversa")
+
+            // Close — clean glass igual hamburger menu popout
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(VitaColors.textPrimary)
+                    .frame(width: 32, height: 32)
+                    .background(
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                            .environment(\.colorScheme, .dark)
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(VitaColors.glassBorder, lineWidth: 1)
+                    )
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Fechar")
@@ -284,8 +316,24 @@ private struct MessageRow: View {
     var onRetry: (() -> Void)?
     var onFeedback: ((Int) -> Void)?
     @State private var cursorVisible: Bool = true
+    /// Mostra actions (thumbs/copy/share/time) só on hover (iPad mouse) ou
+    /// after long-press no celular. Auto-hide após 4s sem interação pra
+    /// manter chat clean — Rafael 2026-04-26.
+    @State private var actionsVisible: Bool = false
+    @State private var hideActionsTask: Task<Void, Never>?
 
     private var isUser: Bool { message.role == "user" }
+
+    private func showActionsTemporarily() {
+        actionsVisible = true
+        hideActionsTask?.cancel()
+        hideActionsTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(4))
+            if !Task.isCancelled {
+                withAnimation(.easeOut(duration: 0.2)) { actionsVisible = false }
+            }
+        }
+    }
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -312,10 +360,23 @@ private struct MessageRow: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    // Action buttons (copy, share, time) — only when done streaming
+                    // Action buttons (copy, share, time) — só on hover/long-press
+                    // Mantém chat limpo, aparecem só quando o usuário vai usar
                     if !isStreaming && !message.content.isEmpty && !message.isError {
                         MessageActions(message: message, onFeedback: onFeedback)
+                            .opacity(actionsVisible ? 1 : 0)
+                            .animation(.easeInOut(duration: 0.2), value: actionsVisible)
+                            .frame(height: actionsVisible ? nil : 0, alignment: .top)
+                            .clipped()
                     }
+                }
+                .onHover { hovering in
+                    if hovering { showActionsTemporarily() }
+                    else { hideActionsTask?.cancel() }
+                }
+                .onLongPressGesture(minimumDuration: 0.2) {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    showActionsTemporarily()
                 }
                 Spacer(minLength: 52)
             }
@@ -680,6 +741,7 @@ private struct ChatInput: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var showCamera: Bool = false
     @State private var isLoadingImage: Bool = false
+    @State private var showPlusSheet: Bool = false
 
     private var canSend: Bool {
         let hasText = !viewModel.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -696,26 +758,21 @@ private struct ChatInput: View {
                 )
             }
 
-            HStack(spacing: 8) {
-                // Attach button
-                PhotosPicker(
-                    selection: Binding(
-                        get: { nil },
-                        set: { item in if let item { selectedPhotoItem = item } }
-                    ),
-                    matching: .images,
-                    photoLibrary: .shared()
-                ) {
-                    Image(systemName: "paperclip")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(VitaColors.textSecondary)
-                        .frame(width: 30, height: 30)
-                        .background(VitaColors.textWarm.opacity(0.04))
-                        .clipShape(Circle())
+            HStack(spacing: 10) {
+                // Vita+ — opens quick-actions sheet (replaced paperclip in Phase 1)
+                Button {
+                    showPlusSheet = true
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 22, weight: .medium))
+                        .symbolRenderingMode(.hierarchical)
+                        .foregroundColor(VitaColors.accent)
+                        .frame(width: 34, height: 34)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Vita+")
 
-                // Text input
+                // Text input — tipografia mais legível (14pt) + placeholder em PT
                 TextField(
                     "Pergunte ao Vita...",
                     text: Binding(
@@ -724,7 +781,7 @@ private struct ChatInput: View {
                     ),
                     axis: .vertical
                 )
-                .font(.system(size: 13))
+                .font(.system(size: 14, weight: .regular, design: .default))
                 .foregroundColor(VitaColors.textPrimary)
                 .tint(VitaColors.accent)
                 .lineLimit(1...4)
@@ -735,7 +792,7 @@ private struct ChatInput: View {
                     Task { await viewModel.send() }
                 }
 
-                // Mic button
+                // Mic — Vita's existing carved button
                 VitaMicButton(isListening: $isListening) { transcribed in
                     if viewModel.inputText.isEmpty {
                         viewModel.inputText = transcribed
@@ -744,17 +801,36 @@ private struct ChatInput: View {
                     }
                 }
 
-                // Send button
+                // Send — D4 gold quando ativo, glass neutro quando idle.
+                // Cor sólida + border gradient pra ter peso visual.
                 Button {
                     isInputFocused.wrappedValue = false
                     Task { await viewModel.send() }
                 } label: {
                     Image(systemName: viewModel.isStreaming ? "stop.fill" : "arrow.up")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 13, weight: .bold))
                         .foregroundColor(canSend ? VitaColors.surface : VitaColors.textTertiary)
-                        .frame(width: 28, height: 28)
-                        .background(canSend ? VitaColors.accent.opacity(0.85) : VitaColors.textWarm.opacity(0.04))
-                        .clipShape(Circle())
+                        .frame(width: 34, height: 34)
+                        .background(
+                            Circle()
+                                .fill(
+                                    canSend
+                                        ? AnyShapeStyle(LinearGradient(
+                                            colors: [VitaColors.accent, VitaColors.accentHover],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ))
+                                        : AnyShapeStyle(.ultraThinMaterial)
+                                )
+                                .environment(\.colorScheme, .dark)
+                        )
+                        .overlay(
+                            Circle().stroke(
+                                canSend ? VitaColors.accentHover.opacity(0.5) : VitaColors.glassBorder,
+                                lineWidth: 1
+                            )
+                        )
+                        .shadow(color: canSend ? VitaColors.accent.opacity(0.35) : .clear, radius: 6, x: 0, y: 2)
                 }
                 .buttonStyle(.plain)
                 .disabled(!canSend)
@@ -762,15 +838,21 @@ private struct ChatInput: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(VitaColors.glassBg)
-            .clipShape(RoundedRectangle(cornerRadius: 18))
-            .overlay(
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(
-                        isInputFocused.wrappedValue ? VitaColors.accent.opacity(0.18) : VitaColors.glassBorder,
-                        lineWidth: 1
+            // Input bar — fundo escuro pra contraste com glow + glow líquido
+            // animado em volta. Shadow gold radiante forte (24pt) faz a luz
+            // do glow "transbordar" pro background.
+            .background(
+                RoundedRectangle(cornerRadius: 22)
+                    .fill(Color.black.opacity(0.35))
+                    .background(
+                        RoundedRectangle(cornerRadius: 22)
+                            .fill(.ultraThinMaterial)
+                            .environment(\.colorScheme, .dark)
                     )
             )
+            .vitaIntelligenceGlow(cornerRadius: 22)
+            .shadow(color: VitaColors.accent.opacity(0.45), radius: 24, x: 0, y: 0)
+            .shadow(color: VitaColors.accent.opacity(0.25), radius: 8, x: 0, y: 2)
             .padding(.horizontal, 14)
             .padding(.bottom, 12)
             .padding(.top, 8)
@@ -790,6 +872,9 @@ private struct ChatInput: View {
                 if let imageData { viewModel.setImageAttachment(data: imageData, mimeType: "image/jpeg") }
                 showCamera = false
             }
+        }
+        .sheet(isPresented: $showPlusSheet) {
+            VitaPlusSheet(viewModel: viewModel)
         }
     }
 }
@@ -858,5 +943,121 @@ private struct CameraCaptureView: UIViewControllerRepresentable {
         }
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { onCapture(nil) }
+    }
+}
+
+// MARK: - VitaIntelligenceGlow Modifier
+//
+// Apple Intelligence-style animated gold glow border. Multi-layer angular
+// gradient strokes with blur halo — borda viva, com luz e profundidade
+// 3D simulada. Período padrão 7s, respeita "Reduzir Movimento".
+//
+// Rafael 2026-04-26: aplicado no VitaChatScreen pra dar estética Siri/AI
+// moderna. Inline aqui (não em arquivo standalone) porque .xcodeproj
+// não auto-detecta novos arquivos.
+
+// VitaIntelligenceGlow — Liquid Light edition (Rafael feedback 2026-04-26)
+//
+// Versão anterior: linear infinite rotation = snap visual a cada 360° +
+// flickering. Aqui usamos TimelineView + 3 layers com periods primos (3.7s,
+// 5.3s, 8.1s) e fase via `sin()` — nunca alinha 100%, dá sensação de
+// fluido "vivo". Também adiciona breathing (escala/intensidade que pulsa).
+//
+// Aplicado no INPUT "Pergunte ao Vita" — borda do composer fica gold
+// líquido em loop suave, sem snap, sem flicker.
+
+private struct VitaIntelligenceGlow: ViewModifier {
+    let cornerRadius: CGFloat
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .overlay(
+                Group {
+                    if reduceMotion {
+                        // Borda estática quando motion reduzida
+                        RoundedRectangle(cornerRadius: cornerRadius)
+                            .stroke(VitaColors.accent.opacity(0.55), lineWidth: 1.5)
+                    } else {
+                        TimelineView(.animation(minimumInterval: 1.0 / 60.0)) { context in
+                            let t = context.date.timeIntervalSinceReferenceDate
+                            // Periods primos pra nunca sincronizar — efeito orgânico
+                            let r1 = Angle.degrees((t / 3.7) * 360)
+                            let r2 = Angle.degrees((t / 5.3) * 360 + 60)
+                            let r3 = Angle.degrees((t / 8.1) * 360 - 30)
+                            // Breathing: intensidade pulsa entre 0.85 e 1.15
+                            let breath = 1.0 + 0.15 * sin(t * 0.8)
+
+                            ZStack {
+                                // Layer 1 — crisp bright gradient (2.5pt) — borda principal
+                                RoundedRectangle(cornerRadius: cornerRadius)
+                                    .strokeBorder(
+                                        AngularGradient(
+                                            gradient: Gradient(stops: [
+                                                .init(color: VitaColors.accent.opacity(0.10), location: 0.00),
+                                                .init(color: VitaColors.accent.opacity(0.85 * breath), location: 0.15),
+                                                .init(color: Color(red: 1.00, green: 0.95, blue: 0.78).opacity(breath), location: 0.27),
+                                                .init(color: VitaColors.accent.opacity(min(1.0, 1.0 * breath)), location: 0.40),
+                                                .init(color: VitaColors.accent.opacity(0.55 * breath), location: 0.55),
+                                                .init(color: VitaColors.accent.opacity(0.10), location: 1.00),
+                                            ]),
+                                            center: .center,
+                                            startAngle: r1,
+                                            endAngle: r1 + .degrees(360)
+                                        ),
+                                        lineWidth: 2.5
+                                    )
+
+                                // Layer 2 — halo médio com blur (refração de luz)
+                                RoundedRectangle(cornerRadius: cornerRadius)
+                                    .strokeBorder(
+                                        AngularGradient(
+                                            gradient: Gradient(stops: [
+                                                .init(color: VitaColors.accent.opacity(0.00), location: 0.00),
+                                                .init(color: VitaColors.accent.opacity(0.65 * breath), location: 0.20),
+                                                .init(color: Color.white.opacity(0.55 * breath), location: 0.30),
+                                                .init(color: VitaColors.accent.opacity(0.80 * breath), location: 0.42),
+                                                .init(color: VitaColors.accent.opacity(0.00), location: 0.62),
+                                                .init(color: VitaColors.accent.opacity(0.00), location: 1.00),
+                                            ]),
+                                            center: .center,
+                                            startAngle: r2,
+                                            endAngle: r2 + .degrees(360)
+                                        ),
+                                        lineWidth: 5
+                                    )
+                                    .blur(radius: 7)
+
+                                // Layer 3 — aura distante (ambient glow)
+                                RoundedRectangle(cornerRadius: cornerRadius)
+                                    .strokeBorder(
+                                        AngularGradient(
+                                            gradient: Gradient(stops: [
+                                                .init(color: VitaColors.accent.opacity(0.00), location: 0.00),
+                                                .init(color: VitaColors.accent.opacity(0.50 * breath), location: 0.28),
+                                                .init(color: VitaColors.accent.opacity(0.00), location: 0.55),
+                                                .init(color: VitaColors.accent.opacity(0.00), location: 1.00),
+                                            ]),
+                                            center: .center,
+                                            startAngle: r3,
+                                            endAngle: r3 + .degrees(360)
+                                        ),
+                                        lineWidth: 11
+                                    )
+                                    .blur(radius: 14)
+                                    .opacity(0.85)
+                            }
+                        }
+                    }
+                }
+                .allowsHitTesting(false)
+            )
+    }
+}
+
+private extension View {
+    func vitaIntelligenceGlow(cornerRadius: CGFloat = 22) -> some View {
+        modifier(VitaIntelligenceGlow(cornerRadius: cornerRadius))
     }
 }
