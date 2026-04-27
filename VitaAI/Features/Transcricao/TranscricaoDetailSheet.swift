@@ -1228,24 +1228,34 @@ struct TranscricaoKaraokeTranscriptSection: View {
             }
 
             // Render segment-by-segment com timestamp clicável tipo Otter/Plaud.
-            // Pra gravação de 1 segment só, fica 1 timestamp no topo.
+            // Timestamp só aparece quando agrega valor: 2+ segments OU primeiro
+            // segment começa depois do início (>1s). Gravação curta de 1 bloco
+            // começando do 0 não precisa — só polui (Rafael 2026-04-27).
+            let showTimestamps = segments.count > 1 || (segments.first?.start ?? 0) > 1.0
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(Array(segments.enumerated()), id: \.offset) { idx, seg in
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         // Timestamp clicável — Otter/Plaud pattern: tap pula áudio.
-                        Button {
-                            player.seekToTime(seg.start)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        } label: {
-                            Text("[\(Self.formatTimestamp(seg.start))]")
-                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        // Ícone ▶ deixa claro que é "play from", não relógio.
+                        if showTimestamps {
+                            Button {
+                                player.seekToTime(seg.start)
+                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            } label: {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "play.fill")
+                                        .font(.system(size: 8, weight: .bold))
+                                    Text(Self.formatTimestamp(seg.start))
+                                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                                }
                                 .foregroundStyle(VitaColors.accentLight.opacity(0.85))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
                                 .background(VitaColors.accent.opacity(0.10))
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
 
                         // Words deste segment (subset do words flat global,
                         // pra activeWordIndex continuar batendo).
