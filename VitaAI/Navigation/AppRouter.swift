@@ -170,6 +170,16 @@ struct AppRouter: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         router.navigate(to: route)
                     }
+                case .qbank, .simuladoHome, .transcricao, .atlas3D, .osce,
+                     .provas, .trabalhos, .flashcardHome, .flashcardSession:
+                    // Sub-features de Estudos: ao chegar via deep link,
+                    // ative a tab Estudos pra bottom nav refletir o contexto.
+                    // Sem isso o bottom nav fica em Home (default) enquanto
+                    // user navega QBank — UX confuso (Rafael 2026-04-27 A5 audit).
+                    router.selectedTab = .estudos
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        router.navigate(to: route)
+                    }
                 default:         router.navigate(to: route)
                 }
             case .integrationCallback(let provider):

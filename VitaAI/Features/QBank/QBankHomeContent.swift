@@ -398,6 +398,10 @@ struct QBankDisciplineRow: View {
             .shadow(color: .black.opacity(0.18), radius: 6, y: 3)
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(name), \(countLabel) questões disponíveis")
+        .accessibilityHint("Toque para ver tópicos e iniciar sessão")
+        .accessibilityAddTraits(.isButton)
     }
 }
 
@@ -482,6 +486,19 @@ struct QBankSessionCard: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(sessionAccessibilityLabel)
+        .accessibilityHint(session.isActive ? "Toque para retomar sessão" : "Toque para revisar resultado")
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private var sessionAccessibilityLabel: String {
+        let title = displayTitle
+        let when = Self.formatRelative(session.createdAt)
+        if session.isActive {
+            return "Sessão \(title), em andamento \(session.currentIndex) de \(session.totalQuestions), \(when)"
+        }
+        return "Sessão \(title), \(session.correctCount) de \(session.totalQuestions) corretas, \(pct)% de acerto, \(when)"
     }
 
     // MARK: - Date formatting (pt_BR)

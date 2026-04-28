@@ -329,5 +329,21 @@ struct QBankDisciplineCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityCardLabel)
+        .accessibilityHint(discipline.children.isEmpty ? "Toque para selecionar" : "Toque para ver subdisciplinas")
+        .accessibilityValue(isSelected ? "Selecionada" : "Não selecionada")
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private var accessibilityCardLabel: String {
+        var parts = [discipline.title]
+        if discipline.questionCount > 0 {
+            parts.append("\(discipline.questionCount) questões")
+        }
+        if !discipline.children.isEmpty {
+            parts.append("\(discipline.children.count) subdisciplinas")
+        }
+        return parts.joined(separator: ", ")
     }
 }

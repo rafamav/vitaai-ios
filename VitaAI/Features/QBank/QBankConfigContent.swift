@@ -67,6 +67,9 @@ struct QBankConfigContent: View {
                             difficultySection
                         }
 
+                        // [4] Quality filters (Rafael 2026-04-27 — A5 UI-SHIPPER)
+                        qualitySection
+
                         // [5] Year range
                         if !vm.state.filters.years.isEmpty {
                             yearRangeSection
@@ -458,6 +461,41 @@ struct QBankConfigContent: View {
             }
             .padding(4)
             .glassCard(cornerRadius: 14)
+        }
+    }
+
+    // MARK: - Quality filters (Rafael 2026-04-27)
+    //
+    // Por padrão app só mostra questões com gabarito substancial e oficiais.
+    // Usuário pode relaxar pra incluir bancos sintéticos / sem comentário.
+
+    private var qualitySection: some View {
+        configGlassSection(title: "QUALIDADE") {
+            VStack(spacing: 8) {
+                QBankConfigToggleRow(
+                    icon: "checkmark.seal.fill",
+                    title: "Apenas com gabarito",
+                    description: "Pula questões sem comentário detalhado",
+                    isOn: vm.state.excludeNoExplanation,
+                    action: { vm.setExcludeNoExplanation(!vm.state.excludeNoExplanation) }
+                )
+                .accessibilityLabel("Apenas com gabarito")
+                .accessibilityHint("Quando ligado, só inclui questões que têm comentário detalhado")
+                .accessibilityValue(vm.state.excludeNoExplanation ? "Ligado" : "Desligado")
+                .accessibilityAddTraits(.isButton)
+
+                QBankConfigToggleRow(
+                    icon: "rosette",
+                    title: "Apenas oficiais",
+                    description: "Exclui questões geradas por IA",
+                    isOn: vm.state.onlyOfficial,
+                    action: { vm.setOnlyOfficial(!vm.state.onlyOfficial) }
+                )
+                .accessibilityLabel("Apenas oficiais")
+                .accessibilityHint("Quando ligado, só inclui questões de provas reais — exclui sintéticas")
+                .accessibilityValue(vm.state.onlyOfficial ? "Ligado" : "Desligado")
+                .accessibilityAddTraits(.isButton)
+            }
         }
     }
 

@@ -113,6 +113,7 @@ final class DeepLinkHandler {
         // Main tabs
         case "home":       return .navigate(.home)
         case "estudos":    return .navigate(.estudos)
+        case "qbank":      return .navigate(.qbank)
         case "trabalhos":  return .navigate(.trabalhos)
         case "agenda":     return .navigate(.agenda)
         case "insights":   return .navigate(.insights)

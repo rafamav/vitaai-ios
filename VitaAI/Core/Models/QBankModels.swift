@@ -277,6 +277,12 @@ struct QBankCreateSessionRequest: Encodable {
     let onlyUnanswered: Bool?
     let title: String?
     let status: String?
+    /// Quality filter — drop questions com explanation NULL ou length<=50.
+    /// Default true client-side (Rafael 2026-04-27): "questões boas têm gabarito".
+    let excludeNoExplanation: Bool?
+    /// Quality filter — when false, drop LLM-generated questions
+    /// (isSynthetic=true, year>=2025, source=medsimple). Default true (only oficiais).
+    let includeSynthetic: Bool?
 }
 
 struct QBankSession: Decodable, Identifiable {

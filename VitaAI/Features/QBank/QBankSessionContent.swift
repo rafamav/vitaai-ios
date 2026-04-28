@@ -348,6 +348,13 @@ struct QBankAlternativeCard: View {
         Self.letters.indices.contains(idx) ? Self.letters[idx] : "\(idx + 1)"
     }
 
+    private var accessibilityStateLabel: String {
+        if showFeedback && isCorrect { return ". Resposta correta" }
+        if isWrongChoice { return ". Resposta incorreta selecionada" }
+        if isSelected { return ". Selecionada" }
+        return ""
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             // option-letter: 24x24 rounded 8px square matching mockup
@@ -386,5 +393,9 @@ struct QBankAlternativeCard: View {
         .onTapGesture { if !showFeedback { onSelect() } }
         .animation(.easeInOut(duration: 0.2), value: showFeedback)
         .animation(.easeInOut(duration: 0.2), value: isSelected)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Alternativa \(letter): \(alternative.text)\(accessibilityStateLabel)")
+        .accessibilityHint(showFeedback ? "" : "Toque para selecionar esta alternativa")
+        .accessibilityAddTraits(.isButton)
     }
 }

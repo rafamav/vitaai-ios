@@ -79,6 +79,12 @@ struct QBankUiState {
     // Status filter: "unanswered" | "wrong" | "correct" | nil
     var selectedStatus: String? = nil
 
+    // Quality filters (Rafael 2026-04-27): app só mostra questões boas por padrão.
+    /// Apenas com gabarito substancial (drop explanation NULL ou length<=50).
+    var excludeNoExplanation = true
+    /// Apenas oficiais (drop questões sintéticas LLM-geradas, year>=2025).
+    var onlyOfficial = true
+
     // Home chip selection. nil => all enrolled disciplines (default scope).
     // Holds the StudyOverviewSubject.id so UI and VM agree without embedding
     // the full subject name in state.
@@ -373,7 +379,9 @@ final class QBankViewModel {
                     onlyResidence: nil,
                     onlyUnanswered: true,
                     title: nil,
-                    status: "wrong"
+                    status: "wrong",
+                    excludeNoExplanation: true,
+                    includeSynthetic: false
                 )
                 let session = try await api.createQBankSession(request: req)
                 state.session = session
@@ -589,6 +597,16 @@ final class QBankViewModel {
         state.onlyUnanswered = val
     }
 
+    func setExcludeNoExplanation(_ val: Bool) {
+        state.excludeNoExplanation = val
+        scheduleCountRefresh()
+    }
+
+    func setOnlyOfficial(_ val: Bool) {
+        state.onlyOfficial = val
+        scheduleCountRefresh()
+    }
+
     func setQuestionCount(_ val: Int) { state.questionCount = val }
 
     // MARK: - Status filter (unanswered / wrong / correct)
@@ -723,7 +741,9 @@ final class QBankViewModel {
                     onlyResidence: nil,
                     onlyUnanswered: nil,
                     title: nil,
-                    status: nil
+                    status: nil,
+                    excludeNoExplanation: true,
+                    includeSynthetic: false
                 )
                 let session = try await api.createQBankSession(request: req)
                 state.session = session
@@ -809,7 +829,9 @@ final class QBankViewModel {
                         return nil
                     }(),
                     title: nil, // backend auto-derives from disciplineSlugs when nil
-                    status: state.selectedStatus
+                    status: state.selectedStatus,
+                    excludeNoExplanation: state.excludeNoExplanation ? true : nil,
+                    includeSynthetic: state.onlyOfficial ? false : nil
                 )
                 let session = try await api.createQBankSession(request: req)
                 state.session = session
