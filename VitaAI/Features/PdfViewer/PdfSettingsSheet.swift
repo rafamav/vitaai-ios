@@ -28,6 +28,7 @@ struct PdfSettingsSheet: View {
     // Shape snap reactivated 2026-04-28 — default OFF (segurança até confirmar
     // em uso real que guards anti-letra estão calibrados). Usuário liga aqui.
     @AppStorage("pdf.shapeSnap.enabled")        private var shapeSnapEnabled: Bool = false
+    @AppStorage("pdf.handwriting.autoConvert")  private var autoConvertHandwriting: Bool = false
 
     @State private var showResetConfirm: Bool = false
 
@@ -66,6 +67,12 @@ struct PdfSettingsSheet: View {
                             title: "Snap de formas",
                             subtitle: "Linha torta vira reta, círculo torto vira perfeito (estilo Goodnotes)",
                             isOn: $shapeSnapEnabled
+                        )
+
+                        toggleRow(
+                            title: "Auto-converter escrita em texto",
+                            subtitle: "Quando você para de escrever, vira digitado sozinho (estilo Apple Notes)",
+                            isOn: $autoConvertHandwriting
                         )
                     }
 

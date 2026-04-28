@@ -534,6 +534,107 @@ final class PdfViewerViewModel {
         isRecognizing = false
     }
 
+    /// Auto-converte handwriting → freeText sem abrir sheet.
+    /// Disparado pelo Coordinator quando user pausa de escrever E o toggle
+    /// `pdf.handwriting.autoConvert` está ON. Igual ao "Scribble" do Apple Notes:
+    /// escreveu, virou digitado.
+    ///
+    /// Algoritmo:
+    ///   1. Renderiza só os strokes NOVOS (delta pré-existente vs estado atual).
+    ///   2. Roda VNRecognizeTextRequest.
+    ///   3. Filtra: confidence >= 0.5 E texto >= 2 chars E NÃO é só símbolos.
+    ///      (Threshold conservador pra não converter rabisco/seta/sublinhado.)
+    ///   4. Cria PDFAnnotation .freeText no bbox dos strokes novos.
+    ///   5. Remove os strokes novos do canvas (preserva strokes pré-existentes).
+    ///   6. Persiste.
+    ///
+    /// Retorna `true` se converteu, `false` se descartou (rabisco / baixa confiança).
+    func autoConvertHandwriting(
+        newStrokes: [PKStroke],
+        priorStrokes: [PKStroke],
+        pageIndex: Int,
+        applyToCanvas: (PKDrawing) -> Void
+    ) async -> Bool {
+        guard !newStrokes.isEmpty else { return false }
+        guard let document, let page = document.page(at: pageIndex) else { return false }
+
+        let deltaDrawing = PKDrawing(strokes: newStrokes)
+        let bounds = deltaDrawing.bounds
+        guard bounds.width > 4, bounds.height > 4 else { return false }
+
+        let renderer = UIGraphicsImageRenderer(bounds: bounds)
+        let image = renderer.image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(bounds)
+            deltaDrawing.image(from: bounds, scale: 2.0).draw(in: bounds)
+        }
+        guard let cgImage = image.cgImage else { return false }
+
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.recognitionLanguages = ["pt-BR", "en-US"]
+        request.usesLanguageCorrection = true
+        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+
+        do {
+            try await Task.detached(priority: .userInitiated) {
+                try handler.perform([request])
+            }.value
+        } catch {
+            return false
+        }
+
+        let observations = request.results ?? []
+        // Coleta texto + média de confidence dos topCandidates.
+        var pieces: [String] = []
+        var confidences: [Float] = []
+        for obs in observations {
+            guard let top = obs.topCandidates(1).first else { continue }
+            pieces.append(top.string)
+            confidences.append(top.confidence)
+        }
+        let text = pieces.joined(separator: "\n")
+        let avgConfidence: Float = confidences.isEmpty
+            ? 0
+            : confidences.reduce(0, +) / Float(confidences.count)
+
+        // Thresholds conservadores. Escrita real geralmente fica >= 0.55 confidence.
+        // Rabisco/seta vai pra 0.2-0.4 e cai fora.
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2,
+              avgConfidence >= 0.5,
+              trimmed.rangeOfCharacter(from: .letters) != nil else {
+            return false
+        }
+
+        // 1. Cria freeText annotation no bbox dos strokes novos.
+        let inset: CGFloat = 4
+        let textBounds = bounds.insetBy(dx: inset, dy: inset)
+        let lineCount = max(1, trimmed.components(separatedBy: "\n").count)
+        let fontSize = max(10, min(24, (textBounds.height / CGFloat(lineCount)) * 0.7))
+
+        let annotation = PDFAnnotation(bounds: textBounds, forType: .freeText, withProperties: nil)
+        annotation.font = UIFont.systemFont(ofSize: fontSize, weight: .regular)
+        annotation.fontColor = UIColor.label
+        annotation.color = .clear
+        let nb = PDFBorder()
+        nb.lineWidth = 0
+        annotation.border = nb
+        annotation.isReadOnly = false
+        annotation.contents = trimmed
+        page.addAnnotation(annotation)
+
+        // 2. Remove strokes novos do canvas, preservando os pré-existentes.
+        let preservedDrawing = PKDrawing(strokes: priorStrokes)
+        applyToCanvas(preservedDrawing)
+        saveDrawing(preservedDrawing, pageIndex: pageIndex)
+
+        // 3. Persiste o PDF (annotations).
+        saveHighlights()
+
+        return true
+    }
+
     /// Substitui o PKDrawing reconhecido por uma PDFAnnotation .freeText posicionada
     /// no MESMO bbox do desenho original (Goodnotes 6 "Live Text Conversion" pattern).
     /// Pré-requisito: chamar recognizeHandwriting antes — `recognizedText`,

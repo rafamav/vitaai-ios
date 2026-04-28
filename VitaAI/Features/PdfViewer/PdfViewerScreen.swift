@@ -1605,6 +1605,16 @@ private final class Coordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDe
 
     private var lastScrolledPage: Int = -1
 
+    /// Baseline de strokes por canvas — snapshot tirado ANTES do user começar a
+    /// escrever (no canvasViewDrawingDidChange quando count crescia de 0->1).
+    /// Usado pelo auto-convert pra calcular o delta (strokes novos da sessão atual).
+    /// Key: ObjectIdentifier(canvasView). Value: strokes pré-existentes.
+    private var canvasBaselines: [ObjectIdentifier: [PKStroke]] = [:]
+
+    /// Debounce de auto-convert por canvas. Cancelado a cada novo stroke,
+    /// dispara após pause de 1.2s.
+    private var autoConvertTasks: [ObjectIdentifier: Task<Void, Never>] = [:]
+
     init(viewModel: PdfViewerViewModel) {
         self.viewModel = viewModel
         super.init()
@@ -1664,6 +1674,11 @@ private final class Coordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDe
         viewModel.saveDrawing(canvas.drawing, pageIndex: pageIndex)
         toolPicker.removeObserver(canvas)
         pageToCanvas.removeValue(forKey: page)
+        // Clean up auto-convert state for this canvas.
+        let key = ObjectIdentifier(canvas)
+        autoConvertTasks[key]?.cancel()
+        autoConvertTasks.removeValue(forKey: key)
+        canvasBaselines.removeValue(forKey: key)
     }
 
     // MARK: PKCanvasViewDelegate
@@ -1675,30 +1690,62 @@ private final class Coordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDe
             try? await Task.sleep(for: .milliseconds(800))
             self?.viewModel.isSaving = false
         }
+
+        // Captura baseline na transição "canvas vazio/sem sessão" → "primeiro stroke
+        // da sessão atual". Auto-convert (se ON) usa esse baseline pra calcular delta.
+        let key = ObjectIdentifier(canvasView)
+        if canvasBaselines[key] == nil {
+            // Strokes pré-existentes ANTES do primeiro stroke desta sessão.
+            // canvas.drawing.strokes já contém o stroke novo, então pegamos
+            // todos exceto o último.
+            let strokes = canvasView.drawing.strokes
+            if strokes.count >= 1 {
+                canvasBaselines[key] = Array(strokes.dropLast())
+            } else {
+                canvasBaselines[key] = []
+            }
+        }
     }
 
-    /// Snap-on-pause shape recognition (Goodnotes 6 / Notability pattern).
+    /// Trigger de duas features quando o usuário pausa de escrever:
+    ///   1. **Auto-convert handwriting → texto** (scribble) — debounce 1.2s,
+    ///      controlado por `pdf.handwriting.autoConvert` (default OFF).
+    ///   2. **Shape snap** (Goodnotes 6 / Notability pattern) — instant,
+    ///      controlado por `pdf.shapeSnap.enabled` (default OFF).
     ///
-    /// **Histórico:**
+    /// **Histórico shape-snap:**
     ///   - 2026-04-26 commit f1e0f92: implementação inicial.
     ///   - 2026-04-26 commit 29e9ead: DESLIGADO porque algoritmo convertia
     ///     letras manuscritas em shapes vazios.
     ///   - 2026-04-28: REATIVADO com guards conservadores e setting toggle.
     ///
     /// **Por que não usar API Apple:** PencilKit não expõe shape recognition
-    /// pública pra third-party (forums confirmam — só Notes/Markup têm).
-    /// WWDC24 mostra "pause-to-snap" no Marker mas o trigger é interno.
-    /// Implementamos custom com guards anti-letra robustos.
+    /// pública pra third-party (só Notes/Markup têm). Implementamos custom
+    /// com guards anti-letra robustos.
     ///
-    /// **Setting:** `pdf.shapeSnap.enabled` (default OFF — segurança). Setting
-    /// vive em PdfSettingsSheet.
-    ///
-    /// **Confidence gate:** só aplica se `confidence >= 0.85` (resíduo bem
-    /// abaixo do threshold máximo). Reduz ainda mais falsos positivos.
+    /// **Confidence gate (shape-snap):** só aplica se `confidence >= 0.85`.
     func canvasViewDidEndUsingTool(_ canvasView: PKCanvasView) {
-        // Setting toggle — default OFF. Usuário liga em PdfSettingsSheet.
-        guard UserDefaults.standard.bool(forKey: "pdf.shapeSnap.enabled") else { return }
+        // 1. Auto-convert handwriting → texto (scribble feature, debounce 1.2s).
+        let autoOn = UserDefaults.standard.bool(forKey: "pdf.handwriting.autoConvert")
+        if autoOn, viewModel.isAnnotating, !viewModel.isHighlightMode {
+            let key = ObjectIdentifier(canvasView)
+            autoConvertTasks[key]?.cancel()
+            autoConvertTasks[key] = Task { @MainActor [weak self, weak canvasView] in
+                try? await Task.sleep(for: .milliseconds(1200))
+                guard !Task.isCancelled,
+                      let self,
+                      let canvasView,
+                      let pdfView = self.pdfView else { return }
+                // Página atual deste canvas (procura no map).
+                guard let pdfPage = self.pageToCanvas.first(where: { $0.value === canvasView })?.key,
+                      let pageIndex = pdfView.document?.index(for: pdfPage) else { return }
 
+                await self.runAutoConvert(canvas: canvasView, pageIndex: pageIndex)
+            }
+        }
+
+        // 2. Shape snap (linha/círculo).
+        guard UserDefaults.standard.bool(forKey: "pdf.shapeSnap.enabled") else { return }
         guard let lastStroke = canvasView.drawing.strokes.last else { return }
 
         let (result, outcome) = PdfShapeSnap.detect(stroke: lastStroke)
@@ -1739,6 +1786,49 @@ private final class Coordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDe
         finalProps["applied"] = appliedKind != nil
         if let appliedKind { finalProps["kind"] = appliedKind }
         VitaPostHogConfig.capture(event: "pdf_shape_snap_applied", properties: finalProps)
+    }
+
+    /// Roda o pipeline de auto-convert: pega delta vs baseline, recognize, replace.
+    /// Após terminar (sucesso OU falha), reseta baseline pra próxima sessão.
+    private func runAutoConvert(canvas: PKCanvasView, pageIndex: Int) async {
+        let key = ObjectIdentifier(canvas)
+        let priorStrokes = canvasBaselines[key] ?? []
+        let allStrokes = canvas.drawing.strokes
+
+        // Strokes novos = todos menos os do baseline (assumindo append-only durante sessão).
+        // Se user usou borracha durante a sessão, allStrokes pode ser menor que priorStrokes
+        // — nesse caso, abortar (não dá pra inferir intent).
+        guard allStrokes.count > priorStrokes.count else {
+            canvasBaselines[key] = allStrokes
+            return
+        }
+        let newStrokes = Array(allStrokes.suffix(allStrokes.count - priorStrokes.count))
+
+        let converted = await viewModel.autoConvertHandwriting(
+            newStrokes: newStrokes,
+            priorStrokes: priorStrokes,
+            pageIndex: pageIndex,
+            applyToCanvas: { newDrawing in
+                canvas.drawing = newDrawing
+            }
+        )
+
+        if converted {
+            VitaPostHogConfig.capture(
+                event: "pdf_handwriting_auto_converted",
+                properties: [
+                    "stroke_count": newStrokes.count,
+                    "page_index": pageIndex,
+                ]
+            )
+            // Após substituição, o canvas só tem priorStrokes — reset baseline pra esse novo estado.
+            canvasBaselines[key] = priorStrokes
+        } else {
+            // Não converteu (rabisco / baixa confiança / texto curto). Mantém os strokes
+            // e atualiza baseline pra refletir o estado atual — próxima sessão é o que
+            // user escrever a partir de AGORA.
+            canvasBaselines[key] = canvas.drawing.strokes
+        }
     }
 
     /// Substitui o último stroke do canvas por uma versão geometricamente
