@@ -52,6 +52,7 @@ struct PdfToolbar: View {
     let onAskVita: () -> Void
     let onExport: () -> Void
     let onTranscribe: () -> Void
+    var onScanDocument: (() -> Void)? = nil
 
     // ZONE-A callbacks (Agent A pen-styles)
     var onToggleEraser: (() -> Void)? = nil
@@ -347,6 +348,11 @@ struct PdfToolbar: View {
             )
 
             Menu {
+                if let onScanDocument {
+                    Button(action: onScanDocument) {
+                        Label("Escanear documento", systemImage: "doc.viewfinder")
+                    }
+                }
                 Button(action: onExport) {
                     Label("Exportar / Compartilhar", systemImage: "square.and.arrow.up")
                 }

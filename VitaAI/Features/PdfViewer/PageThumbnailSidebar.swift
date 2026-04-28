@@ -11,8 +11,14 @@ struct PageThumbnailSidebar: View {
     let onPageSelected: (Int) -> Void
     var onToggleBookmarkFor: ((Int) -> Void)? = nil
     var onRotatePage: ((Int, Int) -> Void)? = nil
+    var onMovePage: ((Int, Int) -> Void)? = nil
+    var onDeletePage: ((Int) -> Void)? = nil
+    var onDuplicatePage: ((Int) -> Void)? = nil
 
     @State private var filterBookmarks: Bool = false
+    @State private var draggingIndex: Int? = nil
+    @State private var dropTargetIndex: Int? = nil
+    @State private var pendingDeleteIndex: Int? = nil
 
     private var visibleIndices: [Int] {
         if filterBookmarks {
@@ -74,9 +80,38 @@ struct PageThumbnailSidebar: View {
                                             pageIndex: index,
                                             isCurrentPage: index == currentPage,
                                             isBookmarked: bookmarkedPages.contains(index),
+                                            isDropTarget: dropTargetIndex == index,
+                                            isDragging: draggingIndex == index,
                                             onTap: { onPageSelected(index) }
                                         )
                                         .id(index)
+                                        // Drag-to-reorder (iOS 16+ Transferable API).
+                                        // We carry only the pageIndex as String; ViewModel.movePage swaps.
+                                        .draggable("\(index)") {
+                                            ThumbnailItem(
+                                                document: document,
+                                                pageIndex: index,
+                                                isCurrentPage: false,
+                                                isBookmarked: bookmarkedPages.contains(index),
+                                                isDropTarget: false,
+                                                isDragging: true,
+                                                onTap: {}
+                                            )
+                                            .onAppear { draggingIndex = index }
+                                        }
+                                        .dropDestination(for: String.self) { items, _ in
+                                            defer {
+                                                draggingIndex = nil
+                                                dropTargetIndex = nil
+                                            }
+                                            guard let str = items.first, let src = Int(str), src != index,
+                                                  let move = onMovePage else { return false }
+                                            move(src, index)
+                                            return true
+                                        } isTargeted: { hovering in
+                                            if hovering { dropTargetIndex = index }
+                                            else if dropTargetIndex == index { dropTargetIndex = nil }
+                                        }
                                         .contextMenu {
                                             Button {
                                                 onPageSelected(index)
@@ -114,6 +149,21 @@ struct PageThumbnailSidebar: View {
                                                     Label("Rotacionar página", systemImage: "rotate.right")
                                                 }
                                             }
+                                            if let duplicate = onDuplicatePage {
+                                                Button {
+                                                    duplicate(index)
+                                                } label: {
+                                                    Label("Duplicar página", systemImage: "plus.square.on.square")
+                                                }
+                                            }
+                                            if let _ = onDeletePage, pageCount > 1 {
+                                                Divider()
+                                                Button(role: .destructive) {
+                                                    pendingDeleteIndex = index
+                                                } label: {
+                                                    Label("Excluir página", systemImage: "trash")
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -130,6 +180,24 @@ struct PageThumbnailSidebar: View {
                 .frame(width: 110)
                 .background(VitaColors.surfaceCard.opacity(0.95))
                 .transition(.move(edge: .leading))
+                .alert(
+                    "Excluir página?",
+                    isPresented: Binding(
+                        get: { pendingDeleteIndex != nil },
+                        set: { if !$0 { pendingDeleteIndex = nil } }
+                    ),
+                    presenting: pendingDeleteIndex
+                ) { idx in
+                    Button("Excluir", role: .destructive) {
+                        onDeletePage?(idx)
+                        pendingDeleteIndex = nil
+                    }
+                    Button("Cancelar", role: .cancel) {
+                        pendingDeleteIndex = nil
+                    }
+                } message: { idx in
+                    Text("A página \(idx + 1) e suas anotações serão removidas. Não dá pra desfazer.")
+                }
             }
         }
         .animation(.spring(duration: 0.3), value: isVisible)
@@ -143,6 +211,8 @@ private struct ThumbnailItem: View {
     let pageIndex: Int
     let isCurrentPage: Bool
     let isBookmarked: Bool
+    var isDropTarget: Bool = false
+    var isDragging: Bool = false
     let onTap: () -> Void
 
     @State private var thumbnail: UIImage? = nil
@@ -168,10 +238,14 @@ private struct ThumbnailItem: View {
                 .overlay(
                     RoundedRectangle(cornerRadius: 6)
                         .stroke(
-                            isCurrentPage ? VitaColors.accent : VitaColors.surfaceBorder,
-                            lineWidth: isCurrentPage ? 2 : 1
+                            isDropTarget ? VitaColors.accentHover : (isCurrentPage ? VitaColors.accent : VitaColors.surfaceBorder),
+                            lineWidth: isDropTarget ? 3 : (isCurrentPage ? 2 : 1)
                         )
                 )
+                .opacity(isDragging ? 0.4 : 1.0)
+                .scaleEffect(isDropTarget ? 1.04 : 1.0)
+                .animation(.easeInOut(duration: 0.18), value: isDropTarget)
+                .animation(.easeInOut(duration: 0.12), value: isDragging)
 
                 // Page number badge
                 Text("\(pageIndex + 1)")

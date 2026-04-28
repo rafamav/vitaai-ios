@@ -85,6 +85,94 @@ final class PdfViewerViewModel {
         saveHighlights()
     }
 
+    /// Move uma página no documento — suporta drag-to-reorder no thumbnail sidebar.
+    /// Bookmarks são deslocados pra acompanhar a nova posição.
+    func movePage(from src: Int, to dst: Int) {
+        guard let document, src != dst,
+              src >= 0, src < document.pageCount,
+              dst >= 0, dst < document.pageCount else { return }
+        document.exchangePage(at: src, withPageAt: dst)
+        // Reposiciona bookmark se a página movida estava marcada.
+        let srcWasBookmarked = bookmarkedPages.contains(src)
+        let dstWasBookmarked = bookmarkedPages.contains(dst)
+        if srcWasBookmarked != dstWasBookmarked {
+            if srcWasBookmarked {
+                bookmarkedPages.remove(src); bookmarkedPages.insert(dst)
+            } else {
+                bookmarkedPages.remove(dst); bookmarkedPages.insert(src)
+            }
+            saveBookmarks()
+        }
+        pageCount = document.pageCount
+        isSaving = true
+        saveHighlights()
+    }
+
+    /// Deleta uma página. Anotações PencilKit + bookmarks daquela página são removidos.
+    func deletePage(at index: Int) {
+        guard let document, index >= 0, index < document.pageCount,
+              document.pageCount > 1 else { return } // não permite documento vazio
+        document.removePage(at: index)
+        bookmarkedPages.remove(index)
+        // Reindexa bookmarks acima do índice removido.
+        let above = bookmarkedPages.filter { $0 > index }
+        bookmarkedPages.subtract(above)
+        bookmarkedPages.formUnion(above.map { $0 - 1 })
+        saveBookmarks()
+        // Remove arquivo de drawing daquela página (se existir).
+        let url = annotationFileURL(page: index)
+        try? FileManager.default.removeItem(at: url)
+        pageCount = document.pageCount
+        currentPage = min(currentPage, pageCount - 1)
+        isSaving = true
+        saveHighlights()
+    }
+
+    /// Duplica uma página (insere cópia logo após o índice).
+    func duplicatePage(at index: Int) {
+        guard let document, let page = document.page(at: index) else { return }
+        // PDFPage.copy() retorna uma cópia da página com mesmas anotações.
+        guard let copy = page.copy() as? PDFPage else { return }
+        document.insert(copy, at: index + 1)
+        pageCount = document.pageCount
+        isSaving = true
+        saveHighlights()
+    }
+
+    /// Anexa páginas escaneadas via VisionKit no fim do documento.
+    /// Cada UIImage vira uma PDFPage A4-sized.
+    func appendScannedPages(_ images: [UIImage]) {
+        guard let document, !images.isEmpty else { return }
+        for image in images {
+            guard let pdfPage = PDFPage(image: image) else { continue }
+            document.insert(pdfPage, at: document.pageCount)
+        }
+        pageCount = document.pageCount
+        isSaving = true
+        saveHighlights()
+    }
+
+    /// Renderiza uma região da página atual em UIImage — usado pelo PdfScanOverlay
+    /// pra mandar pra rota /api/ai/ask-image (Pergunte ao Vita com imagem).
+    func captureRegionImage(rect pageRect: CGRect, pageIndex: Int) -> UIImage? {
+        guard let document, let page = document.page(at: pageIndex) else { return nil }
+        let pageBounds = page.bounds(for: .mediaBox)
+        // Clamp pageRect dentro dos bounds reais.
+        let clamped = pageRect.intersection(pageBounds)
+        guard !clamped.isEmpty else { return nil }
+        // Render @ 2x pra qualidade legível pelo modelo de visão.
+        let scale: CGFloat = 2.0
+        let outputSize = CGSize(width: clamped.width * scale, height: clamped.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: outputSize)
+        return renderer.image { ctx in
+            UIColor.white.setFill()
+            ctx.fill(CGRect(origin: .zero, size: outputSize))
+            ctx.cgContext.scaleBy(x: scale, y: scale)
+            ctx.cgContext.translateBy(x: -clamped.minX, y: -clamped.minY)
+            page.draw(with: .mediaBox, to: ctx.cgContext)
+        }
+    }
+
     func loadBookmarks() {
         let url = bookmarksFileURL()
         guard let data = try? Data(contentsOf: url),

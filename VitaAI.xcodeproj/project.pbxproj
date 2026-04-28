@@ -243,6 +243,7 @@
 		8C65C081946C5EB9325CA5C5 /* CanvasSilentReauth.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE31CC2592D05FF00976F24A /* CanvasSilentReauth.swift */; };
 		8C9BB863C94A5710F2664067 /* ProgressoScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7993D339523EA36C4CC8B25C /* ProgressoScreen.swift */; };
 		8D831E286DC2B35A11F4467E /* PdfShapeSnap.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D811804E1E2A9F1E06FFB9 /* PdfShapeSnap.swift */; };
+		5CDD4728E401439A9B40B70F /* PdfDocumentScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 378A72A07E0345C9B75FEBA5 /* PdfDocumentScanner.swift */; };
 		8D9F5CD12607C01389C6B254 /* NotebookStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5513CD19D0230B41AC440E8D /* NotebookStore.swift */; };
 		8DAB61FBB197AC29828DE194 /* FlashcardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6827736C1825D7205D33703E /* FlashcardModels.swift */; };
 		8E5C3FCDB7EC7E77A034CADD /* InsightsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E64F3F466E1AEC167C8E16C4 /* InsightsScreen.swift */; };
@@ -794,6 +795,7 @@
 		F4B6DB5F8404467635FBFC49 /* ConversationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationModels.swift; sourceTree = "<group>"; };
 		F4C7EE91AF90098D6FB1DAD0 /* PushManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushManager.swift; sourceTree = "<group>"; };
 		F4D811804E1E2A9F1E06FFB9 /* PdfShapeSnap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PdfShapeSnap.swift; sourceTree = "<group>"; };
+		378A72A07E0345C9B75FEBA5 /* PdfDocumentScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PdfDocumentScanner.swift; sourceTree = "<group>"; };
 		F5079577D6F3E546C0B07954 /* ConnectorStatusSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectorStatusSheet.swift; sourceTree = "<group>"; };
 		F5CBDEBE92E57751092C2AD1 /* DisciplineDetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisciplineDetailScreen.swift; sourceTree = "<group>"; };
 		F5F50F25FBC60669076E52AA /* SimuladoDiagnosticsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimuladoDiagnosticsScreen.swift; sourceTree = "<group>"; };
@@ -904,6 +906,7 @@
 				05B1E34202A8907EFFFFACD1 /* PdfScanOverlay.swift */,
 				303BA1D3D9EFF7031A182BB5 /* PdfSettingsSheet.swift */,
 				F4D811804E1E2A9F1E06FFB9 /* PdfShapeSnap.swift */,
+				378A72A07E0345C9B75FEBA5 /* PdfDocumentScanner.swift */,
 				1130D9D84A3608728A01845E /* PdfStudyStatsSheet.swift */,
 				D76BE069C1F75FD8C95A138A /* PdfTabBar.swift */,
 				E6EFEEFBA17AF37F355A4848 /* PdfToolbar.swift */,
@@ -2073,6 +2076,7 @@
 				DB5C2B7F9757B2683C89B850 /* PdfScanOverlay.swift in Sources */,
 				696CBE7E1E29936CEF915F00 /* PdfSettingsSheet.swift in Sources */,
 				8D831E286DC2B35A11F4467E /* PdfShapeSnap.swift in Sources */,
+				5CDD4728E401439A9B40B70F /* PdfDocumentScanner.swift in Sources */,
 				611E98DC1816E350AFCEF2D0 /* PdfStudyStatsSheet.swift in Sources */,
 				EBD32F8B6FC327034ED9A70E /* PdfTabBar.swift in Sources */,
 				042B3027A14F3834E0DCBC54 /* PdfToolbar.swift in Sources */,

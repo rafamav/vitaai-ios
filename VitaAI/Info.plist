@@ -40,6 +40,8 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>VitaAI usa a câmera para escanear apostilas, quadros e anotações em PDF.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>VitaAI usa dados de sono e exercicio para correlacionar com seu desempenho academico.</string>
 	<key>NSHealthUpdateUsageDescription</key>

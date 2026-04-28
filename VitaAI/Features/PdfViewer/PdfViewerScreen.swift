@@ -29,6 +29,8 @@ struct PdfViewerScreen: View {
     @State private var isScanMode: Bool = false
     @State private var scanSelection: CGRect? = nil   // in pdfViewContainer coords
     @State private var pdfViewContainerFrame: CGRect = .zero
+    // VisionKit document scanner (camera → PDF pages)
+    @State private var showDocumentScanner: Bool = false
     // ZONE-A — Pen styles + eraser/pointer + undo/redo
     @State private var isEraserMode: Bool = false
     @State private var isPointerMode: Bool = false
@@ -147,6 +149,23 @@ struct PdfViewerScreen: View {
                 },
                 onCancel: { showFilePicker = false }
             )
+        }
+        // VisionKit Document Scanner — camera → PDF pages, anexa no fim do doc.
+        // vita-modals-ignore: VNDocumentCameraViewController é viewController nativo Apple — VitaSheet quebraria a captura de câmera (precisa de fullScreenCover puro)
+        .fullScreenCover(isPresented: $showDocumentScanner) {
+            PdfDocumentScanner(
+                onScan: { images in
+                    showDocumentScanner = false
+                    guard !images.isEmpty else { return }
+                    viewModel.appendScannedPages(images)
+                    VitaPostHogConfig.capture(event: "pdf_scan_pages_added", properties: [
+                        "count": images.count,
+                        "total_pages": viewModel.pageCount,
+                    ])
+                },
+                onCancel: { showDocumentScanner = false }
+            )
+            .ignoresSafeArea()
         }
         .trackScreen("PdfViewer")
         .onDisappear { viewModel.saveAllAnnotations() }
@@ -332,6 +351,10 @@ struct PdfViewerScreen: View {
                               !drawing.strokes.isEmpty else { return }
                         Task { await viewModel.recognizeHandwriting(drawing: drawing) }
                     },
+                    onScanDocument: {
+                        showDocumentScanner = true
+                        VitaPostHogConfig.capture(event: "pdf_scan_document_tap")
+                    },
                     onToggleEraser: {
                         isEraserMode.toggle()
                         if isEraserMode { isPointerMode = false }
@@ -441,6 +464,25 @@ struct PdfViewerScreen: View {
                     },
                     onRotatePage: { index, degrees in
                         viewModel.rotatePage(at: index, byDegrees: degrees)
+                    },
+                    onMovePage: { src, dst in
+                        viewModel.movePage(from: src, to: dst)
+                        VitaPostHogConfig.capture(event: "pdf_page_reordered", properties: [
+                            "from": src,
+                            "to": dst,
+                        ])
+                    },
+                    onDeletePage: { index in
+                        viewModel.deletePage(at: index)
+                        VitaPostHogConfig.capture(event: "pdf_page_deleted", properties: [
+                            "index": index,
+                        ])
+                    },
+                    onDuplicatePage: { index in
+                        viewModel.duplicatePage(at: index)
+                        VitaPostHogConfig.capture(event: "pdf_page_duplicated", properties: [
+                            "index": index,
+                        ])
                     }
                 )
             }
