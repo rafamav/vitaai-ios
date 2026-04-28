@@ -337,7 +337,14 @@ struct ConnectionsScreen: View {
             }
 
             // "Outros portais" toggle
-            if !otherPortals.isEmpty {
+            // "Outros portais" só faz sentido quando NÃO temos faculdade detectada
+            // (user sem onboarding completo). Quando uni está conhecida, mostrar
+            // apenas os portais que ELA usa — clicar Moodle/SIGAA sem URL leva
+            // pra tela "URL não configurada" e quebra UX. Rafael 2026-04-27:
+            // "porque nao colocaram o link de todos conectores para cada
+            //  instituicao ... entao nem deveria mostrar esses conectores quando
+            //  o usuario nao eh da faculdade que tem eles".
+            if !hasUniversity && !otherPortals.isEmpty {
                 Button {
                     withAnimation(.spring(response: 0.3)) { showAllPortals.toggle() }
                 } label: {
@@ -358,7 +365,7 @@ struct ConnectionsScreen: View {
                 .buttonStyle(.plain)
             }
 
-            if showAllPortals {
+            if !hasUniversity && showAllPortals {
                 ForEach(otherPortals) { portal in
                     let connState = vm.state(for: portal.type)
                     ConnectorCard(
@@ -373,8 +380,39 @@ struct ConnectionsScreen: View {
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
+
+            // Quando user TEM faculdade mas portal dela não está mapeado, o
+            // helper hint "meu portal não aparece" abre um caminho de feedback
+            // sem expor a lista cheia de connectors quebrados.
+            if hasUniversity && detectedPortals.isEmpty {
+                missingPortalHint
+            }
         }
         .padding(.horizontal, 14)
+    }
+
+    // MARK: - Missing Portal Hint
+    // Mostrado quando user tem uni configurada mas o catálogo
+    // university_portals não tem nenhum portal mapeado pra ela. Em vez de
+    // listar 8 conectores genéricos sem URL (UX quebrada), pede contato.
+    private var missingPortalHint: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "questionmark.circle")
+                .font(.system(size: 22))
+                .foregroundColor(goldSubtle.opacity(0.40))
+            Text("Portal da sua faculdade ainda não mapeado")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(.white.opacity(0.6))
+                .multilineTextAlignment(.center)
+            Text("Estamos adicionando 351+ faculdades. Avise no chat da Vita qual é o portal da sua e adicionamos rápido.")
+                .font(.system(size: 11))
+                .foregroundColor(goldSubtle.opacity(0.35))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 12)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 18)
+        .glassCard(cornerRadius: 16)
     }
 
     // MARK: - University Display
