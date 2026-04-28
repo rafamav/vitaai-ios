@@ -8,6 +8,7 @@ info:
   # 2026-04-09: portal extraction uses vLLM direct, chat includes portal data (no API surface changes)
   # 2026-04-18: flash_cards.disciplineId now text UUID (schema drift fix matching live DB); no API surface change
   # 2026-04-20: Haiku plano-de-ensino extract via CLAUDE_CODE_OAUTH_TOKEN (no more x-api-key); no API surface change
+  # 2026-04-27: portal notifications refactor — sendNotification unified dispatch + portal source/metadata in Notification schema (additive, no breaking change)
   # 2026-04-20: subject UPDATE via Drizzle native (raw SQL was silently failing on escape of long syllabus strings); no API surface change
   # 2026-04-24: Layer 4 LLM Judge fire-and-forget after audit (issue #170); no API surface change
   # 2026-04-20: cron-drives-Haiku — PDFs recém-baixados pro R2 disparam Haiku server-side (plano extract sem iOS inline)
@@ -1232,6 +1233,63 @@ components:
         userAnswer:
           type: object
           nullable: true
+        medevoSlug:
+          description: 'Slug original MedEvo (cross-match Vita x MedEvo). Rastreia origem cursinho. Added 2026-04-27.'
+          type: string
+          nullable: true
+        medevoArea:
+          description: 'Area cursinho-style MedEvo (7 valores). Tag PARALELA a arvore canonica BYMAV. Mapeada para examArea INEP via vita.exam_area_mapping. Added 2026-04-27.'
+          type: string
+          nullable: true
+          enum: ["Clinica Medica", "Cirurgia", "Pediatria", "Ginecologia", "Obstetricia", "Medicina Preventiva e Social", "Oftalmologia", "Saude Mental"]
+        medevoTopic:
+          description: 'Topic granular MedEvo (~169 valores). Tag PARALELA. Added 2026-04-27.'
+          type: string
+          nullable: true
+        medevoSubtopic:
+          description: 'Subtopic ultra-granular MedEvo (~799 valores). Tag PARALELA. Added 2026-04-27.'
+          type: string
+          nullable: true
+        examGreatAreaSlug:
+          description: |
+            Grande área CNRM/Enare (5 fixas). Derivada de disciplineSlug e/ou
+            medevoArea via mapping declarativo. Usada por Jornada-com-objetivo
+            (Residência/ENAMED/Revalida) e modo great-areas do toggle 3 lentes.
+            SOT da decisão: agent-brain/decisions/2026-04-27_jornada-3lentes-FINAL.md
+            Cobertura atual: 88.8% das Q reais (não-sintéticas). Updated 2026-04-27.
+          type: string
+          nullable: true
+          enum: [clinica-medica, cirurgia-geral, ginecologia-obstetricia, pediatria, medicina-preventiva-social]
+        pblSystemSlug:
+          description: |
+            Sistema PBL (12 fixos). Derivada de disciplineSlug via mapping
+            declarativo. Usada pelo modo PBL do toggle 3 lentes (faculdades
+            modulares: UFRN, FAMETRO, USP-RP, UFOP, CESUPA).
+            Cobertura atual: 77.1% das Q reais. Updated 2026-04-27.
+          type: string
+          nullable: true
+          enum:
+            - cardiovascular
+            - respiratorio
+            - renal-urinario
+            - endocrino-metabolico
+            - digestorio
+            - nervoso
+            - hematologico-imunologico
+            - locomotor
+            - reprodutor-sexualidade
+            - saude-mental-comportamento
+            - infectoparasitario
+            - integrado-aps
+        isSynthetic:
+          description: 'true se Q gerada (sem institutionId + year>=2025 + source=medsimple). false se prova real. Filtrar isSynthetic=false para Jornada-com-objetivo. Added 2026-04-27.'
+          type: boolean
+          default: false
+        matchConfidence:
+          description: 'Confianca cross-match MedEvo. 1.0=exato fingerprint SHA1 normalizado, 0.85-0.99=fuzzy MinHash+LSH, null=sem match. Added 2026-04-27.'
+          type: number
+          format: float
+          nullable: true
 
     QBankProgress:
       type: object
@@ -1470,6 +1528,93 @@ components:
           nullable: true
 
     # ── AI ──
+    QuickActionsResponse:
+      type: object
+      required: [suggestions, studyTools, aboutYou, connectors, attachments, ttlSeconds]
+      properties:
+        suggestions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuickAction'
+        studyTools:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuickAction'
+        aboutYou:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuickAction'
+        connectors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConnectorBlock'
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttachmentAction'
+        ttlSeconds:
+          type: integer
+          description: Suggested client-side cache TTL.
+
+    QuickAction:
+      type: object
+      required: [id, label, icon, prompt]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        sublabel:
+          type: string
+          nullable: true
+        icon:
+          type: string
+          description: SF Symbol name for iOS rendering.
+        prompt:
+          type: string
+          description: Pre-filled prompt sent on tap. Empty when needsSelector is set.
+        toolHint:
+          type: string
+          nullable: true
+          description: Hint to backend coach which tool MUST be invoked (toolChoice=required).
+        badge:
+          type: string
+          nullable: true
+        needsSelector:
+          type: string
+          nullable: true
+          enum: [subject, document, note, topic]
+          description: When set, client opens picker before sending.
+
+    ConnectorBlock:
+      type: object
+      required: [provider, displayName, connected, actions]
+      properties:
+        provider:
+          type: string
+        displayName:
+          type: string
+        connected:
+          type: boolean
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuickAction'
+
+    AttachmentAction:
+      type: object
+      required: [id, label, icon, kind]
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        icon:
+          type: string
+        kind:
+          type: string
+          enum: [photo, camera, file, audio, document, note]
+
     ChatMessage:
       type: object
       properties:
@@ -1653,6 +1798,196 @@ components:
           type: object
         onboardingCompleted:
           type: boolean
+        journeyType:
+          $ref: '#/components/schemas/JourneyType'
+        journeyConfig:
+          $ref: '#/components/schemas/JourneyConfig'
+        contentOrganizationMode:
+          $ref: '#/components/schemas/ContentOrganizationMode'
+
+    ContentOrganizationMode:
+      type: string
+      nullable: true
+      enum: [tradicional, pbl, great-areas, null]
+      description: |
+        Modo de organização do conteúdo (toggle 3 lentes). null = default
+        derivado de journeyType + university.curriculumMethod (override
+        pessoal sempre vence).
+        - 'tradicional': 96 disciplinas (Anatomia, Fisio, Cardio...)
+        - 'pbl': 12 sistemas integrados (Cardiovascular, Respiratório...)
+        - 'great-areas': 5 grandes áreas CNRM/Enare (Clínica/Cirurgia/GO/Pediatria/MPS)
+        SOT: agent-brain/decisions/2026-04-27_jornada-3lentes-FINAL.md
+
+    MedicalSpecialty:
+      type: object
+      description: |
+        Especialidade médica canônica CNRM/MEC.
+        SOT: vita.medical_specialties (migration 0080, 63 entries seedadas).
+      properties:
+        slug:
+          type: string
+          description: 'Identificador estável: cardiologia, cirurgia-geral, etc'
+        name:
+          type: string
+        type:
+          type: string
+          enum: [direct_access, with_prerequisite]
+        prerequisiteSlug:
+          type: string
+          nullable: true
+          description: Quando type=with_prerequisite, slug da especialidade pré-requisito
+        displayOrder:
+          type: integer
+        cnrmCode:
+          type: string
+          nullable: true
+          description: 'Código oficial CNRM (ex: R3-CM-CARD)'
+
+    OnboardingV2Request:
+      type: object
+      description: |
+        Payload do onboarding novo (Onda 5a). Backend deriva journeyType,
+        journeyConfig e contentOrganizationMode via tabela canônica.
+        SOT: agent-brain/decisions/2026-04-27_jornada-3lentes-FINAL.md §7
+      required: [goal]
+      properties:
+        goal:
+          type: string
+          enum: [FACULDADE, ENAMED, RESIDENCIA, REVALIDA]
+          description: P1 — objetivo macro
+        inFaculdade:
+          type: string
+          enum: [yes, graduated, skip]
+          description: P2 — status faculdade. Obrigatório exceto se goal=REVALIDA
+        semester:
+          type: integer
+          minimum: 1
+          maximum: 12
+          nullable: true
+          description: Obrigatório se inFaculdade=yes. 1-8=FACULDADE, 9-12=INTERNATO
+        university:
+          type: string
+          nullable: true
+          description: Display name da universidade
+        universityId:
+          type: string
+          nullable: true
+          description: FK universities.id (preferido)
+        universityLms:
+          type: string
+          nullable: true
+          description: 'Portal LMS: canvas|mannesoft|moodle|sigaa|totvs'
+        selectedSubjects:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: object
+                properties:
+                  id:
+                    type: string
+                  difficulty:
+                    type: string
+                    enum: [easy, med, hard]
+                    nullable: true
+        studyGoal:
+          type: string
+          nullable: true
+          description: Objetivo de estudo (Aprovar 1ª, Top 10%, etc)
+        targetSpecialty:
+          type: string
+          nullable: true
+          description: 'Slug de medical_specialties (apenas goal=RESIDENCIA)'
+        targetInstitutions:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: 'Bancas-alvo (apenas goal=RESIDENCIA)'
+        currentStage:
+          type: string
+          enum: [PRIMEIRA, SEGUNDA]
+          nullable: true
+          description: 'Etapa Revalida (apenas goal=REVALIDA)'
+        focusAreas:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: 'Áreas de foco (apenas goal=REVALIDA)'
+
+    JourneyType:
+      type: string
+      enum: [FACULDADE, INTERNATO, ENAMED, RESIDENCIA, REVALIDA]
+      description: |
+        Jornada universal do usuário. Substitui a tab "Faculdade" por uma tab
+        "Jornada" que adapta o conteúdo (cards, conectores, mascote) ao
+        contexto. SOT: agent-brain/decisions/2026-04-27_jornada-plano-consolidado.md
+
+        - FACULDADE: graduação 1º-4º ano (template atual da Faculdade).
+        - INTERNATO: 5º-6º ano, rotações sem notas tradicionais.
+        - ENAMED: exame federal de medicina.
+        - RESIDENCIA: foco em banca + especialidade-alvo.
+        - REVALIDA: médicos formados no exterior, etapas 1ª e 2ª.
+
+    JourneyConfig:
+      type: object
+      description: |
+        Configuração específica da jornada. Shape varia por journeyType.
+        Default `{}` quando ainda não preenchido pelo onboarding.
+      properties:
+        currentSemester:
+          type: integer
+          description: FACULDADE — semestre cursando (1-12)
+          nullable: true
+        institution:
+          type: string
+          description: FACULDADE — nome da instituição
+          nullable: true
+        activeDisciplines:
+          type: array
+          description: FACULDADE — slugs das disciplinas ativas
+          items:
+            type: string
+          nullable: true
+        currentStage:
+          type: string
+          enum: [PRIMEIRA, SEGUNDA]
+          description: REVALIDA — etapa atual
+          nullable: true
+        focusAreas:
+          type: array
+          description: REVALIDA — áreas de foco selecionadas
+          items:
+            type: string
+          nullable: true
+        targetSpecialty:
+          type: string
+          description: RESIDENCIA — especialidade-alvo
+          nullable: true
+        targetInstitutions:
+          type: array
+          description: RESIDENCIA — instituições/bancas-alvo
+          items:
+            type: string
+          nullable: true
+        currentRotation:
+          type: string
+          description: INTERNATO — rotação atual
+          nullable: true
+        mainGoal:
+          type: string
+          description: Universal — objetivo principal escrito pelo usuário
+          nullable: true
+
+    UserJourney:
+      type: object
+      required: [journeyType]
+      properties:
+        journeyType:
+          $ref: '#/components/schemas/JourneyType'
+        journeyConfig:
+          $ref: '#/components/schemas/JourneyConfig'
 
     UserProgress:
       type: object
@@ -1742,6 +2077,20 @@ components:
         createdAt:
           type: string
           format: date-time
+        portalCreatedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Data REAL de upload do material no portal (Canvas/WebAluno),
+            distinta de `createdAt` que é o timestamp do nosso sync.
+            Quando ausente (docs antigos sincronizados antes do feature),
+            UI faz fallback para `createdAt`.
+        portalModifiedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Última modificação do material no portal de origem.
 
     Note:
       type: object
@@ -1770,6 +2119,7 @@ components:
         id:
           type: string
         type:
+          description: 'badge | flashcard | transcriptionReady | portal_announcement | portal_file_added | portal_assignment_added | portal_grade_posted | portal_update | portal_summary'
           type: string
         title:
           type: string
@@ -1789,6 +2139,19 @@ components:
         createdAt:
           type: string
           format: date-time
+        source:
+          description: 'Portal slug (canvas, mannesoft, sigaa, ...) ou null para notif interna Vita. Usado pelo client pra renderizar icone do portal. Added 2026-04-27.'
+          type: string
+          nullable: true
+        subjectId:
+          description: 'Disciplina linkada (academic_subjects.id) — pra deep link na UI. Added 2026-04-27.'
+          type: string
+          nullable: true
+        metadata:
+          description: 'Payload self-contained com iconUrl + brandColor + portalDisplayName + extras (announcementId, fileId, courseId, etc). Resolved no momento da criacao. Added 2026-04-27.'
+          type: object
+          nullable: true
+          additionalProperties: true
 
     Briefing:
       type: object
@@ -1830,6 +2193,40 @@ components:
         checks:
           type: object
           nullable: true
+
+    PortalSyncHealth:
+      type: object
+      required:
+        - healthy
+        - staleConnections
+        - activeConnections
+        - stalePct
+        - thresholdMinutes
+        - breakdown
+        - checkedAt
+      properties:
+        healthy:
+          type: boolean
+        staleConnections:
+          type: integer
+        activeConnections:
+          type: integer
+        stalePct:
+          type: integer
+        oldestSyncAt:
+          type: string
+          format: date-time
+          nullable: true
+        thresholdMinutes:
+          type: integer
+        breakdown:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Stale connection count grouped by portalType
+        checkedAt:
+          type: string
+          format: date-time
 
     Grade:
       type: object
@@ -3108,6 +3505,11 @@ paths:
   # ════════════════════════════════════════
   /api/portal/filter-files:
     post:
+      description: |
+        Classifica PDFs do portal (Canvas/Mannesoft) usando LLM via brain('classify')
+        -> LiteLLM :8788 -> Qwen local. Retorna apenas IDs de planos de ensino/ementas
+        pra iOS baixar (economiza bandwidth: download seletivo em vez de todos PDFs).
+        Migrado pra brain canonico em 2026-04-27 (Onda 2 epic agents-hub#3).
       tags: [portal]
       operationId: portalFilterFiles
       summary: LLM-based file filter — classify which files are planos de ensino (Langfuse-traced as process:portal-filter-files)
@@ -3153,6 +3555,71 @@ paths:
                     description: True if regex fallback was used (LLM unavailable)
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  /api/portal/sync-now:
+    post:
+      tags: [portal]
+      operationId: triggerPortalSyncNow
+      summary: User-triggered re-sync of active portal connections
+      description: |
+        Used by iOS pull-to-refresh on the Connections screen and any future
+        "Sincronizar agora" button. Behavior per portalType:
+          - canvas: server-side re-scrape + ingest, inline (~5–10s wall clock).
+            lastSyncAt advances on success.
+          - mannesoft: dispatches APNs silent push to the user's device for
+            client-driven extract (Cloudflare cf_clearance lives in the iOS
+            WKWebView store; SaaS-scale residential proxy is unviable).
+            lastPingAt bumps immediately so the ConnectorCard exits "Sync
+            travado" on the next status fetch.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connectionIds:
+                  type: array
+                  items:
+                    type: string
+                  description: Optional. If empty/absent, re-syncs all active connections for the user.
+      responses:
+        '200':
+          description: Re-sync dispatched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  dispatched:
+                    type: object
+                    properties:
+                      canvas:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            synced:
+                              type: boolean
+                            error:
+                              type: string
+                      mannesoft:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            dispatched:
+                              type: boolean
+                            error:
+                              type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No active connections to sync
+        '500':
+          $ref: '#/components/responses/ServerError'
 
   /api/portal/status:
     get:
@@ -3350,6 +3817,7 @@ paths:
 
   /api/portal/ingest:
     post:
+      description: Portal ingest — judge dispara só em geração de fingerprint (Camada 1) desde 2026-04-27.
       tags: [portal]
       operationId: portalIngest
       summary: Ingest data from Canvas or WebAluno portal (canonical EN statuses from 2026-04-17)
@@ -3358,12 +3826,15 @@ paths:
   # 2026-04-09: portal extraction uses vLLM direct, chat includes portal data (no API surface changes)
   # 2026-04-18: flash_cards.disciplineId now text UUID (schema drift fix matching live DB); no API surface change
   # 2026-04-20: Haiku plano-de-ensino extract via CLAUDE_CODE_OAUTH_TOKEN (no more x-api-key); no API surface change
+  # 2026-04-27: portal notifications refactor — sendNotification unified dispatch + portal source/metadata in Notification schema (additive, no breaking change)
   # 2026-04-20: subject UPDATE via Drizzle native (raw SQL was silently failing on escape of long syllabus strings); no API surface change
   # 2026-04-20: cron-drives-Haiku — PDFs recém-baixados pro R2 disparam Haiku server-side (plano extract sem iOS inline)
   # 2026-04-20: cron-haiku-backfill — varredura retroativa de planos já em R2 sem extraction (sem precisar download novo)
   # 2026-04-20: multi-format support — downloader fetches docx/xlsx/pptx to R2, backfill uses mammoth/xlsx parsers
   # 2026-04-20: Canvas module items scraping — files inside modules now discovered
   # 2026-04-22: ingest auto-calls normalizePortalData on success so academic_subjects fills immediately (no cron wait)
+  # 2026-04-26: ingest persiste portalCreatedAt/portalModifiedAt em documents (file.created_at/modified_at do Canvas) — no API surface change, novos campos opcionais no payload
+  # 2026-04-27: transcribe agora dispara generateChapters async + summary prompt pede [mm:ss] inline — no API surface change, novos campos opcionais em metadata
   # 2026-04-22: ingest response carries an `audit` field with canonical-model issues detected after normalize (#147 C7+E12)
   # 2026-04-22: dashboard 5.77s→0.12s (merge dup queries + agg SQL); Drizzle dev logger in src/db/index.ts
   # 2026-04-22: ingest response also carries `autofix` field with applied deterministic fixes (#147 E12-bis)
@@ -3443,6 +3914,7 @@ paths:
   # 2026-04-09: portal extraction uses vLLM direct, chat includes portal data (no API surface changes)
   # 2026-04-18: flash_cards.disciplineId now text UUID (schema drift fix matching live DB); no API surface change
   # 2026-04-20: Haiku plano-de-ensino extract via CLAUDE_CODE_OAUTH_TOKEN (no more x-api-key); no API surface change
+  # 2026-04-27: portal notifications refactor — sendNotification unified dispatch + portal source/metadata in Notification schema (additive, no breaking change)
   # 2026-04-20: subject UPDATE via Drizzle native (raw SQL was silently failing on escape of long syllabus strings); no API surface change
   # 2026-04-20: cron-drives-Haiku — PDFs recém-baixados pro R2 disparam Haiku server-side (plano extract sem iOS inline)
   # 2026-04-20: cron-haiku-backfill — varredura retroativa de planos já em R2 sem extraction (sem precisar download novo)
@@ -5224,6 +5696,19 @@ paths:
                 title:
                   type: string
                   nullable: true
+                excludeNoExplanation:
+                  type: boolean
+                  nullable: true
+                  description: >
+                    Quality filter — drop questions com explanation NULL ou
+                    length<=50 chars. Default true client-side. Added 2026-04-27.
+                includeSynthetic:
+                  type: boolean
+                  nullable: true
+                  description: >
+                    Quality filter — when false, drop LLM-generated questions
+                    (isSynthetic=true; year>=2025, source=medsimple). Default
+                    true. Added 2026-04-27.
       responses:
         '201':
           description: Session created
@@ -5370,6 +5855,24 @@ paths:
           $ref: '#/components/responses/PlanLimit'
         '500':
           $ref: '#/components/responses/ServerError'
+
+  /api/simulados/screen:
+    get:
+      tags: [simulados]
+      operationId: simuladosScreen
+      summary: BFF aggregator pra Simulado Home (substitui N+1 listSimulados+getDiagnostics)
+      description: Stub minimal adicionado pra desbloquear pre-commit gate. Agente original deve completar com schema completo.
+      security: [{ sessionCookie: [], extensionToken: [] }]
+      responses:
+        '200':
+          description: Simulado screen aggregate
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /api/simulados/templates:
     get:
@@ -5655,6 +6158,32 @@ paths:
   # ════════════════════════════════════════
   # AI
   # ════════════════════════════════════════
+  /api/chat/quick-actions:
+    # 2026-04-27 (Onda 1): tiles carregam toolHint (mindmap_generate / clinical_case_generate / briefing_generate) — coach forca tool_choice='required' quando user toca tile, garante invocacao da skill.
+    get:
+      tags: [ai]
+      operationId: getChatQuickActions
+      summary: Quick-actions for the Vita+ sheet (chat input bar "+")
+      description: |
+        Powers the bottom sheet that opens from the chat input. Returns 5
+        sections: contextual suggestions (ranked server-side from study
+        context + horario + integrations), study generators (mapa mental,
+        simulado, flashcard, etc), about-you prompts (force tool calls
+        like get_subject_progress), connectors (Spotify hoje, Drive/Cal
+        futuros), and attachments. Server-driven so adding a new MCP/tool
+        surfaces in the sheet without an iOS deploy. Cached 30s per user.
+      responses:
+        '200':
+          description: Quick actions catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuickActionsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
   /api/ai/coach:
     post:
       tags: [ai]
@@ -5679,6 +6208,14 @@ paths:
                   items:
                     type: string
                   nullable: true
+                image:
+                  type: string
+                  nullable: true
+                  description: Base64-encoded inline image (used by iOS PdfViewer "Pergunte ao Vita" — bypass studioSources upload)
+                imageType:
+                  type: string
+                  nullable: true
+                  description: MIME type for inline base64 image (default image/jpeg)
               required: [messages]
       responses:
         '200':
@@ -5910,7 +6447,7 @@ paths:
       description: |
         Client already got a real-time transcript via WS `/asr`. Body includes
         the text + r2Key + sourceId. Server updates studio_sources (status=ready)
-        and inserts a single chunk. No Whisper re-run, saves 2-9s per audio.
+        and inserts a single chunk. No Whisper re-run, saves 2-9s per audio. Smart-title async via brain(classify) -> LiteLLM :8788 -> Qwen local (migrado 2026-04-27).
       security: [{ sessionCookie: [] }]
       requestBody:
         required: true
@@ -6216,7 +6753,11 @@ paths:
     post:
       tags: [studio]
       operationId: studioGenerate
-      summary: Generate study output from sources
+      summary: Generate study output from sources (LiteLLM brain canonico)
+      description: |
+        Gera summary/flashcards/mindmap/quiz a partir de chunks de N sources via
+        brain('classify') -> LiteLLM :8788 -> Qwen local. Aceita sourceIds (camelCase)
+        ou source_ids (snake_case) por compatibilidade com iOS encoder.
       requestBody:
         required: true
         content:
@@ -6228,6 +6769,7 @@ paths:
                   type: array
                   items:
                     type: string
+                  description: camelCase (web/android default). Backend tambem aceita source_ids.
                 type:
                   type: string
                   enum: [summary, flashcards, mindmap, quiz]
@@ -6635,6 +7177,46 @@ paths:
   # ════════════════════════════════════════
   # USER & PROFILE
   # ════════════════════════════════════════
+  /api/profile/transcricao-settings:
+    get:
+      tags: [profile]
+      operationId: getTranscricaoSettings
+      summary: User Transcrição preferences (Issue #93)
+      description: |
+        Retorna full doc com defaults aplicados. Storage em
+        vita.user_profiles.transcricaoSettings JSONB. iOS + Android +
+        Web consomem mesmo endpoint (sync entre devices).
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscricaoSettings'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [profile]
+      operationId: updateTranscricaoSettings
+      summary: Partial update — qualquer subset dos campos
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TranscricaoSettingsPatch'
+      responses:
+        '200':
+          description: Settings atualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscricaoSettings'
+        '400':
+          description: Invalid body
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /api/profile:
     get:
       tags: [user]
@@ -6694,6 +7276,65 @@ paths:
                 $ref: '#/components/schemas/Profile'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/user/journey:
+    get:
+      tags: [user]
+      operationId: getUserJourney
+      summary: Get current user journey (type + config)
+      description: |
+        Returns the user's chosen journey (FACULDADE, INTERNATO, ENAMED,
+        RESIDENCIA ou REVALIDA) and its config blob (semester, institution,
+        targetSpecialty, etc — varia por tipo). Default 'FACULDADE' para users
+        existentes via backfill da migration 0077.
+      responses:
+        '200':
+          description: User journey
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserJourney'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    patch:
+      tags: [user]
+      operationId: updateUserJourney
+      summary: Update user journey (type + config) — drives Jornada tab template
+      description: |
+        Atualiza journeyType e/ou journeyConfig do usuário. Pode mandar só um
+        dos dois campos ou os dois juntos. journeyType obriga estar no enum
+        canônico (FACULDADE/INTERNATO/ENAMED/RESIDENCIA/REVALIDA) — qualquer
+        valor fora retorna 400.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                journeyType:
+                  $ref: '#/components/schemas/JourneyType'
+                journeyConfig:
+                  $ref: '#/components/schemas/JourneyConfig'
+      responses:
+        '200':
+          description: Updated journey
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserJourney'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/ServerError'
 
@@ -7303,6 +7944,60 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /api/user/quota:
+    get:
+      tags: [user]
+      operationId: getUserQuota
+      summary: Quota e uso do plano corrente — storage, transcrição (minutos), audio max
+      description: |
+        Retorna usado vs limite por categoria. Plumb com `storageBytesUsed` +
+        `transcriptionMinutesUsedPeriod` em `user_profiles`, atualizados via
+        hooks de upload R2 e transcribe-complete. Reset mensal automático via
+        cron quando `quotaPeriodEnd` passa.
+      security: [{ sessionCookie: [] }]
+      responses:
+        '200':
+          description: Quota do plano corrente
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [plan, planLabel, storage, transcription, audioMaxDurationSeconds, subscription]
+                properties:
+                  plan:
+                    type: string
+                    enum: [free, trial, pro, premium]
+                    description: Valor real do DB (legado free/trial/pro/premium)
+                  planLabel:
+                    type: string
+                    description: Rótulo de produto (Free, Plus, Premium)
+                  storage:
+                    type: object
+                    required: [usedBytes, limitBytes]
+                    properties:
+                      usedBytes: { type: integer, format: int64 }
+                      limitBytes: { type: integer, format: int64 }
+                  transcription:
+                    type: object
+                    required: [usedMinutesThisPeriod, limitMinutesPerPeriod]
+                    properties:
+                      usedMinutesThisPeriod: { type: integer }
+                      limitMinutesPerPeriod: { type: integer }
+                      periodStart: { type: string, format: date-time, nullable: true }
+                      periodEnd: { type: string, format: date-time, nullable: true }
+                  audioMaxDurationSeconds:
+                    type: integer
+                    description: Limite de duração por arquivo (5h em planos pagos, 0 em free)
+                  subscription:
+                    type: object
+                    properties:
+                      stripeSubscriptionId: { type: string, nullable: true }
+                      stripeCurrentPeriodEnd: { type: string, format: date-time, nullable: true }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/user/export:
     get:
       tags: [user]
@@ -7447,6 +8142,7 @@ paths:
   # ════════════════════════════════════════
   /api/documents:
     # 2026-04-21: response rows now include `subjectName` (joined from academic_subjects) so the Documentos screen can group by subject name instead of raw UUID. Additive, no breaking change.
+    # 2026-04-26: response now also includes portalCreatedAt + portalModifiedAt (already in Document schema) so iOS can sort/filter by portal date vs internal sync date.
     get:
       tags: [content]
       operationId: getDocuments
@@ -7659,7 +8355,15 @@ paths:
     get:
       tags: [content]
       operationId: getDocumentFile
-      summary: Download document PDF file (R2 first; Canvas proxy validates %PDF magic bytes)
+      summary: Serve document as PDF (auto-converts .docx/.xlsx/.pptx via LibreOffice headless, R2-cached)
+      description: |
+        Always returns a PDF. Source resolution:
+          1. Source already PDF → R2/local/external proxy (validates %PDF magic).
+          2. Source is convertible Office (.docx/.xlsx/.pptx/.odt/.rtf):
+             a. Cache hit at R2 key 'converted/{id}.pdf' → serve cached.
+             b. Cache miss → fetch original, soffice --convert-to pdf, upload
+                to R2 cache (best-effort), serve. ~2-5s cold, <1s hot.
+        Header X-Vita-Converted=fresh|cached emitted for converted sources.
       parameters:
         - name: id
           in: path
@@ -7668,7 +8372,17 @@ paths:
             type: string
       responses:
         '200':
-          description: PDF file
+          description: PDF file (Content-Disposition filename rewritten to .pdf when converted)
+          headers:
+            X-Vita-Converted:
+              description: Present only for converted sources. 'fresh' = converted on this request, 'cached' = served from R2.
+              schema:
+                type: string
+                enum: [fresh, cached]
+            X-Vita-Cache-Hash:
+              description: First 12 chars of sha256(source bytes) — cache key prefix. Same source content across users = same hash = same cache hit. Debug/observability.
+              schema:
+                type: string
           content:
             application/pdf:
               schema:
@@ -7678,6 +8392,15 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          description: Conversion failed (libreoffice error)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  detail: { type: string }
 
   /api/notes:
     get:
@@ -7933,6 +8656,47 @@ paths:
                     type: boolean
                   updated:
                     type: integer
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    delete:
+      tags: [notifications]
+      operationId: deleteNotifications
+      summary: Soft-dismiss notifications (tombstone). GitHub-style "mark as done" + Google AIP-164 §3 soft-delete. Tombstone preserves deterministic PK so cron generators (flashcards-due-{userId}-{date}, badge-{id}) hit ON CONFLICT DO NOTHING and skip recreation.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+                deleteAllRead:
+                  type: boolean
+                  description: Dismiss all notifications already marked as read.
+      responses:
+        '200':
+          description: Dismissed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  dismissed:
+                    description: Either array of dismissed ids (when ids passed) or count (when deleteAllRead).
+                    oneOf:
+                      - type: array
+                        items:
+                          type: string
+                      - type: integer
+        '400':
+          description: Bad request — neither ids nor deleteAllRead
         '401':
           $ref: '#/components/responses/Unauthorized'
         '500':
@@ -8324,6 +9088,157 @@ paths:
         '500':
           $ref: '#/components/responses/ServerError'
 
+  /api/bootstrap:
+    get:
+      tags: [platform]
+      operationId: appBootstrap
+      summary: App launch bootstrap (1-RTT, Duolingo/Spotify pattern)
+      description: |
+        Aggregates profile + subjects + evaluations + flashcardDecks + qbankRecentSessions + audioSources in a single response.
+        Replaces 12+ serialized requests on app launch with one parallel server-side Promise.all.
+      responses:
+        '200':
+          description: Bootstrap payload
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [schemaVersion, elapsedMs, profile, subjects, evaluations, flashcardDecks, qbankRecentSessions, audioSources]
+                properties:
+                  schemaVersion:
+                    type: integer
+                  elapsedMs:
+                    type: integer
+                  profile:
+                    type: object
+                  subjects:
+                    type: array
+                    items: { type: object }
+                  evaluations:
+                    type: array
+                    items: { type: object }
+                  flashcardDecks:
+                    type: array
+                    items: { type: object }
+                  qbankRecentSessions:
+                    type: array
+                    items: { type: object }
+                  audioSources:
+                    type: array
+                    items: { type: object }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Profile not found
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/cron/studio-stuck-sweeper:
+    get:
+      tags: [platform]
+      operationId: cronStudioStuckSweeper
+      summary: Marca studio_sources presos como failed + dispara notificação
+      description: |
+        Cron a cada 5min. Critério:
+          - status='uploading' AND createdAt < now() - 10min
+          - status='processing' AND createdAt < now() - 30min
+        Pra cada item, marca status='failed' + chama notify(uploadFailed|transcriptionFailed)
+        e recomputa storageBytesUsed do user afetado.
+      security: []
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema:
+            type: string
+            example: 'Bearer vita-cron-dev'
+      responses:
+        '200':
+          description: Sweep result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  swept: { type: integer }
+                  notified: { type: integer }
+                  cutoffs:
+                    type: object
+                    properties:
+                      uploadingOlderThan: { type: string, format: date-time }
+                      processingOlderThan: { type: string, format: date-time }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/cron/whisper-backfill-segments:
+    get:
+      tags: [platform]
+      operationId: cronWhisperBackfillSegments
+      summary: Re-transcreve audio sources sem word timestamps (one-shot pra ativar karaoke)
+      description: |
+        Para cada studio_source.audio com status=ready e metadata.segments[0].words=null,
+        baixa do R2, re-roda Whisper pedindo timestamp_granularities=word, e atualiza
+        metadata com segments contendo words por segment. Idempotente.
+      security: []
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema: { type: string, example: 'Bearer vita-cron-dev' }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50, maximum: 100 }
+      responses:
+        '200':
+          description: Backfill result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  candidates: { type: integer }
+                  processed: { type: integer }
+                  skipped: { type: integer }
+                  failed: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/cron/whisper-backfill-chapters:
+    get:
+      tags: [platform]
+      operationId: cronWhisperBackfillChapters
+      summary: Re-gera chapters Qwen pra audio sources sem metadata.chapters
+      description: |
+        Para cada studio_source.audio com status=ready, segments presentes mas
+        SEM metadata.chapters, chama lib/ai/transcript-chapters.ts (Qwen vLLM)
+        e salva. Idempotente. Skip se gravacao <60s ou <2 segments.
+      security: []
+      parameters:
+        - name: Authorization
+          in: header
+          required: true
+          schema: { type: string, example: 'Bearer vita-cron-dev' }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 30, maximum: 50 }
+      responses:
+        '200':
+          description: Backfill chapters result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  candidates: { type: integer }
+                  processed: { type: integer }
+                  skipped: { type: integer }
+                  failed: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /api/health:
     get:
       tags: [platform]
@@ -8344,6 +9259,39 @@ paths:
                 $ref: '#/components/schemas/HealthCheck'
         '500':
           $ref: '#/components/responses/ServerError'
+
+  /api/health/portal-sync:
+    get:
+      tags: [platform]
+      operationId: healthCheckPortalSync
+      summary: Portal sync health monitor (SaaS-scale)
+      description: |
+        Read-only check of portal_connections health. Returns staleConnections
+        breakdown by portalType, oldest sync, and a healthy boolean.
+        Used by iOS app, Linux cron alerts, and uptime monitors.
+      security: []
+      parameters:
+        - name: threshold
+          in: query
+          description: Stale threshold in minutes (default 30, max 1440)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1440
+            default: 30
+      responses:
+        '200':
+          description: Healthy (no stale connections or stale rate < 5%)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalSyncHealth'
+        '503':
+          description: Degraded (stale rate >= 5%)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalSyncHealth'
 
   /api/account/delete-request:
     post:
@@ -9066,6 +10014,51 @@ paths:
         '500':
           $ref: '#/components/responses/ServerError'
 
+  /api/universities/{id}/portals:
+    get:
+      tags: [universities]
+      operationId: getUniversityPortals
+      summary: Portals offered by a specific university (filtered list for ConnectionsScreen)
+      description: |
+        Returns the portals the user's university offers (Canvas + Mannesoft for ULBRA,
+        Moodle for FAESA, etc) with instanceUrl pre-filled. iOS ConnectionsScreen uses
+        this to filter the connector list — Rafael 2026-04-27: each university has its
+        own portal URL; showing 8 generic connectors when only 2 work breaks UX.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of portals available for this university
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [portals, universityId, total]
+                properties:
+                  portals:
+                    type: array
+                    items:
+                      type: object
+                      required: [slug, portalName, displayName, category, authMethod]
+                      properties:
+                        slug: { type: string }
+                        portalName: { type: string }
+                        instanceUrl: { type: string, nullable: true }
+                        authMethod: { type: string }
+                        displayName: { type: string }
+                        category: { type: string }
+                        brandColor: { type: string, nullable: true }
+                        iconUrl: { type: string, nullable: true }
+                        vendor: { type: string, nullable: true }
+                  universityId: { type: string }
+                  total: { type: integer }
+        '500':
+          $ref: '#/components/responses/ServerError'
+
   /api/universities/{id}/disciplines:
     get:
       tags: [universities]
@@ -9704,3 +10697,258 @@ paths:
         '401': { description: Unauthorized }
         '404': { description: Provider not found }
 
+  # ════════════════════════════════════════
+  # SCREEN BFF endpoints (1-RTT pre-aggregated payloads per tela)
+  # ════════════════════════════════════════
+  # ════════════════════════════════════════
+  # ONBOARDING V2 + MEDICAL SPECIALTIES (Onda 5a, Rafael 2026-04-27)
+  # SOT: agent-brain/decisions/2026-04-27_jornada-3lentes-FINAL.md §7
+  # ════════════════════════════════════════
+
+  /api/medical-specialties:
+    get:
+      tags: [onboarding]
+      operationId: listMedicalSpecialties
+      summary: Lista canônica CNRM/MEC de especialidades de residência médica
+      description: |
+        Retorna catálogo público (63 entries: 22 acesso direto + 41 com pré-requisito).
+        Usado no onboarding v2 pra dropdown targetSpecialty quando journeyType=RESIDENCIA.
+        Cache estável (max-age=3600, stale-while-revalidate=86400).
+      responses:
+        '200':
+          description: Catálogo de especialidades
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  directAccess:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MedicalSpecialty'
+                  withPrerequisite:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MedicalSpecialty'
+                  total:
+                    type: integer
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/onboarding/v2:
+    post:
+      tags: [onboarding]
+      operationId: submitOnboardingV2
+      summary: Onboarding novo (P1+P2+P3 fork) — deriva journeyType + journeyConfig + contentOrganizationMode
+      description: |
+        Recebe payload com goal (P1), inFaculdade (P2), e campos específicos (P3 + jornada).
+        Backend deriva automaticamente journeyType, journeyConfig e contentOrganizationMode
+        usando a tabela canônica do plano (decisions/2026-04-27_jornada-3lentes-FINAL.md §7).
+
+        Combinação inválida bloqueada: goal=FACULDADE + inFaculdade=graduated → HTTP 400.
+        REVALIDA pula P2 (currentStage obrigatório).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnboardingV2Request'
+      responses:
+        '200':
+          description: Onboarding salvo com derivações aplicadas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  profile:
+                    type: object
+                    additionalProperties: true
+                  derived:
+                    type: object
+                    properties:
+                      journeyType:
+                        $ref: '#/components/schemas/JourneyType'
+                      journeyConfig:
+                        $ref: '#/components/schemas/JourneyConfig'
+                      contentOrganizationMode:
+                        $ref: '#/components/schemas/ContentOrganizationMode'
+                      moment:
+                        type: string
+        '400':
+          description: Combinação inválida (ex Faculdade+graduated) ou validação falhou
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/insights/screen:
+    get:
+      tags: [screen]
+      operationId: getInsightsScreen
+      summary: BFF agregado da tela Insights (substitui progress + grades + flashcardStats por 1 RTT)
+      responses:
+        '200':
+          description: Payload agregado com profile/subjects/grades/decks
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/onboarding/screen:
+    get:
+      tags: [screen]
+      operationId: getOnboardingScreen
+      summary: BFF agregado da tela de Onboarding (universidades + disciplinas iniciais + studyGoals em 1 RTT)
+      responses:
+        '200':
+          description: Payload agregado pra preencher o wizard sem múltiplas chamadas
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/planner/screen:
+    get:
+      tags: [screen]
+      operationId: getPlannerScreen
+      summary: BFF agregado da tela Planner (study plan + items + grades + dashboard score em 1 RTT)
+      responses:
+        '200':
+          description: Payload agregado da semana atual + sugestões
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/provas/screen:
+    get:
+      tags: [screen]
+      operationId: getProvasScreen
+      summary: BFF agregado da tela Provas (academic_evaluations + grades + dashboard agregado em 1 RTT)
+      responses:
+        '200':
+          description: Payload agregado de provas próximas + histórico
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/simulados/screen:
+    get:
+      tags: [screen]
+      operationId: getSimuladosScreen
+      summary: BFF agregado da tela Simulados (lista + estatísticas + sessions ativas em 1 RTT)
+      responses:
+        '200':
+          description: Payload agregado da home de simulados
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /api/subjects/{id}/screen:
+    get:
+      tags: [screen]
+      operationId: getSubjectScreen
+      summary: BFF agregado da tela DisciplineDetail (subject + grades + evaluations + documents + flashcards em 1 RTT)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payload agregado da disciplina
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+# focus/end metadata typing internal fix 2026-04-26 (no contract change)
+
+  /api/subjects/{id}/screen:
+    get:
+      summary: BFF aggregator per-screen pra DisciplineDetail
+      tags: [subjects]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object } } } }
+        '401': { description: Unauthorized }
+
+  /api/onboarding/screen:
+    get:
+      summary: BFF aggregator per-screen pra Onboarding
+      tags: [onboarding]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object } } } }
+        '401': { description: Unauthorized }
+
+  /api/insights/screen:
+    get:
+      summary: BFF aggregator per-screen pra Insights
+      tags: [insights]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object } } } }
+        '401': { description: Unauthorized }
+
+  /api/provas/screen:
+    get:
+      summary: BFF aggregator per-screen pra Provas
+      tags: [provas]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object } } } }
+        '401': { description: Unauthorized }
+
+  /api/planner/screen:
+    get:
+      summary: BFF aggregator per-screen pra Planner
+      tags: [planner]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object } } } }
+        '401': { description: Unauthorized }

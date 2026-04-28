@@ -9,6 +9,37 @@ import Foundation
 
 public struct QBankQuestion: Sendable, Codable, Hashable {
 
+    public enum MedevoArea: String, Sendable, Codable, CaseIterable {
+        case clinicaMedica = "Clinica Medica"
+        case cirurgia = "Cirurgia"
+        case pediatria = "Pediatria"
+        case ginecologia = "Ginecologia"
+        case obstetricia = "Obstetricia"
+        case medicinaPreventivaESocial = "Medicina Preventiva e Social"
+        case oftalmologia = "Oftalmologia"
+        case saudeMental = "Saude Mental"
+    }
+    public enum ExamGreatAreaSlug: String, Sendable, Codable, CaseIterable {
+        case clinicaMedica = "clinica-medica"
+        case cirurgiaGeral = "cirurgia-geral"
+        case ginecologiaObstetricia = "ginecologia-obstetricia"
+        case pediatria = "pediatria"
+        case medicinaPreventivaSocial = "medicina-preventiva-social"
+    }
+    public enum PblSystemSlug: String, Sendable, Codable, CaseIterable {
+        case cardiovascular = "cardiovascular"
+        case respiratorio = "respiratorio"
+        case renalUrinario = "renal-urinario"
+        case endocrinoMetabolico = "endocrino-metabolico"
+        case digestorio = "digestorio"
+        case nervoso = "nervoso"
+        case hematologicoImunologico = "hematologico-imunologico"
+        case locomotor = "locomotor"
+        case reprodutorSexualidade = "reprodutor-sexualidade"
+        case saudeMentalComportamento = "saude-mental-comportamento"
+        case infectoparasitario = "infectoparasitario"
+        case integradoAps = "integrado-aps"
+    }
     public var id: Int?
     public var statement: String?
     public var year: Int?
@@ -19,8 +50,24 @@ public struct QBankQuestion: Sendable, Codable, Hashable {
     public var topics: [JSONValue]?
     public var statistics: JSONValue?
     public var userAnswer: JSONValue?
+    /** Slug original MedEvo (cross-match Vita x MedEvo). Rastreia origem cursinho. Added 2026-04-27. */
+    public var medevoSlug: String?
+    /** Area cursinho-style MedEvo (7 valores). Tag PARALELA a arvore canonica BYMAV. Mapeada para examArea INEP via vita.exam_area_mapping. Added 2026-04-27. */
+    public var medevoArea: MedevoArea?
+    /** Topic granular MedEvo (~169 valores). Tag PARALELA. Added 2026-04-27. */
+    public var medevoTopic: String?
+    /** Subtopic ultra-granular MedEvo (~799 valores). Tag PARALELA. Added 2026-04-27. */
+    public var medevoSubtopic: String?
+    /** Grande área CNRM/Enare (5 fixas). Derivada de disciplineSlug e/ou medevoArea via mapping declarativo. Usada por Jornada-com-objetivo (Residência/ENAMED/Revalida) e modo great-areas do toggle 3 lentes. SOT da decisão: agent-brain/decisions/2026-04-27_jornada-3lentes-FINAL.md Cobertura atual: 88.8% das Q reais (não-sintéticas). Updated 2026-04-27.  */
+    public var examGreatAreaSlug: ExamGreatAreaSlug?
+    /** Sistema PBL (12 fixos). Derivada de disciplineSlug via mapping declarativo. Usada pelo modo PBL do toggle 3 lentes (faculdades modulares: UFRN, FAMETRO, USP-RP, UFOP, CESUPA). Cobertura atual: 77.1% das Q reais. Updated 2026-04-27.  */
+    public var pblSystemSlug: PblSystemSlug?
+    /** true se Q gerada (sem institutionId + year>=2025 + source=medsimple). false se prova real. Filtrar isSynthetic=false para Jornada-com-objetivo. Added 2026-04-27. */
+    public var isSynthetic: Bool? = false
+    /** Confianca cross-match MedEvo. 1.0=exato fingerprint SHA1 normalizado, 0.85-0.99=fuzzy MinHash+LSH, null=sem match. Added 2026-04-27. */
+    public var matchConfidence: Float?
 
-    public init(id: Int? = nil, statement: String? = nil, year: Int? = nil, difficulty: String? = nil, institutionName: String? = nil, alternatives: [QBankQuestionAlternativesInner]? = nil, images: [JSONValue]? = nil, topics: [JSONValue]? = nil, statistics: JSONValue? = nil, userAnswer: JSONValue? = nil) {
+    public init(id: Int? = nil, statement: String? = nil, year: Int? = nil, difficulty: String? = nil, institutionName: String? = nil, alternatives: [QBankQuestionAlternativesInner]? = nil, images: [JSONValue]? = nil, topics: [JSONValue]? = nil, statistics: JSONValue? = nil, userAnswer: JSONValue? = nil, medevoSlug: String? = nil, medevoArea: MedevoArea? = nil, medevoTopic: String? = nil, medevoSubtopic: String? = nil, examGreatAreaSlug: ExamGreatAreaSlug? = nil, pblSystemSlug: PblSystemSlug? = nil, isSynthetic: Bool? = false, matchConfidence: Float? = nil) {
         self.id = id
         self.statement = statement
         self.year = year
@@ -31,6 +78,14 @@ public struct QBankQuestion: Sendable, Codable, Hashable {
         self.topics = topics
         self.statistics = statistics
         self.userAnswer = userAnswer
+        self.medevoSlug = medevoSlug
+        self.medevoArea = medevoArea
+        self.medevoTopic = medevoTopic
+        self.medevoSubtopic = medevoSubtopic
+        self.examGreatAreaSlug = examGreatAreaSlug
+        self.pblSystemSlug = pblSystemSlug
+        self.isSynthetic = isSynthetic
+        self.matchConfidence = matchConfidence
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
@@ -44,6 +99,14 @@ public struct QBankQuestion: Sendable, Codable, Hashable {
         case topics
         case statistics
         case userAnswer
+        case medevoSlug
+        case medevoArea
+        case medevoTopic
+        case medevoSubtopic
+        case examGreatAreaSlug
+        case pblSystemSlug
+        case isSynthetic
+        case matchConfidence
     }
 
     // Encodable protocol methods
@@ -60,6 +123,14 @@ public struct QBankQuestion: Sendable, Codable, Hashable {
         try container.encodeIfPresent(topics, forKey: .topics)
         try container.encodeIfPresent(statistics, forKey: .statistics)
         try container.encodeIfPresent(userAnswer, forKey: .userAnswer)
+        try container.encodeIfPresent(medevoSlug, forKey: .medevoSlug)
+        try container.encodeIfPresent(medevoArea, forKey: .medevoArea)
+        try container.encodeIfPresent(medevoTopic, forKey: .medevoTopic)
+        try container.encodeIfPresent(medevoSubtopic, forKey: .medevoSubtopic)
+        try container.encodeIfPresent(examGreatAreaSlug, forKey: .examGreatAreaSlug)
+        try container.encodeIfPresent(pblSystemSlug, forKey: .pblSystemSlug)
+        try container.encodeIfPresent(isSynthetic, forKey: .isSynthetic)
+        try container.encodeIfPresent(matchConfidence, forKey: .matchConfidence)
     }
 }
 

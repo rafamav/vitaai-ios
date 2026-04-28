@@ -10,6 +10,7 @@ import Foundation
 public struct Notification: Sendable, Codable, Hashable {
 
     public var id: String?
+    /** badge | flashcard | transcriptionReady | portal_announcement | portal_file_added | portal_assignment_added | portal_grade_posted | portal_update | portal_summary */
     public var type: String?
     public var title: String?
     public var description: String?
@@ -19,8 +20,14 @@ public struct Notification: Sendable, Codable, Hashable {
     public var route: String?
     public var priority: String?
     public var createdAt: Date?
+    /** Portal slug (canvas, mannesoft, sigaa, ...) ou null para notif interna Vita. Usado pelo client pra renderizar icone do portal. Added 2026-04-27. */
+    public var source: String?
+    /** Disciplina linkada (academic_subjects.id) — pra deep link na UI. Added 2026-04-27. */
+    public var subjectId: String?
+    /** Payload self-contained com iconUrl + brandColor + portalDisplayName + extras (announcementId, fileId, courseId, etc). Resolved no momento da criacao. Added 2026-04-27. */
+    public var metadata: [String: JSONValue]?
 
-    public init(id: String? = nil, type: String? = nil, title: String? = nil, description: String? = nil, time: String? = nil, read: Bool? = nil, group: String? = nil, route: String? = nil, priority: String? = nil, createdAt: Date? = nil) {
+    public init(id: String? = nil, type: String? = nil, title: String? = nil, description: String? = nil, time: String? = nil, read: Bool? = nil, group: String? = nil, route: String? = nil, priority: String? = nil, createdAt: Date? = nil, source: String? = nil, subjectId: String? = nil, metadata: [String: JSONValue]? = nil) {
         self.id = id
         self.type = type
         self.title = title
@@ -31,6 +38,9 @@ public struct Notification: Sendable, Codable, Hashable {
         self.route = route
         self.priority = priority
         self.createdAt = createdAt
+        self.source = source
+        self.subjectId = subjectId
+        self.metadata = metadata
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
@@ -44,6 +54,9 @@ public struct Notification: Sendable, Codable, Hashable {
         case route
         case priority
         case createdAt
+        case source
+        case subjectId
+        case metadata
     }
 
     // Encodable protocol methods
@@ -60,6 +73,9 @@ public struct Notification: Sendable, Codable, Hashable {
         try container.encodeIfPresent(route, forKey: .route)
         try container.encodeIfPresent(priority, forKey: .priority)
         try container.encodeIfPresent(createdAt, forKey: .createdAt)
+        try container.encodeIfPresent(source, forKey: .source)
+        try container.encodeIfPresent(subjectId, forKey: .subjectId)
+        try container.encodeIfPresent(metadata, forKey: .metadata)
     }
 }
 

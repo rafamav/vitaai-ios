@@ -20,6 +20,9 @@ Name | Type | Description | Notes
 **subjects** | **[JSONValue]** |  | [optional] 
 **stats** | **JSONValue** |  | [optional] 
 **onboardingCompleted** | **Bool** |  | [optional] 
+**journeyType** | [**JourneyType**](JourneyType.md) |  | [optional] 
+**journeyConfig** | [**JourneyConfig**](JourneyConfig.md) |  | [optional] 
+**contentOrganizationMode** | [**ContentOrganizationMode**](ContentOrganizationMode.md) |  | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

@@ -5,19 +5,25 @@ import SwiftUI
 // Tela universal da tab Jornada. Substitui FaculdadeHomeScreen como entry point.
 // Renderiza cards diferentes conforme userJourney.journeyType (Onda 6).
 //
-// PHASE 1 (atual): default journeyType=.faculdade → renderiza FaculdadeHomeScreen
-// (conteudo atual da Faculdade — ZERO mudanca pra Rafael e users existentes).
+// PHASE 6 (Slice 5 Onda 5b, Rafael 2026-04-28): le journeyType de
+// `appData.profile.journeyType` — backend ja retorna no GET /api/profile
+// (migration 0077 + Profile schema com journeyType+journeyConfig). Default
+// `.faculdade` continua aplicado pra usuarios pre-Onda-5 (backfill).
 //
-// PHASE 6 (futuro): integrar com appData.profile.journeyType (apos backend
-// expor o campo no /api/profile). Stubs INTERNATO/ENAMED/RESIDENCIA/REVALIDA
-// ja prontos como JornadaEmptyStateCards.
+// Templates por jornada:
+//   - FACULDADE -> FaculdadeHomeScreen (conteudo atual)
+//   - INTERNATO/ENAMED/RESIDENCIA/REVALIDA -> JornadaEmptyStateCards
+//     (cards adaptados ficam pra Onda 6).
 //
 // SOT: agent-brain/decisions/2026-04-27_jornada-3lentes-FINAL.md
 // Backend Phase 1 ja em main: commit d2ab3a1 (migration 0077 + endpoint).
 
 struct JornadaScreen: View {
-    // PHASE 1: default fixo pra retrocompat. PHASE 6 lera do AppDataManager.
-    private var journeyType: JourneyType { .faculdade }
+    @Environment(\.appData) private var appData
+
+    private var journeyType: JourneyType {
+        appData.profile?.journeyType ?? .faculdade
+    }
 
     var body: some View {
         switch journeyType {

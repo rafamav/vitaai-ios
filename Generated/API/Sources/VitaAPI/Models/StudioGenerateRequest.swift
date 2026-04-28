@@ -15,6 +15,7 @@ public struct StudioGenerateRequest: Sendable, Codable, Hashable {
         case mindmap = "mindmap"
         case quiz = "quiz"
     }
+    /** camelCase (web/android default). Backend tambem aceita source_ids. */
     public var sourceIds: [String]
     public var type: ModelType
 

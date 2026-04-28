@@ -29,8 +29,11 @@ public struct Profile: Sendable, Codable, Hashable {
     public var subjects: [JSONValue]?
     public var stats: JSONValue?
     public var onboardingCompleted: Bool?
+    public var journeyType: JourneyType?
+    public var journeyConfig: JourneyConfig?
+    public var contentOrganizationMode: ContentOrganizationMode?
 
-    public init(id: String? = nil, displayName: String? = nil, email: String? = nil, image: String? = nil, moment: String? = nil, year: Int? = nil, semester: Int? = nil, highSchoolYear: Int? = nil, examBoard: String? = nil, studyGoalId: String? = nil, university: String? = nil, universityState: String? = nil, universityId: String? = nil, universityLms: String? = nil, subjects: [JSONValue]? = nil, stats: JSONValue? = nil, onboardingCompleted: Bool? = nil) {
+    public init(id: String? = nil, displayName: String? = nil, email: String? = nil, image: String? = nil, moment: String? = nil, year: Int? = nil, semester: Int? = nil, highSchoolYear: Int? = nil, examBoard: String? = nil, studyGoalId: String? = nil, university: String? = nil, universityState: String? = nil, universityId: String? = nil, universityLms: String? = nil, subjects: [JSONValue]? = nil, stats: JSONValue? = nil, onboardingCompleted: Bool? = nil, journeyType: JourneyType? = nil, journeyConfig: JourneyConfig? = nil, contentOrganizationMode: ContentOrganizationMode? = nil) {
         self.id = id
         self.displayName = displayName
         self.email = email
@@ -48,6 +51,9 @@ public struct Profile: Sendable, Codable, Hashable {
         self.subjects = subjects
         self.stats = stats
         self.onboardingCompleted = onboardingCompleted
+        self.journeyType = journeyType
+        self.journeyConfig = journeyConfig
+        self.contentOrganizationMode = contentOrganizationMode
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
@@ -68,6 +74,9 @@ public struct Profile: Sendable, Codable, Hashable {
         case subjects
         case stats
         case onboardingCompleted
+        case journeyType
+        case journeyConfig
+        case contentOrganizationMode
     }
 
     // Encodable protocol methods
@@ -91,6 +100,9 @@ public struct Profile: Sendable, Codable, Hashable {
         try container.encodeIfPresent(subjects, forKey: .subjects)
         try container.encodeIfPresent(stats, forKey: .stats)
         try container.encodeIfPresent(onboardingCompleted, forKey: .onboardingCompleted)
+        try container.encodeIfPresent(journeyType, forKey: .journeyType)
+        try container.encodeIfPresent(journeyConfig, forKey: .journeyConfig)
+        try container.encodeIfPresent(contentOrganizationMode, forKey: .contentOrganizationMode)
     }
 }
 

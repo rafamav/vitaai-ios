@@ -19,8 +19,12 @@ public struct Document: Sendable, Codable, Hashable {
     public var readProgress: Double?
     public var isFavorite: Bool?
     public var createdAt: Date?
+    /** Data REAL de upload do material no portal (Canvas/WebAluno), distinta de `createdAt` que é o timestamp do nosso sync. Quando ausente (docs antigos sincronizados antes do feature), UI faz fallback para `createdAt`.  */
+    public var portalCreatedAt: Date?
+    /** Última modificação do material no portal de origem. */
+    public var portalModifiedAt: Date?
 
-    public init(id: String? = nil, title: String? = nil, fileName: String? = nil, fileUrl: String? = nil, subjectId: String? = nil, totalPages: Int? = nil, currentPage: Int? = nil, readProgress: Double? = nil, isFavorite: Bool? = nil, createdAt: Date? = nil) {
+    public init(id: String? = nil, title: String? = nil, fileName: String? = nil, fileUrl: String? = nil, subjectId: String? = nil, totalPages: Int? = nil, currentPage: Int? = nil, readProgress: Double? = nil, isFavorite: Bool? = nil, createdAt: Date? = nil, portalCreatedAt: Date? = nil, portalModifiedAt: Date? = nil) {
         self.id = id
         self.title = title
         self.fileName = fileName
@@ -31,6 +35,8 @@ public struct Document: Sendable, Codable, Hashable {
         self.readProgress = readProgress
         self.isFavorite = isFavorite
         self.createdAt = createdAt
+        self.portalCreatedAt = portalCreatedAt
+        self.portalModifiedAt = portalModifiedAt
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
@@ -44,6 +50,8 @@ public struct Document: Sendable, Codable, Hashable {
         case readProgress
         case isFavorite
         case createdAt
+        case portalCreatedAt
+        case portalModifiedAt
     }
 
     // Encodable protocol methods
@@ -60,6 +68,8 @@ public struct Document: Sendable, Codable, Hashable {
         try container.encodeIfPresent(readProgress, forKey: .readProgress)
         try container.encodeIfPresent(isFavorite, forKey: .isFavorite)
         try container.encodeIfPresent(createdAt, forKey: .createdAt)
+        try container.encodeIfPresent(portalCreatedAt, forKey: .portalCreatedAt)
+        try container.encodeIfPresent(portalModifiedAt, forKey: .portalModifiedAt)
     }
 }
 

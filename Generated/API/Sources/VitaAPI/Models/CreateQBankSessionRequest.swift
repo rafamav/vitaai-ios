@@ -23,8 +23,12 @@ public struct CreateQBankSessionRequest: Sendable, Codable, Hashable {
     public var stage: String?
     public var onlyUnanswered: Bool?
     public var title: String?
+    /** Quality filter — drop questions com explanation NULL ou length<=50 chars. Default true client-side. Added 2026-04-27.  */
+    public var excludeNoExplanation: Bool?
+    /** Quality filter — when false, drop LLM-generated questions (isSynthetic=true; year>=2025, source=medsimple). Default true. Added 2026-04-27.  */
+    public var includeSynthetic: Bool?
 
-    public init(questionCount: Int? = nil, institutionIds: [Int]? = nil, years: [Int]? = nil, difficulties: [String]? = nil, topicIds: [Int]? = nil, subjectIds: [String]? = nil, disciplineSlugs: [String]? = nil, onlyResidence: Bool? = nil, stage: String? = nil, onlyUnanswered: Bool? = nil, title: String? = nil) {
+    public init(questionCount: Int? = nil, institutionIds: [Int]? = nil, years: [Int]? = nil, difficulties: [String]? = nil, topicIds: [Int]? = nil, subjectIds: [String]? = nil, disciplineSlugs: [String]? = nil, onlyResidence: Bool? = nil, stage: String? = nil, onlyUnanswered: Bool? = nil, title: String? = nil, excludeNoExplanation: Bool? = nil, includeSynthetic: Bool? = nil) {
         self.questionCount = questionCount
         self.institutionIds = institutionIds
         self.years = years
@@ -36,6 +40,8 @@ public struct CreateQBankSessionRequest: Sendable, Codable, Hashable {
         self.stage = stage
         self.onlyUnanswered = onlyUnanswered
         self.title = title
+        self.excludeNoExplanation = excludeNoExplanation
+        self.includeSynthetic = includeSynthetic
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
@@ -50,6 +56,8 @@ public struct CreateQBankSessionRequest: Sendable, Codable, Hashable {
         case stage
         case onlyUnanswered
         case title
+        case excludeNoExplanation
+        case includeSynthetic
     }
 
     // Encodable protocol methods
@@ -67,6 +75,8 @@ public struct CreateQBankSessionRequest: Sendable, Codable, Hashable {
         try container.encodeIfPresent(stage, forKey: .stage)
         try container.encodeIfPresent(onlyUnanswered, forKey: .onlyUnanswered)
         try container.encodeIfPresent(title, forKey: .title)
+        try container.encodeIfPresent(excludeNoExplanation, forKey: .excludeNoExplanation)
+        try container.encodeIfPresent(includeSynthetic, forKey: .includeSynthetic)
     }
 }
 

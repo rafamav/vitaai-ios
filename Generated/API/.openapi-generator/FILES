@@ -28,8 +28,10 @@ Sources/VitaAPI/Models/AnswerQBankQuestion200Response.swift
 Sources/VitaAPI/Models/AnswerQBankQuestionRequest.swift
 Sources/VitaAPI/Models/AnswerSimulado200Response.swift
 Sources/VitaAPI/Models/AnswerSimuladoRequest.swift
+Sources/VitaAPI/Models/AppBootstrap200Response.swift
 Sources/VitaAPI/Models/ApproveAdminPortalDiscovery200Response.swift
 Sources/VitaAPI/Models/ApproveAdminPortalDiscoveryRequest.swift
+Sources/VitaAPI/Models/AttachmentAction.swift
 Sources/VitaAPI/Models/AuthToken.swift
 Sources/VitaAPI/Models/Briefing.swift
 Sources/VitaAPI/Models/CanvasAssignment.swift
@@ -42,6 +44,8 @@ Sources/VitaAPI/Models/CanvasIngestResponseStats.swift
 Sources/VitaAPI/Models/CanvasPdfContent.swift
 Sources/VitaAPI/Models/CatalogStatusDiscipline.swift
 Sources/VitaAPI/Models/ChatMessage.swift
+Sources/VitaAPI/Models/ConnectorBlock.swift
+Sources/VitaAPI/Models/ContentOrganizationMode.swift
 Sources/VitaAPI/Models/Conversation.swift
 Sources/VitaAPI/Models/ConversationMessage.swift
 Sources/VitaAPI/Models/CreateAudioUploadUrl200Response.swift
@@ -76,6 +80,9 @@ Sources/VitaAPI/Models/CronPortalSilentSync200Response.swift
 Sources/VitaAPI/Models/CronPortalSilentSyncDevice200Response.swift
 Sources/VitaAPI/Models/CronPortalSilentSyncDeviceRequest.swift
 Sources/VitaAPI/Models/CronPortalSync200Response.swift
+Sources/VitaAPI/Models/CronStudioStuckSweeper200Response.swift
+Sources/VitaAPI/Models/CronStudioStuckSweeper200ResponseCutoffs.swift
+Sources/VitaAPI/Models/CronWhisperBackfillSegments200Response.swift
 Sources/VitaAPI/Models/CustomizeReferralCode200Response.swift
 Sources/VitaAPI/Models/CustomizeReferralCodeRequest.swift
 Sources/VitaAPI/Models/Dashboard.swift
@@ -88,6 +95,9 @@ Sources/VitaAPI/Models/DashboardHeroCardPillsInner.swift
 Sources/VitaAPI/Models/DashboardSubject.swift
 Sources/VitaAPI/Models/DashboardXp.swift
 Sources/VitaAPI/Models/DeleteFlashcardOverlay200Response.swift
+Sources/VitaAPI/Models/DeleteNotifications200Response.swift
+Sources/VitaAPI/Models/DeleteNotifications200ResponseDismissed.swift
+Sources/VitaAPI/Models/DeleteNotificationsRequest.swift
 Sources/VitaAPI/Models/DeleteStudioOutput200Response.swift
 Sources/VitaAPI/Models/DeleteUserData200Response.swift
 Sources/VitaAPI/Models/DeleteUserDataRequest.swift
@@ -139,6 +149,7 @@ Sources/VitaAPI/Models/GetBillingStatus200Response.swift
 Sources/VitaAPI/Models/GetBriefings200Response.swift
 Sources/VitaAPI/Models/GetCoachConversation200Response.swift
 Sources/VitaAPI/Models/GetDocumentExtractions200Response.swift
+Sources/VitaAPI/Models/GetDocumentFile500Response.swift
 Sources/VitaAPI/Models/GetExtensionSummary200Response.swift
 Sources/VitaAPI/Models/GetIntegrationStatus200Response.swift
 Sources/VitaAPI/Models/GetNotificationPreferences200Response.swift
@@ -167,6 +178,12 @@ Sources/VitaAPI/Models/GetStudyPlan200ResponseInnerTopicsInner.swift
 Sources/VitaAPI/Models/GetStudySessions200Response.swift
 Sources/VitaAPI/Models/GetSubjects200Response.swift
 Sources/VitaAPI/Models/GetUniversityDisciplines200Response.swift
+Sources/VitaAPI/Models/GetUniversityPortals200Response.swift
+Sources/VitaAPI/Models/GetUniversityPortals200ResponsePortalsInner.swift
+Sources/VitaAPI/Models/GetUserQuota200Response.swift
+Sources/VitaAPI/Models/GetUserQuota200ResponseStorage.swift
+Sources/VitaAPI/Models/GetUserQuota200ResponseSubscription.swift
+Sources/VitaAPI/Models/GetUserQuota200ResponseTranscription.swift
 Sources/VitaAPI/Models/GetVitaMemory200Response.swift
 Sources/VitaAPI/Models/GetVoiceSessions200Response.swift
 Sources/VitaAPI/Models/GetWhatsappStatus200Response.swift
@@ -176,6 +193,8 @@ Sources/VitaAPI/Models/GradesCurrentResponse.swift
 Sources/VitaAPI/Models/GradesSummary.swift
 Sources/VitaAPI/Models/GrantAudioConsentRequest.swift
 Sources/VitaAPI/Models/HealthCheck.swift
+Sources/VitaAPI/Models/JourneyConfig.swift
+Sources/VitaAPI/Models/JourneyType.swift
 Sources/VitaAPI/Models/LeaderboardEntry.swift
 Sources/VitaAPI/Models/LinkWhatsapp200Response.swift
 Sources/VitaAPI/Models/LinkWhatsappRequest.swift
@@ -184,6 +203,7 @@ Sources/VitaAPI/Models/ListFolderDocuments200Response.swift
 Sources/VitaAPI/Models/ListFolderDocuments200ResponseFolder.swift
 Sources/VitaAPI/Models/ListIntegrations200Response.swift
 Sources/VitaAPI/Models/ListIntegrations200ResponseProvidersInner.swift
+Sources/VitaAPI/Models/ListMedicalSpecialties200Response.swift
 Sources/VitaAPI/Models/ListSimuladoTemplates200Response.swift
 Sources/VitaAPI/Models/ListStudioFolders200Response.swift
 Sources/VitaAPI/Models/ListStudioFolders200ResponseFoldersInner.swift
@@ -195,6 +215,7 @@ Sources/VitaAPI/Models/MarkNotificationsRead200Response.swift
 Sources/VitaAPI/Models/MarkNotificationsReadRequest.swift
 Sources/VitaAPI/Models/Material.swift
 Sources/VitaAPI/Models/MaterialFolder.swift
+Sources/VitaAPI/Models/MedicalSpecialty.swift
 Sources/VitaAPI/Models/Mindmap.swift
 Sources/VitaAPI/Models/MindmapData200Response.swift
 Sources/VitaAPI/Models/MindmapData200ResponseStats.swift
@@ -209,6 +230,9 @@ Sources/VitaAPI/Models/MyReferralResponseQualifiedFriendsInner.swift
 Sources/VitaAPI/Models/MyReferralResponseRewards.swift
 Sources/VitaAPI/Models/Note.swift
 Sources/VitaAPI/Models/Notification.swift
+Sources/VitaAPI/Models/OnboardingV2Request.swift
+Sources/VitaAPI/Models/OnboardingV2RequestSelectedSubjectsInner.swift
+Sources/VitaAPI/Models/OnboardingV2RequestSelectedSubjectsInnerOneOf.swift
 Sources/VitaAPI/Models/OsceAttemptStart.swift
 Sources/VitaAPI/Models/OsceStepResponse.swift
 Sources/VitaAPI/Models/PerformAchievementAction200Response.swift
@@ -249,6 +273,7 @@ Sources/VitaAPI/Models/PortalServerScrape200Response.swift
 Sources/VitaAPI/Models/PortalServerScrapeRequest.swift
 Sources/VitaAPI/Models/PortalSessionRequest.swift
 Sources/VitaAPI/Models/PortalStatus.swift
+Sources/VitaAPI/Models/PortalSyncHealth.swift
 Sources/VitaAPI/Models/PresignFolderUpload200Response.swift
 Sources/VitaAPI/Models/PresignFolderUploadRequest.swift
 Sources/VitaAPI/Models/PrivacyPreferences.swift
@@ -264,6 +289,8 @@ Sources/VitaAPI/Models/QBankProgress.swift
 Sources/VitaAPI/Models/QBankQuestion.swift
 Sources/VitaAPI/Models/QBankQuestionAlternativesInner.swift
 Sources/VitaAPI/Models/QBankSession.swift
+Sources/VitaAPI/Models/QuickAction.swift
+Sources/VitaAPI/Models/QuickActionsResponse.swift
 Sources/VitaAPI/Models/RedeemReferralCode200Response.swift
 Sources/VitaAPI/Models/RedeemReferralCodeRequest.swift
 Sources/VitaAPI/Models/RefreshAdminCatalogStatus200Response.swift
@@ -309,6 +336,8 @@ Sources/VitaAPI/Models/StudyPlanItem.swift
 Sources/VitaAPI/Models/StudySession.swift
 Sources/VitaAPI/Models/SubmitCoachFeedbackRequest.swift
 Sources/VitaAPI/Models/SubmitOnboardingRequest.swift
+Sources/VitaAPI/Models/SubmitOnboardingV2200Response.swift
+Sources/VitaAPI/Models/SubmitOnboardingV2200ResponseDerived.swift
 Sources/VitaAPI/Models/SyncProgress.swift
 Sources/VitaAPI/Models/TestPing200Response.swift
 Sources/VitaAPI/Models/TrabalhoItem.swift
@@ -317,6 +346,11 @@ Sources/VitaAPI/Models/TranscribeAudioRequest.swift
 Sources/VitaAPI/Models/TranscribeFromLive200Response.swift
 Sources/VitaAPI/Models/TranscribeFromLiveRequest.swift
 Sources/VitaAPI/Models/Transcription.swift
+Sources/VitaAPI/Models/TriggerPortalSyncNow200Response.swift
+Sources/VitaAPI/Models/TriggerPortalSyncNow200ResponseDispatched.swift
+Sources/VitaAPI/Models/TriggerPortalSyncNow200ResponseDispatchedCanvasInner.swift
+Sources/VitaAPI/Models/TriggerPortalSyncNow200ResponseDispatchedMannesoftInner.swift
+Sources/VitaAPI/Models/TriggerPortalSyncNowRequest.swift
 Sources/VitaAPI/Models/University.swift
 Sources/VitaAPI/Models/UniversityPortal.swift
 Sources/VitaAPI/Models/UnregisterPushTokenRequest.swift
@@ -329,7 +363,9 @@ Sources/VitaAPI/Models/UpdateProfileRequest.swift
 Sources/VitaAPI/Models/UpdateStudioFolderRequest.swift
 Sources/VitaAPI/Models/UpdateStudioSourceRequest.swift
 Sources/VitaAPI/Models/UpdateSubjectRequest.swift
+Sources/VitaAPI/Models/UpdateUserJourneyRequest.swift
 Sources/VitaAPI/Models/UploadStudioSource200Response.swift
+Sources/VitaAPI/Models/UserJourney.swift
 Sources/VitaAPI/Models/UserProgress.swift
 Sources/VitaAPI/Models/VerifyWhatsapp200Response.swift
 Sources/VitaAPI/Models/VerifyWhatsappRequest.swift
@@ -363,8 +399,10 @@ docs/AnswerQBankQuestion200Response.md
 docs/AnswerQBankQuestionRequest.md
 docs/AnswerSimulado200Response.md
 docs/AnswerSimuladoRequest.md
+docs/AppBootstrap200Response.md
 docs/ApproveAdminPortalDiscovery200Response.md
 docs/ApproveAdminPortalDiscoveryRequest.md
+docs/AttachmentAction.md
 docs/AuthToken.md
 docs/Briefing.md
 docs/CanvasAssignment.md
@@ -377,6 +415,8 @@ docs/CanvasIngestResponseStats.md
 docs/CanvasPdfContent.md
 docs/CatalogStatusDiscipline.md
 docs/ChatMessage.md
+docs/ConnectorBlock.md
+docs/ContentOrganizationMode.md
 docs/Conversation.md
 docs/ConversationMessage.md
 docs/CreateAudioUploadUrl200Response.md
@@ -411,6 +451,9 @@ docs/CronPortalSilentSync200Response.md
 docs/CronPortalSilentSyncDevice200Response.md
 docs/CronPortalSilentSyncDeviceRequest.md
 docs/CronPortalSync200Response.md
+docs/CronStudioStuckSweeper200Response.md
+docs/CronStudioStuckSweeper200ResponseCutoffs.md
+docs/CronWhisperBackfillSegments200Response.md
 docs/CustomizeReferralCode200Response.md
 docs/CustomizeReferralCodeRequest.md
 docs/Dashboard.md
@@ -423,6 +466,9 @@ docs/DashboardHeroCardPillsInner.md
 docs/DashboardSubject.md
 docs/DashboardXp.md
 docs/DeleteFlashcardOverlay200Response.md
+docs/DeleteNotifications200Response.md
+docs/DeleteNotifications200ResponseDismissed.md
+docs/DeleteNotificationsRequest.md
 docs/DeleteStudioOutput200Response.md
 docs/DeleteUserData200Response.md
 docs/DeleteUserDataRequest.md
@@ -474,6 +520,7 @@ docs/GetBillingStatus200Response.md
 docs/GetBriefings200Response.md
 docs/GetCoachConversation200Response.md
 docs/GetDocumentExtractions200Response.md
+docs/GetDocumentFile500Response.md
 docs/GetExtensionSummary200Response.md
 docs/GetIntegrationStatus200Response.md
 docs/GetNotificationPreferences200Response.md
@@ -502,6 +549,12 @@ docs/GetStudyPlan200ResponseInnerTopicsInner.md
 docs/GetStudySessions200Response.md
 docs/GetSubjects200Response.md
 docs/GetUniversityDisciplines200Response.md
+docs/GetUniversityPortals200Response.md
+docs/GetUniversityPortals200ResponsePortalsInner.md
+docs/GetUserQuota200Response.md
+docs/GetUserQuota200ResponseStorage.md
+docs/GetUserQuota200ResponseSubscription.md
+docs/GetUserQuota200ResponseTranscription.md
 docs/GetVitaMemory200Response.md
 docs/GetVoiceSessions200Response.md
 docs/GetWhatsappStatus200Response.md
@@ -511,6 +564,8 @@ docs/GradesCurrentResponse.md
 docs/GradesSummary.md
 docs/GrantAudioConsentRequest.md
 docs/HealthCheck.md
+docs/JourneyConfig.md
+docs/JourneyType.md
 docs/LeaderboardEntry.md
 docs/LinkWhatsapp200Response.md
 docs/LinkWhatsappRequest.md
@@ -519,6 +574,7 @@ docs/ListFolderDocuments200Response.md
 docs/ListFolderDocuments200ResponseFolder.md
 docs/ListIntegrations200Response.md
 docs/ListIntegrations200ResponseProvidersInner.md
+docs/ListMedicalSpecialties200Response.md
 docs/ListSimuladoTemplates200Response.md
 docs/ListStudioFolders200Response.md
 docs/ListStudioFolders200ResponseFoldersInner.md
@@ -530,6 +586,7 @@ docs/MarkNotificationsRead200Response.md
 docs/MarkNotificationsReadRequest.md
 docs/Material.md
 docs/MaterialFolder.md
+docs/MedicalSpecialty.md
 docs/Mindmap.md
 docs/MindmapData200Response.md
 docs/MindmapData200ResponseStats.md
@@ -544,6 +601,9 @@ docs/MyReferralResponseQualifiedFriendsInner.md
 docs/MyReferralResponseRewards.md
 docs/Note.md
 docs/Notification.md
+docs/OnboardingV2Request.md
+docs/OnboardingV2RequestSelectedSubjectsInner.md
+docs/OnboardingV2RequestSelectedSubjectsInnerOneOf.md
 docs/OsceAttemptStart.md
 docs/OsceStepResponse.md
 docs/PerformAchievementAction200Response.md
@@ -584,6 +644,7 @@ docs/PortalServerScrape200Response.md
 docs/PortalServerScrapeRequest.md
 docs/PortalSessionRequest.md
 docs/PortalStatus.md
+docs/PortalSyncHealth.md
 docs/PresignFolderUpload200Response.md
 docs/PresignFolderUploadRequest.md
 docs/PrivacyPreferences.md
@@ -599,6 +660,8 @@ docs/QBankProgress.md
 docs/QBankQuestion.md
 docs/QBankQuestionAlternativesInner.md
 docs/QBankSession.md
+docs/QuickAction.md
+docs/QuickActionsResponse.md
 docs/RedeemReferralCode200Response.md
 docs/RedeemReferralCodeRequest.md
 docs/RefreshAdminCatalogStatus200Response.md
@@ -644,6 +707,8 @@ docs/StudyPlanItem.md
 docs/StudySession.md
 docs/SubmitCoachFeedbackRequest.md
 docs/SubmitOnboardingRequest.md
+docs/SubmitOnboardingV2200Response.md
+docs/SubmitOnboardingV2200ResponseDerived.md
 docs/SyncProgress.md
 docs/TestPing200Response.md
 docs/TrabalhoItem.md
@@ -652,6 +717,11 @@ docs/TranscribeAudioRequest.md
 docs/TranscribeFromLive200Response.md
 docs/TranscribeFromLiveRequest.md
 docs/Transcription.md
+docs/TriggerPortalSyncNow200Response.md
+docs/TriggerPortalSyncNow200ResponseDispatched.md
+docs/TriggerPortalSyncNow200ResponseDispatchedCanvasInner.md
+docs/TriggerPortalSyncNow200ResponseDispatchedMannesoftInner.md
+docs/TriggerPortalSyncNowRequest.md
 docs/University.md
 docs/UniversityPortal.md
 docs/UnregisterPushTokenRequest.md
@@ -664,7 +734,9 @@ docs/UpdateProfileRequest.md
 docs/UpdateStudioFolderRequest.md
 docs/UpdateStudioSourceRequest.md
 docs/UpdateSubjectRequest.md
+docs/UpdateUserJourneyRequest.md
 docs/UploadStudioSource200Response.md
+docs/UserJourney.md
 docs/UserProgress.md
 docs/VerifyWhatsapp200Response.md
 docs/VerifyWhatsappRequest.md

@@ -14,6 +14,8 @@ Name | Type | Description | Notes
 **stage** | **String** |  | [optional] 
 **onlyUnanswered** | **Bool** |  | [optional] 
 **title** | **String** |  | [optional] 
+**excludeNoExplanation** | **Bool** | Quality filter — drop questions com explanation NULL ou length&lt;&#x3D;50 chars. Default true client-side. Added 2026-04-27.  | [optional] 
+**includeSynthetic** | **Bool** | Quality filter — when false, drop LLM-generated questions (isSynthetic&#x3D;true; year&gt;&#x3D;2025, source&#x3D;medsimple). Default true. Added 2026-04-27.  | [optional] 
 
 [[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
 

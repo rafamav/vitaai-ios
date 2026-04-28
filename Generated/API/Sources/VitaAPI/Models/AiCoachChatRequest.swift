@@ -12,17 +12,25 @@ public struct AiCoachChatRequest: Sendable, Codable, Hashable {
     public var messages: [ChatMessage]
     public var conversationId: String?
     public var attachmentIds: [String]?
+    /** Base64-encoded inline image (used by iOS PdfViewer \"Pergunte ao Vita\" — bypass studioSources upload) */
+    public var image: String?
+    /** MIME type for inline base64 image (default image/jpeg) */
+    public var imageType: String?
 
-    public init(messages: [ChatMessage], conversationId: String? = nil, attachmentIds: [String]? = nil) {
+    public init(messages: [ChatMessage], conversationId: String? = nil, attachmentIds: [String]? = nil, image: String? = nil, imageType: String? = nil) {
         self.messages = messages
         self.conversationId = conversationId
         self.attachmentIds = attachmentIds
+        self.image = image
+        self.imageType = imageType
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
         case messages
         case conversationId
         case attachmentIds
+        case image
+        case imageType
     }
 
     // Encodable protocol methods
@@ -32,6 +40,8 @@ public struct AiCoachChatRequest: Sendable, Codable, Hashable {
         try container.encode(messages, forKey: .messages)
         try container.encodeIfPresent(conversationId, forKey: .conversationId)
         try container.encodeIfPresent(attachmentIds, forKey: .attachmentIds)
+        try container.encodeIfPresent(image, forKey: .image)
+        try container.encodeIfPresent(imageType, forKey: .imageType)
     }
 }
 
