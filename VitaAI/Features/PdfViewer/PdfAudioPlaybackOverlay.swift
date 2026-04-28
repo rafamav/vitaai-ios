@@ -47,7 +47,7 @@ struct PdfAudioPlaybackOverlay: View {
         Button(action: onStartRecording) {
             HStack(spacing: 8) {
                 Image(systemName: "mic.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(VitaTypography.titleSmall.weight(.semibold))
                 Text("Gravar aula")
                     .font(VitaTypography.labelMedium)
             }
@@ -57,7 +57,7 @@ struct PdfAudioPlaybackOverlay: View {
 
         Button(action: onClose) {
             Image(systemName: "xmark")
-                .font(.system(size: 13, weight: .semibold))
+                .font(VitaTypography.titleSmall.weight(.semibold))
                 .foregroundStyle(VitaColors.textSecondary)
         }
         .buttonStyle(.plain)
@@ -66,8 +66,8 @@ struct PdfAudioPlaybackOverlay: View {
     @ViewBuilder
     private var recordingControls: some View {
         Image(systemName: "circle.fill")
-            .font(.system(size: 11))
-            .foregroundStyle(.red)
+            .font(VitaTypography.labelSmall)
+            .foregroundStyle(VitaColors.recording)
             .symbolEffect(.pulse.byLayer, options: .repeating)
 
         Text(formatTime(recorder.currentTime))
@@ -81,8 +81,8 @@ struct PdfAudioPlaybackOverlay: View {
 
         Button(action: onStopRecording) {
             Image(systemName: "stop.circle.fill")
-                .font(.system(size: 24))
-                .foregroundStyle(.red)
+                .font(VitaTypography.headlineMedium)
+                .foregroundStyle(VitaColors.recording)
                 .symbolRenderingMode(.hierarchical)
         }
         .buttonStyle(.plain)
@@ -95,7 +95,7 @@ struct PdfAudioPlaybackOverlay: View {
             if showPause { recorder.pausePlayback() } else { recorder.startPlayback() }
         } label: {
             Image(systemName: showPause ? "pause.fill" : "play.fill")
-                .font(.system(size: 16, weight: .semibold))
+                .font(VitaTypography.titleMedium.weight(.semibold))
                 .foregroundStyle(VitaColors.accent)
                 .frame(width: 32, height: 32)
                 .background(VitaColors.accent.opacity(0.15), in: Circle())
@@ -118,7 +118,7 @@ struct PdfAudioPlaybackOverlay: View {
 
         Button(action: onClose) {
             Image(systemName: "xmark")
-                .font(.system(size: 13, weight: .semibold))
+                .font(VitaTypography.titleSmall.weight(.semibold))
                 .foregroundStyle(VitaColors.textSecondary)
         }
         .buttonStyle(.plain)

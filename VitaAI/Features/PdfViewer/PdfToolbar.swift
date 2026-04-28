@@ -144,7 +144,7 @@ struct PdfToolbar: View {
         HStack(spacing: 12) {
             Button(action: onBack) {
                 Image(systemName: "house.fill")
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(VitaTypography.titleMedium.weight(.semibold))
                     .foregroundStyle(VitaColors.accent)
                     .frame(width: 36, height: 36)
             }
@@ -313,7 +313,7 @@ struct PdfToolbar: View {
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 16))
+                    .font(VitaTypography.titleMedium)
                     .foregroundStyle((isSearching || isBookmarked) ? VitaColors.accent : VitaColors.textSecondary)
                     .frame(width: 36, height: 36)
             }
@@ -424,18 +424,18 @@ struct PdfToolbar: View {
                 onToggleAudioRecording?()
             } label: {
                 Image(systemName: "stop.circle.fill")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.red)
+                    .font(VitaTypography.titleLarge.weight(.semibold))
+                    .foregroundStyle(VitaColors.recording)
                     .frame(width: 38, height: 38)
                     .background(
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.red.opacity(0.18))
+                            .fill(VitaColors.recording.opacity(0.18))
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color.red.opacity(0.7), lineWidth: 1.0)
+                            .stroke(VitaColors.recording.opacity(0.7), lineWidth: 1.0)
                     )
-                    .shadow(color: Color.red.opacity(0.5), radius: 10, y: 1)
+                    .shadow(color: VitaColors.recording.opacity(0.5), radius: 10, y: 1)
                     .symbolEffect(.pulse.byLayer, options: .repeating)
             }
             .buttonStyle(.plain)
@@ -446,7 +446,7 @@ struct PdfToolbar: View {
                 onTogglePlaybackOverlay?()
             } label: {
                 Image(systemName: "waveform.circle.fill")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(VitaTypography.titleLarge.weight(.semibold))
                     .foregroundStyle(VitaColors.accent)
                     .frame(width: 38, height: 38)
                     .background(
@@ -466,7 +466,7 @@ struct PdfToolbar: View {
                 onToggleAudioRecording?()
             } label: {
                 Image(systemName: "mic")
-                    .font(.system(size: 17))
+                    .font(VitaTypography.titleMedium)
                     .foregroundStyle(VitaColors.textSecondary)
                     .frame(width: 38, height: 38)
             }
