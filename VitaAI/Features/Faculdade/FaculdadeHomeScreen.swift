@@ -8,8 +8,15 @@ import SwiftUI
 //   3. Mini cards — compact previews of each subpage content (today, CR, recent docs)
 //
 // Every navigable element pushes to its respective full subpage via NavigationStack.
+//
+// Variant `.internato` (Rafael 2026-04-28): mesma tela, com 3 cortes:
+//   - Hero eyebrow vira "INTERNATO" em vez de "Xº SEMESTRE"
+//   - Stats strip (CR/Aprov/Cursando) some — internato não tem notas tradicionais
+//   - Seção "Minhas Disciplinas" some — agenda + trabalhos + documentos é o que importa
 
 struct FaculdadeHomeScreen: View {
+    var variant: JourneyType = .faculdade
+
     @Environment(\.appData) private var appData
     @Environment(\.scenePhase) private var scenePhase
     @Environment(Router.self) private var router
@@ -25,15 +32,19 @@ struct FaculdadeHomeScreen: View {
 
     // Institution info from user profile (via onboarding)
     private var institutionName: String { appData.profile?.university ?? "Minha Faculdade" }
-    private var courseName: String { "Medicina" }
+    private var courseName: String { variant == .internato ? "Medicina · Internato" : "Medicina" }
     private var currentSemester: Int { appData.profile?.semester ?? 0 }
+
+    private var isInternato: Bool { variant == .internato }
 
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 16) {
                 subTabRow
                 heroCard
-                disciplinesSection
+                if !isInternato {
+                    disciplinesSection
+                }
                 MateriasAgendaWidget(
                     subjects: appData.gradesResponse?.current ?? [],
                     schedule: appData.classSchedule,
@@ -70,7 +81,11 @@ struct FaculdadeHomeScreen: View {
     private var subTabRow: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                subTabPill(title: "Disciplinas", icon: "graduationcap", route: .faculdadeDisciplinas)
+                // Internato esconde "Disciplinas" — não há grid de matérias
+                // tradicional; rotações vivem na agenda.
+                if !isInternato {
+                    subTabPill(title: "Disciplinas", icon: "graduationcap", route: .faculdadeDisciplinas)
+                }
                 subTabPill(title: "Documentos", icon: "doc.text", route: .faculdadeDocumentos)
                 subTabPill(title: "Trabalhos", icon: "doc.richtext", route: .trabalhos)
                 subTabPill(title: "Professores", icon: "person.2", route: .faculdadeProfessores)
@@ -129,7 +144,20 @@ struct FaculdadeHomeScreen: View {
     private var heroContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Zona 1: eyebrow no topo
-            if currentSemester > 0 {
+            // Internato (Rafael 2026-04-28): substitui "Xº SEMESTRE" por "INTERNATO"
+            // independente do número exato — o aluno está em rotação clínica.
+            if isInternato {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(goldPrimary)
+                        .frame(width: 5, height: 5)
+                    Text("INTERNATO")
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.2)
+                        .foregroundStyle(goldPrimary)
+                }
+                .padding(.bottom, 6)
+            } else if currentSemester > 0 {
                 HStack(spacing: 6) {
                     Circle()
                         .fill(goldPrimary)
@@ -162,8 +190,11 @@ struct FaculdadeHomeScreen: View {
 
             Spacer(minLength: 0)
 
-            // Zona 3: stats strip embaixo
-            heroStatsStrip
+            // Zona 3: stats strip embaixo (CR/Aprov/Cursando).
+            // Internato não tem notas tradicionais — esconde a strip toda.
+            if !isInternato {
+                heroStatsStrip
+            }
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 16)

@@ -11,9 +11,11 @@ import SwiftUI
 // `.faculdade` continua aplicado pra usuarios pre-Onda-5 (backfill).
 //
 // Templates por jornada:
-//   - FACULDADE -> FaculdadeHomeScreen (conteudo atual)
-//   - INTERNATO/ENAMED/RESIDENCIA/REVALIDA -> JornadaEmptyStateCards
-//     (cards adaptados ficam pra Onda 6).
+//   - FACULDADE  -> FaculdadeHomeScreen()
+//   - INTERNATO  -> FaculdadeHomeScreen(variant: .internato)
+//                   (Rafael 2026-04-28: nao eh "modo proprio", eh a mesma tela
+//                    sem notas e com titulo trocado — agenda padrao manda)
+//   - ENAMED/RESIDENCIA/REVALIDA -> JornadaEmptyStateCards (Onda 6 propria)
 //
 // SOT: agent-brain/decisions/2026-04-27_jornada-3lentes-FINAL.md
 // Backend Phase 1 ja em main: commit d2ab3a1 (migration 0077 + endpoint).
@@ -30,11 +32,7 @@ struct JornadaScreen: View {
         case .faculdade:
             FaculdadeHomeScreen()
         case .internato:
-            JornadaEmptyStateCards(
-                journeyName: "Internato",
-                tagline: "Rotacoes, casos clinicos, OSCE e checklists",
-                icon: "stethoscope"
-            )
+            FaculdadeHomeScreen(variant: .internato)
         case .enamed:
             JornadaEmptyStateCards(
                 journeyName: "ENAMED",
