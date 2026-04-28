@@ -1636,6 +1636,12 @@ private final class Coordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDe
         canvas.tool = toolPicker.selectedTool
         pageToCanvas[page] = canvas
 
+        // Apple Pencil hover preview (Pencil 2 em iPad Pro M2+ e Pencil Pro).
+        // UIHoverGestureRecognizer expõe zOffset/azimuthAngle a partir de iOS 16.1.
+        // Em hardware sem hover (iPad Air, Pencil 1, Pencil USB-C), o callback
+        // simplesmente não dispara — degrada gracefully sem `if available` extra.
+        attachPencilHoverPreview(to: canvas)
+
         // Load saved drawing from disk
         if let pageIndex = view.document?.index(for: page),
            let drawing = viewModel.loadDrawing(pageIndex: pageIndex) {
@@ -2300,6 +2306,170 @@ private final class Coordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDe
         let g = CGFloat((v >> 8) & 0xFF) / 255.0
         let b = CGFloat(v & 0xFF) / 255.0
         return UIColor(red: r, green: g, blue: b, alpha: 0.4)
+    }
+
+    // MARK: Apple Pencil hover preview
+    //
+    // Goodnotes/Notability/Apple Notes mostram um "ghost" do tip da Pencil antes
+    // do toque encostar na tela. UIHoverGestureRecognizer (iOS 13+) ganhou as
+    // properties zOffset/azimuthAngle/altitudeAngle em iOS 16.1 (WWDC 22 +
+    // iPadOS 16.1 release). Funciona automaticamente com Apple Pencil 2 em
+    // iPad Pro M2/M4 e Apple Pencil Pro. Em hardware sem hover (Pencil 1,
+    // Pencil USB-C, iPad Air não-M2), o callback simplesmente nunca dispara —
+    // ou dispara com zOffset=0, que filtramos abaixo.
+    //
+    // Sources:
+    //   developer.apple.com/documentation/UIKit/adopting-hover-support-for-apple-pencil
+    //   developer.apple.com/documentation/uikit/uihovergesturerecognizer/zoffset
+    //   developer.apple.com/news/?id=23ksaoks (Spotlight on: Apple Pencil hover)
+
+    /// Tag aplicada à subview de preview pra encontrá-la depois sem property novo
+    /// no Coordinator (evitamos guardar map per-canvas que vazaria com a página).
+    private static let hoverPreviewTag: Int = 7331
+
+    private func attachPencilHoverPreview(to canvas: PKCanvasView) {
+        // Preview view: subview do próprio canvas, em coordenadas do canvas.
+        // Já entra escondida — só aparece quando hover de Pencil dispara.
+        let preview = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: 12))
+        preview.tag = Coordinator.hoverPreviewTag
+        preview.isHidden = true
+        preview.isUserInteractionEnabled = false
+        preview.backgroundColor = .clear
+        preview.layer.allowsEdgeAntialiasing = true
+        canvas.addSubview(preview)
+
+        let hover = UIHoverGestureRecognizer(target: self,
+                                             action: #selector(handlePencilHover(_:)))
+        // Reconhecer mesmo se PKCanvasView tiver outros gestures ativos.
+        hover.delegate = self
+        canvas.addGestureRecognizer(hover)
+    }
+
+    @objc private func handlePencilHover(_ gr: UIHoverGestureRecognizer) {
+        guard let canvas = gr.view as? PKCanvasView,
+              let preview = canvas.viewWithTag(Coordinator.hoverPreviewTag) else { return }
+
+        // Gate: só mostra hover preview em modo de desenho real.
+        // Pointer-mode (cor .clear) não desenha, então não faz sentido preview.
+        guard viewModel.isAnnotating else {
+            preview.isHidden = true
+            return
+        }
+
+        switch gr.state {
+        case .began, .changed:
+            // zOffset == 0 quando a fonte não é Apple Pencil capable de hover
+            // (mouse, finger, Pencil 1). Filtra silenciosamente.
+            let zOffset: CGFloat
+            if #available(iOS 16.1, *) {
+                zOffset = gr.zOffset
+            } else {
+                zOffset = 0
+            }
+            guard zOffset > 0 else {
+                preview.isHidden = true
+                return
+            }
+
+            let location = gr.location(in: canvas)
+            updateHoverPreview(preview, at: location, zOffset: zOffset, on: canvas)
+
+        case .ended, .cancelled, .failed:
+            preview.isHidden = true
+
+        default:
+            break
+        }
+    }
+
+    /// Repinta + reposiciona o ghost baseado no tool ativo. Sem animação no
+    /// .changed pra manter 60fps; ajusta center via transform-equivalent direto.
+    private func updateHoverPreview(_ preview: UIView,
+                                    at location: CGPoint,
+                                    zOffset: CGFloat,
+                                    on canvas: PKCanvasView) {
+        // Opacidade cresce conforme tip se aproxima da tela (1mm-12mm range).
+        // zOffset é normalizado [0, 1] — quanto menor, mais perto.
+        let proximityAlpha = max(0.35, 1.0 - zOffset)
+
+        let tool = canvas.tool
+
+        // Limpa shape anterior (recriamos a cada frame — barato pra primitivas
+        // simples, evita guardar estado e fica visualmente correto se o user
+        // trocar de tool no PKToolPicker enquanto pairava com a Pencil).
+        preview.layer.sublayers?.removeAll()
+        preview.backgroundColor = .clear
+        preview.layer.cornerRadius = 0
+        preview.layer.borderWidth = 0
+        preview.transform = .identity
+
+        if let eraser = tool as? PKEraserTool {
+            // Borracha: círculo cinza translúcido. Bitmap eraser usa raio
+            // ~22pt; vector eraser segue a width do tool. Damos fallback 22.
+            let radius: CGFloat
+            switch eraser.eraserType {
+            case .bitmap: radius = 22
+            case .vector: radius = 18
+            @unknown default: radius = 20
+            }
+            let size = CGSize(width: radius * 2, height: radius * 2)
+            preview.bounds = CGRect(origin: .zero, size: size)
+            preview.center = location
+            preview.layer.cornerRadius = radius
+            preview.backgroundColor = UIColor.systemGray.withAlphaComponent(0.18 * proximityAlpha)
+            preview.layer.borderWidth = 1
+            preview.layer.borderColor = UIColor.systemGray.withAlphaComponent(0.45 * proximityAlpha).cgColor
+
+        } else if let ink = tool as? PKInkingTool {
+            let color = ink.color
+            // Heurística marca-texto: marker tool OU cor com alpha < 1 (highlight).
+            let isHighlighter: Bool = {
+                if ink.inkType == .marker { return true }
+                var alpha: CGFloat = 1
+                color.getRed(nil, green: nil, blue: nil, alpha: &alpha)
+                return alpha < 0.95
+            }()
+
+            // Pointer-mode usa cor totalmente transparente — não desenha nada
+            // visível. Pra esse caso, esconde preview (não há "tip" real).
+            var alpha: CGFloat = 1
+            color.getRed(nil, green: nil, blue: nil, alpha: &alpha)
+            if alpha < 0.05 {
+                preview.isHidden = true
+                return
+            }
+
+            if isHighlighter {
+                // Barra horizontal proporcional à largura do marker.
+                let barHeight = max(6, ink.width * 0.9)
+                let barWidth: CGFloat = 28
+                preview.bounds = CGRect(x: 0, y: 0, width: barWidth, height: barHeight)
+                preview.center = location
+                preview.backgroundColor = color.withAlphaComponent(min(0.65, alpha) * proximityAlpha)
+                preview.layer.cornerRadius = barHeight / 2
+            } else {
+                // Pen/pencil/fountain: dot pequeno na cor do tool, raio
+                // proporcional à width (clamp 3...8 pra não virar bolha).
+                let dotRadius = max(3, min(8, ink.width / 2 + 1))
+                let size = CGSize(width: dotRadius * 2, height: dotRadius * 2)
+                preview.bounds = CGRect(origin: .zero, size: size)
+                preview.center = location
+                preview.backgroundColor = color.withAlphaComponent(0.85 * proximityAlpha)
+                preview.layer.cornerRadius = dotRadius
+                preview.layer.borderWidth = 0.5
+                preview.layer.borderColor = UIColor.white.withAlphaComponent(0.7 * proximityAlpha).cgColor
+            }
+
+        } else {
+            // Lasso, ou tool desconhecido: dot neutro discreto.
+            let size = CGSize(width: 8, height: 8)
+            preview.bounds = CGRect(origin: .zero, size: size)
+            preview.center = location
+            preview.backgroundColor = UIColor.label.withAlphaComponent(0.4 * proximityAlpha)
+            preview.layer.cornerRadius = 4
+        }
+
+        preview.isHidden = false
     }
 }
 
