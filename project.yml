@@ -1,3 +1,10 @@
+# IMPORTANTE: Este projeto usa AMBOS xcodegen E CocoaPods.
+# NAO rode xcodegen generate direto — use ./scripts/regenerate-project.sh
+# que faz xcodegen generate + pod install em sequencia.
+# CocoaPods eh necessario porque Google ML Kit Digital Ink Recognition NAO
+# tem SPM oficial (apenas CocoaPods). Build via VitaAI.xcworkspace (NAO .xcodeproj).
+# Ref: agent-brain/incidents/vitaai/2026-04-29_xcodegen-cocoapods-coexistence.md
+
 name: VitaAI
 
 options:

@@ -31,6 +31,7 @@ cd "$PROJECT_DIR"
 
 SCHEME="VitaAI"
 PROJECT="VitaAI.xcodeproj"
+WORKSPACE="VitaAI.xcworkspace"
 INFO_PLIST="VitaAI/Info.plist"
 ARCHIVE_PATH="/tmp/VitaAI.xcarchive"
 EXPORT_PATH="/tmp/VitaAI-export"
@@ -153,7 +154,7 @@ echo "[2/4] Archiving... (60-90s)"
 find "$ARCHIVE_PATH" -delete 2>/dev/null || true
 set +e
 xcodebuild \
-    -project "$PROJECT" \
+    -workspace "$WORKSPACE" \
     -scheme "$SCHEME" \
     -sdk iphoneos \
     -configuration Release \

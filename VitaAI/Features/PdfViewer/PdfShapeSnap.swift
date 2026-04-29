@@ -9,7 +9,7 @@ import CoreGraphics
 // custom heurístico anterior que não funcionava de forma confiável.
 //
 // Como funciona:
-//   1. Stroke do user é recolhido via PKStrokePath → [StrokePoint]
+//   1. Stroke do user é recolhido via PKStrokePath → [ODPoint]
 //   2. Guards anti-letra (mínimo de pontos, duração, tamanho) — apertados o
 //      bastante pra não pegar handwriting, soltos o bastante pra pegar shape
 //      apressado normal.
@@ -73,7 +73,7 @@ enum PdfShapeSnap {
             let p = path[pathIndex]
             if idx == 0 { firstTime = p.timeOffset }
             lastTime = p.timeOffset
-            rawPoints.append(StrokePoke(point: StrokePoint(p.location), time: p.timeOffset))
+            rawPoints.append(StrokePoke(point: ODPoint(p.location), time: p.timeOffset))
             idx += 1
         }
 
@@ -201,6 +201,6 @@ enum PdfShapeSnap {
 
 // Wrapper interno pra carry timestamp + point juntos durante guards.
 private struct StrokePoke {
-    let point: StrokePoint
+    let point: ODPoint
     let time: TimeInterval
 }

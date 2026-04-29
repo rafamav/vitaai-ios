@@ -24,6 +24,7 @@
 		042B3027A14F3834E0DCBC54 /* PdfToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6EFEEFBA17AF37F355A4848 /* PdfToolbar.swift */; };
 		06E94FB9C41A0031FD9D8556 /* DisciplineFolderCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E7557D01511F8DFA457E786 /* DisciplineFolderCard.swift */; };
 		0780E271D8611FDE00449801 /* AssinaturaScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4F671C3A0DA731099C2B38F /* AssinaturaScreen.swift */; };
+		0788F32D8D6AF8482DF23E02 /* OneDollarRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CF7A4E142CDD4D34FC14BF1 /* OneDollarRecognizer.swift */; };
 		07B30BC927DFC5058114361F /* VitaErrorState.swift in Sources */ = {isa = PBXBuildFile; fileRef = CABC58C8177E84A757D6500E /* VitaErrorState.swift */; };
 		080253DCA05BE7A7CEE88473 /* NotebookListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26F29C8F6797062934D4D8F /* NotebookListViewModel.swift */; };
 		0821412783608B782A4212F1 /* EmailAuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8562D147AB3395719D9F977 /* EmailAuthViewModel.swift */; };
@@ -262,7 +263,6 @@
 		8C65C081946C5EB9325CA5C5 /* CanvasSilentReauth.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE31CC2592D05FF00976F24A /* CanvasSilentReauth.swift */; };
 		8C9BB863C94A5710F2664067 /* ProgressoScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7993D339523EA36C4CC8B25C /* ProgressoScreen.swift */; };
 		8D831E286DC2B35A11F4467E /* PdfShapeSnap.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D811804E1E2A9F1E06FFB9 /* PdfShapeSnap.swift */; };
-		6F0B879E421345ADAFABDD45 /* OneDollarRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A71CAC3A555E448F8FFC5C1C /* OneDollarRecognizer.swift */; };
 		8D9F5CD12607C01389C6B254 /* NotebookStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5513CD19D0230B41AC440E8D /* NotebookStore.swift */; };
 		8DAB61FBB197AC29828DE194 /* FlashcardModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6827736C1825D7205D33703E /* FlashcardModels.swift */; };
 		8E5C3FCDB7EC7E77A034CADD /* InsightsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = E64F3F466E1AEC167C8E16C4 /* InsightsScreen.swift */; };
@@ -642,6 +642,7 @@
 		7B354B45703FC01F5DBB4D68 /* FaculdadeDocumentosScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaculdadeDocumentosScreen.swift; sourceTree = "<group>"; };
 		7BA44FA79DA06D105CBE8F08 /* HealthKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitManager.swift; sourceTree = "<group>"; };
 		7BD3F3D91DE3FE5D24710650 /* TranscricaoShared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscricaoShared.swift; sourceTree = "<group>"; };
+		7CF7A4E142CDD4D34FC14BF1 /* OneDollarRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneDollarRecognizer.swift; sourceTree = "<group>"; };
 		7ECE46CA939DEDECC0CA2196 /* TextToSpeechManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextToSpeechManager.swift; sourceTree = "<group>"; };
 		7F941EEE1160DE104E36CA06 /* VitaXpToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitaXpToast.swift; sourceTree = "<group>"; };
 		7FB81E58389F9A442111E690 /* AppConfigResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfigResponse.swift; sourceTree = "<group>"; };
@@ -835,7 +836,6 @@
 		F4C7EE91AF90098D6FB1DAD0 /* PushManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushManager.swift; sourceTree = "<group>"; };
 		F4CFEE2E7B4158031EA735AD /* RevalidaStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevalidaStage.swift; sourceTree = "<group>"; };
 		F4D811804E1E2A9F1E06FFB9 /* PdfShapeSnap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PdfShapeSnap.swift; sourceTree = "<group>"; };
-		A71CAC3A555E448F8FFC5C1C /* OneDollarRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneDollarRecognizer.swift; sourceTree = "<group>"; };
 		F5079577D6F3E546C0B07954 /* ConnectorStatusSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectorStatusSheet.swift; sourceTree = "<group>"; };
 		F5CBDEBE92E57751092C2AD1 /* DisciplineDetailScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisciplineDetailScreen.swift; sourceTree = "<group>"; };
 		F5F50F25FBC60669076E52AA /* SimuladoDiagnosticsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimuladoDiagnosticsScreen.swift; sourceTree = "<group>"; };
@@ -935,6 +935,7 @@
 		0B0FAB0B9742C793BF68895C /* PdfViewer */ = {
 			isa = PBXGroup;
 			children = (
+				7CF7A4E142CDD4D34FC14BF1 /* OneDollarRecognizer.swift */,
 				DC81D5F2654A52C372EB9A0D /* PageThumbnailSidebar.swift */,
 				21F707CB00A1F232460531A0 /* PdfAnnotationModels.swift */,
 				BC27E6AE3ABE1187BACC6D28 /* PdfAudioPlaybackOverlay.swift */,
@@ -951,7 +952,6 @@
 				05B1E34202A8907EFFFFACD1 /* PdfScanOverlay.swift */,
 				303BA1D3D9EFF7031A182BB5 /* PdfSettingsSheet.swift */,
 				F4D811804E1E2A9F1E06FFB9 /* PdfShapeSnap.swift */,
-				A71CAC3A555E448F8FFC5C1C /* OneDollarRecognizer.swift */,
 				1130D9D84A3608728A01845E /* PdfStudyStatsSheet.swift */,
 				D76BE069C1F75FD8C95A138A /* PdfTabBar.swift */,
 				E6EFEEFBA17AF37F355A4848 /* PdfToolbar.swift */,
@@ -2123,6 +2123,7 @@
 				315C4CFA08A29F217F42D2BF /* OnboardingShared.swift in Sources */,
 				230911245A9DCBF6A9C6AEA8 /* OnboardingViewModel.swift in Sources */,
 				39385C5B0814FF112278FF51 /* OnboardingWhatsAppLinkSheet.swift in Sources */,
+				0788F32D8D6AF8482DF23E02 /* OneDollarRecognizer.swift in Sources */,
 				43029DE4468B4C70273E2047 /* OsceModels.swift in Sources */,
 				D60B987372A74F7ABEEF21A1 /* OsceResultView.swift in Sources */,
 				CD764114E07D347F8DF2A44D /* OsceScreen.swift in Sources */,
@@ -2148,7 +2149,6 @@
 				DB5C2B7F9757B2683C89B850 /* PdfScanOverlay.swift in Sources */,
 				696CBE7E1E29936CEF915F00 /* PdfSettingsSheet.swift in Sources */,
 				8D831E286DC2B35A11F4467E /* PdfShapeSnap.swift in Sources */,
-				6F0B879E421345ADAFABDD45 /* OneDollarRecognizer.swift in Sources */,
 				611E98DC1816E350AFCEF2D0 /* PdfStudyStatsSheet.swift in Sources */,
 				EBD32F8B6FC327034ED9A70E /* PdfTabBar.swift in Sources */,
 				042B3027A14F3834E0DCBC54 /* PdfToolbar.swift in Sources */,

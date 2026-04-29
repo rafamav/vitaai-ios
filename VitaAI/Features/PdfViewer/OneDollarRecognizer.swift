@@ -25,18 +25,18 @@ import PencilKit
 //   - https://depts.washington.edu/acelab/proj/dollar/
 //   - Wobbrock/Wilson/Li (UIST 2007)
 
-struct StrokePoint {
+struct ODPoint {
     var x: Double
     var y: Double
 
     init(x: Double, y: Double) { self.x = x; self.y = y }
     init(_ point: CGPoint) { self.x = Double(point.x); self.y = Double(point.y) }
 
-    static let zero = StrokePoint(x: 0, y: 0)
+    static let zero = ODPoint(x: 0, y: 0)
 
     func toCGPoint() -> CGPoint { CGPoint(x: x, y: y) }
 
-    func distance(to other: StrokePoint) -> Double {
+    func distance(to other: ODPoint) -> Double {
         let dx = other.x - x, dy = other.y - y
         return (dx * dx + dy * dy).squareRoot()
     }
@@ -54,7 +54,7 @@ private enum StrokeMath {
     static let angleRange: Double = 45.0 * .pi / 180.0
     static let anglePrecision: Double = 2.0 * .pi / 180.0
 
-    static func pathLength(_ points: [StrokePoint]) -> Double {
+    static func pathLength(_ points: [ODPoint]) -> Double {
         var total = 0.0
         for i in 1..<points.count {
             total += points[i - 1].distance(to: points[i])
@@ -62,7 +62,7 @@ private enum StrokeMath {
         return total
     }
 
-    static func pathDistance(_ a: [StrokePoint], _ b: [StrokePoint]) -> Double {
+    static func pathDistance(_ a: [ODPoint], _ b: [ODPoint]) -> Double {
         let n = min(a.count, b.count)
         guard n > 0 else { return .infinity }
         var d = 0.0
@@ -72,16 +72,16 @@ private enum StrokeMath {
         return d / Double(n)
     }
 
-    static func centroid(_ points: [StrokePoint]) -> StrokePoint {
+    static func centroid(_ points: [ODPoint]) -> ODPoint {
         guard !points.isEmpty else { return .zero }
-        var c = StrokePoint.zero
+        var c = ODPoint.zero
         for p in points { c.x += p.x; c.y += p.y }
         c.x /= Double(points.count)
         c.y /= Double(points.count)
         return c
     }
 
-    static func boundingBox(_ points: [StrokePoint]) -> StrokeBoundingBox {
+    static func boundingBox(_ points: [ODPoint]) -> StrokeBoundingBox {
         var minX = Double.infinity, maxX = -Double.infinity
         var minY = Double.infinity, maxY = -Double.infinity
         for p in points {
@@ -91,12 +91,12 @@ private enum StrokeMath {
         return StrokeBoundingBox(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
     }
 
-    static func resample(_ points: [StrokePoint], totalPoints: Int) -> [StrokePoint] {
+    static func resample(_ points: [ODPoint], totalPoints: Int) -> [ODPoint] {
         guard points.count >= 2 else { return points }
         let interval = pathLength(points) / Double(totalPoints - 1)
         guard interval > 0 else { return points }
         var working = points
-        var newPoints: [StrokePoint] = [points[0]]
+        var newPoints: [ODPoint] = [points[0]]
         var totalLen = 0.0
         var i = 1
         while i < working.count {
@@ -106,7 +106,7 @@ private enum StrokeMath {
             if (totalLen + d) >= interval {
                 let qx = prev.x + ((interval - totalLen) / d) * (cur.x - prev.x)
                 let qy = prev.y + ((interval - totalLen) / d) * (cur.y - prev.y)
-                let q = StrokePoint(x: qx, y: qy)
+                let q = ODPoint(x: qx, y: qy)
                 newPoints.append(q)
                 working.insert(q, at: i)
                 totalLen = 0
@@ -121,43 +121,43 @@ private enum StrokeMath {
         return newPoints
     }
 
-    static func indicativeAngle(_ points: [StrokePoint]) -> Double {
+    static func indicativeAngle(_ points: [ODPoint]) -> Double {
         let c = centroid(points)
         guard let first = points.first else { return 0 }
         return atan2(c.y - first.y, c.x - first.x)
     }
 
-    static func rotate(_ points: [StrokePoint], byRadians radians: Double) -> [StrokePoint] {
+    static func rotate(_ points: [ODPoint], byRadians radians: Double) -> [ODPoint] {
         let c = centroid(points)
         let cosV = cos(radians), sinV = sin(radians)
         return points.map { p in
             let qx = (p.x - c.x) * cosV - (p.y - c.y) * sinV + c.x
             let qy = (p.x - c.x) * sinV + (p.y - c.y) * cosV + c.y
-            return StrokePoint(x: qx, y: qy)
+            return ODPoint(x: qx, y: qy)
         }
     }
 
-    static func scale(_ points: [StrokePoint], toSize size: Double) -> [StrokePoint] {
+    static func scale(_ points: [ODPoint], toSize size: Double) -> [ODPoint] {
         let bbox = boundingBox(points)
         guard bbox.width > 0, bbox.height > 0 else { return points }
         let sx = size / bbox.width, sy = size / bbox.height
-        return points.map { StrokePoint(x: $0.x * sx, y: $0.y * sy) }
+        return points.map { ODPoint(x: $0.x * sx, y: $0.y * sy) }
     }
 
-    static func translate(_ points: [StrokePoint], to target: StrokePoint) -> [StrokePoint] {
+    static func translate(_ points: [ODPoint], to target: ODPoint) -> [ODPoint] {
         let c = centroid(points)
-        return points.map { StrokePoint(x: $0.x + target.x - c.x, y: $0.y + target.y - c.y) }
+        return points.map { ODPoint(x: $0.x + target.x - c.x, y: $0.y + target.y - c.y) }
     }
 
-    static func distanceAtAngle(_ points: [StrokePoint],
-                                template: [StrokePoint],
+    static func distanceAtAngle(_ points: [ODPoint],
+                                template: [ODPoint],
                                 radians: Double) -> Double {
         let rotated = rotate(points, byRadians: radians)
         return pathDistance(rotated, template)
     }
 
-    static func distanceAtBestAngle(_ points: [StrokePoint],
-                                    template: [StrokePoint],
+    static func distanceAtBestAngle(_ points: [ODPoint],
+                                    template: [ODPoint],
                                     fromAngle: Double,
                                     toAngle: Double,
                                     threshold: Double) -> Double {
@@ -185,9 +185,9 @@ private enum StrokeMath {
 
 struct OneDollarTemplate {
     let name: String
-    let normalizedPoints: [StrokePoint]
+    let normalizedPoints: [ODPoint]
 
-    init(name: String, rawPoints: [StrokePoint]) {
+    init(name: String, rawPoints: [ODPoint]) {
         self.name = name
         let resampled = StrokeMath.resample(rawPoints, totalPoints: StrokeMath.numPoints)
         let radians = StrokeMath.indicativeAngle(resampled)
@@ -210,7 +210,7 @@ enum OneDollarRecognizer {
     /// Roda o algoritmo $1 contra a lista de templates. Retorna o template com
     /// maior similaridade + score 0.0..1.0 (1.0 = perfeito).
     /// Throws se points < 10, templates vazio, ou score < minThreshold.
-    static func recognize(rawPoints: [StrokePoint],
+    static func recognize(rawPoints: [ODPoint],
                           templates: [OneDollarTemplate],
                           minThreshold: Double = 0.78) throws -> (template: OneDollarTemplate, score: Double) {
         guard !templates.isEmpty else { throw OneDollarError.noTemplates }
@@ -251,11 +251,11 @@ enum OneDollarBuiltinTemplates {
 
     /// Círculo: 64 pontos em torno de uma circunferência unitária
     static let circle: OneDollarTemplate = {
-        var pts: [StrokePoint] = []
+        var pts: [ODPoint] = []
         let r = 100.0
         for i in 0..<64 {
             let theta = (Double(i) / 64.0) * 2.0 * .pi
-            pts.append(StrokePoint(x: r * cos(theta), y: r * sin(theta)))
+            pts.append(ODPoint(x: r * cos(theta), y: r * sin(theta)))
         }
         return OneDollarTemplate(name: "circle", rawPoints: pts)
     }()
@@ -263,7 +263,7 @@ enum OneDollarBuiltinTemplates {
     /// Linha horizontal: 64 pontos uniformes left → right
     static let lineHorizontal: OneDollarTemplate = {
         let pts = (0..<64).map { i in
-            StrokePoint(x: Double(i) * 5.0, y: 0)
+            ODPoint(x: Double(i) * 5.0, y: 0)
         }
         return OneDollarTemplate(name: "line-h", rawPoints: pts)
     }()
@@ -271,7 +271,7 @@ enum OneDollarBuiltinTemplates {
     /// Linha vertical: top → bottom
     static let lineVertical: OneDollarTemplate = {
         let pts = (0..<64).map { i in
-            StrokePoint(x: 0, y: Double(i) * 5.0)
+            ODPoint(x: 0, y: Double(i) * 5.0)
         }
         return OneDollarTemplate(name: "line-v", rawPoints: pts)
     }()
@@ -279,7 +279,7 @@ enum OneDollarBuiltinTemplates {
     /// Linha diagonal /
     static let lineDiagonal1: OneDollarTemplate = {
         let pts = (0..<64).map { i in
-            StrokePoint(x: Double(i) * 5.0, y: Double(i) * 5.0)
+            ODPoint(x: Double(i) * 5.0, y: Double(i) * 5.0)
         }
         return OneDollarTemplate(name: "line-d1", rawPoints: pts)
     }()
@@ -287,54 +287,54 @@ enum OneDollarBuiltinTemplates {
     /// Linha diagonal \
     static let lineDiagonal2: OneDollarTemplate = {
         let pts = (0..<64).map { i in
-            StrokePoint(x: Double(i) * 5.0, y: Double(63 - i) * 5.0)
+            ODPoint(x: Double(i) * 5.0, y: Double(63 - i) * 5.0)
         }
         return OneDollarTemplate(name: "line-d2", rawPoints: pts)
     }()
 
     /// Retângulo: 64 pontos no perímetro de um quadrado
     static let rectangle: OneDollarTemplate = {
-        var pts: [StrokePoint] = []
+        var pts: [ODPoint] = []
         let side = 100.0
         let perSide = 16
         // Top
         for i in 0..<perSide {
-            pts.append(StrokePoint(x: Double(i) * side / Double(perSide), y: 0))
+            pts.append(ODPoint(x: Double(i) * side / Double(perSide), y: 0))
         }
         // Right
         for i in 0..<perSide {
-            pts.append(StrokePoint(x: side, y: Double(i) * side / Double(perSide)))
+            pts.append(ODPoint(x: side, y: Double(i) * side / Double(perSide)))
         }
         // Bottom
         for i in 0..<perSide {
-            pts.append(StrokePoint(x: side - Double(i) * side / Double(perSide), y: side))
+            pts.append(ODPoint(x: side - Double(i) * side / Double(perSide), y: side))
         }
         // Left
         for i in 0..<perSide {
-            pts.append(StrokePoint(x: 0, y: side - Double(i) * side / Double(perSide)))
+            pts.append(ODPoint(x: 0, y: side - Double(i) * side / Double(perSide)))
         }
         return OneDollarTemplate(name: "rectangle", rawPoints: pts)
     }()
 
     /// Triângulo: 64 pontos no perímetro de triângulo equilátero
     static let triangle: OneDollarTemplate = {
-        var pts: [StrokePoint] = []
+        var pts: [ODPoint] = []
         let r = 100.0
         let perSide = 22
-        let a = StrokePoint(x: 0, y: -r)
-        let b = StrokePoint(x: r * cos(.pi / 6), y: r * sin(.pi / 6))
-        let c = StrokePoint(x: -r * cos(.pi / 6), y: r * sin(.pi / 6))
+        let a = ODPoint(x: 0, y: -r)
+        let b = ODPoint(x: r * cos(.pi / 6), y: r * sin(.pi / 6))
+        let c = ODPoint(x: -r * cos(.pi / 6), y: r * sin(.pi / 6))
         for i in 0..<perSide {
             let t = Double(i) / Double(perSide)
-            pts.append(StrokePoint(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t))
+            pts.append(ODPoint(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t))
         }
         for i in 0..<perSide {
             let t = Double(i) / Double(perSide)
-            pts.append(StrokePoint(x: b.x + (c.x - b.x) * t, y: b.y + (c.y - b.y) * t))
+            pts.append(ODPoint(x: b.x + (c.x - b.x) * t, y: b.y + (c.y - b.y) * t))
         }
         for i in 0..<(64 - 2 * perSide) {
             let t = Double(i) / Double(64 - 2 * perSide)
-            pts.append(StrokePoint(x: c.x + (a.x - c.x) * t, y: c.y + (a.y - c.y) * t))
+            pts.append(ODPoint(x: c.x + (a.x - c.x) * t, y: c.y + (a.y - c.y) * t))
         }
         return OneDollarTemplate(name: "triangle", rawPoints: pts)
     }()

@@ -1,0 +1,175 @@
+import Foundation
+import PencilKit
+import MLKit
+import OSLog
+
+// MARK: - MLKitDigitalInkBridge
+//
+// Wrapper async/await ao redor do Google ML Kit Digital Ink Recognition.
+// Substitui Apple VNRecognizeTextRequest (que era pra texto IMPRESSO em
+// imagens, não handwriting digital cru).
+//
+// Modelos disponíveis (each ~5MB, on-device, lazy-downloaded):
+//   - "pt-BR" → handwriting → texto digitado em português brasileiro
+//   - "en-US" → handwriting inglês (fallback)
+//   - "zxx-Zsym-x-shapes" → desenhos → shape identificado (circle, square,
+//     triangle, arrow, etc) — alternativa/complemento ao $1 Recognizer
+//
+// Refs:
+//   - https://developers.google.com/ml-kit/vision/digital-ink-recognition/ios
+//   - https://developers.google.com/ml-kit/vision/digital-ink-recognition/base-models
+//
+// Rafael 2026-04-29: substitui Vision framework (que comia o texto sem
+// converter) pra parar o sangramento. PT-BR é o foco — Rafael estuda em
+// português.
+
+enum MLKitDigitalInkBridge {
+
+    private static let logger = Logger(subsystem: "com.bymav.vitaai", category: "mlkit-digital-ink")
+
+    /// Modelos disponíveis. Cada um precisa download (lazy) de ~5MB on first use.
+    enum Model: String {
+        case textPtBR = "pt-BR"
+        case textEnUS = "en-US"
+        case shapes = "zxx-Zsym-x-shapes"
+    }
+
+    /// Reconhece handwriting. Retorna o texto candidato top + score 0..1, ou
+    /// nil se falhou / score baixo.
+    ///
+    /// strokes: array de PKStroke do PencilKit. Cada PKStrokePoint vira
+    /// MLKit StrokePoint (x, y, timestamp ms).
+    static func recognize(
+        strokes: [PKStroke],
+        model: Model,
+        minScore: Float = 0.5
+    ) async -> RecognitionResult? {
+
+        guard !strokes.isEmpty else { return nil }
+
+        // 1. Garantir que o model está baixado
+        guard let identifier = DigitalInkRecognitionModelIdentifier(forLanguageTag: model.rawValue) else {
+            logger.error("[mlkit] model identifier inválido pra \(model.rawValue, privacy: .public)")
+            return nil
+        }
+        let inkModel = DigitalInkRecognitionModel(modelIdentifier: identifier)
+        let manager = ModelManager.modelManager()
+
+        if !manager.isModelDownloaded(inkModel) {
+            logger.notice("[mlkit] baixando model \(model.rawValue, privacy: .public) (~5MB)")
+            let conditions = ModelDownloadConditions(allowsCellularAccess: true,
+                                                     allowsBackgroundDownloading: true)
+            // Download bloqueia até completar via Notification
+            do {
+                try await waitForDownload(model: inkModel, conditions: conditions, manager: manager)
+            } catch {
+                logger.error("[mlkit] download falhou: \(error.localizedDescription, privacy: .public)")
+                return nil
+            }
+        }
+
+        // 2. Construir Ink a partir dos PKStrokes
+        let mlStrokes = strokes.compactMap { pkStroke -> Stroke? in
+            var points: [StrokePoint] = []
+            let path = pkStroke.path
+            for idx in path.indices {
+                let p = path[idx]
+                points.append(StrokePoint(
+                    x: Float(p.location.x),
+                    y: Float(p.location.y),
+                    t: Int(p.timeOffset * 1000) // segundos → ms
+                ))
+            }
+            guard !points.isEmpty else { return nil }
+            return Stroke(points: points)
+        }
+        guard !mlStrokes.isEmpty else { return nil }
+
+        let ink = Ink(strokes: mlStrokes)
+
+        // 3. Recognizer
+        let options = DigitalInkRecognizerOptions(model: inkModel)
+        let recognizer = DigitalInkRecognizer.digitalInkRecognizer(options: options)
+
+        return await withCheckedContinuation { continuation in
+            recognizer.recognize(ink: ink) { result, error in
+                if let error {
+                    Self.logger.error("[mlkit] recognize erro: \(error.localizedDescription, privacy: .public)")
+                    continuation.resume(returning: nil)
+                    return
+                }
+                guard let result, !result.candidates.isEmpty else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                let top = result.candidates[0]
+                // ML Kit Digital Ink retorna score como NSNumber? — inverso de
+                // distance (lower = better). Convertemos pra similaridade 0..1.
+                let scoreFloat: Float = top.score?.floatValue ?? 0.0
+                Self.logger.notice("[mlkit] top='\(top.text, privacy: .public)' score=\(scoreFloat) candidates=\(result.candidates.count)")
+                continuation.resume(returning: RecognitionResult(text: top.text, score: scoreFloat))
+            }
+        }
+    }
+
+    /// Resultado do reconhecimento.
+    struct RecognitionResult {
+        let text: String
+        let score: Float
+    }
+
+    // MARK: - Helpers
+
+    private static func waitForDownload(
+        model: DigitalInkRecognitionModel,
+        conditions: ModelDownloadConditions,
+        manager: ModelManager
+    ) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            var resumed = false
+            let lock = NSLock()
+            let resume: (Result<Void, Error>) -> Void = { result in
+                lock.lock(); defer { lock.unlock() }
+                guard !resumed else { return }
+                resumed = true
+                switch result {
+                case .success: continuation.resume(returning: ())
+                case .failure(let e): continuation.resume(throwing: e)
+                }
+            }
+
+            // Observers
+            let didFinish = NotificationCenter.default.addObserver(
+                forName: .mlkitModelDownloadDidSucceed,
+                object: nil,
+                queue: nil
+            ) { note in
+                if let m = note.userInfo?[ModelDownloadUserInfoKey.remoteModel.rawValue] as? DigitalInkRecognitionModel,
+                   m.modelIdentifier.languageTag == model.modelIdentifier.languageTag {
+                    resume(.success(()))
+                }
+            }
+            let didFail = NotificationCenter.default.addObserver(
+                forName: .mlkitModelDownloadDidFail,
+                object: nil,
+                queue: nil
+            ) { note in
+                if let m = note.userInfo?[ModelDownloadUserInfoKey.remoteModel.rawValue] as? DigitalInkRecognitionModel,
+                   m.modelIdentifier.languageTag == model.modelIdentifier.languageTag {
+                    let err = (note.userInfo?[ModelDownloadUserInfoKey.error.rawValue] as? Error)
+                        ?? NSError(domain: "MLKit", code: -1, userInfo: nil)
+                    resume(.failure(err))
+                }
+            }
+
+            manager.download(model, conditions: conditions)
+
+            // Cleanup notifications após resumo (best effort)
+            Task {
+                try? await Task.sleep(for: .seconds(120))
+                NotificationCenter.default.removeObserver(didFinish)
+                NotificationCenter.default.removeObserver(didFail)
+            }
+        }
+    }
+}

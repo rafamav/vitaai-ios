@@ -26,7 +26,7 @@ struct PdfSettingsSheet: View {
     // Shape snap reactivated 2026-04-28 — default OFF (segurança até confirmar
     // em uso real que guards anti-letra estão calibrados). Usuário liga aqui.
     @AppStorage("pdf.shapeSnap.enabled")        private var shapeSnapEnabled: Bool = true
-    @AppStorage("pdf.handwriting.autoConvert")  private var autoConvertHandwriting: Bool = false
+    @AppStorage("pdf.handwriting.autoConvert")  private var autoConvertHandwriting: Bool = true
 
     @State private var showResetConfirm: Bool = false
 
@@ -69,7 +69,7 @@ struct PdfSettingsSheet: View {
 
                         toggleRow(
                             title: "Auto-converter escrita em texto",
-                            subtitle: "EXPERIMENTAL — Apple Vision não foi feito pra handwriting cru. Pode apagar texto sem reconhecer. Migração pra Google ML Kit Digital Ink na próxima versão",
+                            subtitle: "Quando você para de escrever, vira digitado sozinho. Google ML Kit Digital Ink (PT-BR, on-device)",
                             isOn: $autoConvertHandwriting
                         )
                     }

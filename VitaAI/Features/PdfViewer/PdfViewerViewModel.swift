@@ -562,47 +562,20 @@ final class PdfViewerViewModel {
         let bounds = deltaDrawing.bounds
         guard bounds.width > 4, bounds.height > 4 else { return false }
 
-        let renderer = UIGraphicsImageRenderer(bounds: bounds)
-        let image = renderer.image { ctx in
-            UIColor.white.setFill()
-            ctx.fill(bounds)
-            deltaDrawing.image(from: bounds, scale: 2.0).draw(in: bounds)
-        }
-        guard let cgImage = image.cgImage else { return false }
+        // 2026-04-29: trocou Apple VNRecognizeTextRequest (que era pra texto
+        // IMPRESSO em imagens, falhava com handwriting cru) por Google ML Kit
+        // Digital Ink Recognition (modelo `pt-BR` específico pra handwriting
+        // digital). Recebe os strokes diretamente — sem render pra imagem.
+        // Modelo on-device, ~5MB, free.
+        let result = await MLKitDigitalInkBridge.recognize(
+            strokes: newStrokes,
+            model: .textPtBR,
+            minScore: 0.5
+        )
+        guard let result, !result.text.isEmpty else { return false }
 
-        let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
-        request.recognitionLanguages = ["pt-BR", "en-US"]
-        request.usesLanguageCorrection = true
-        let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-
-        do {
-            try await Task.detached(priority: .userInitiated) {
-                try handler.perform([request])
-            }.value
-        } catch {
-            return false
-        }
-
-        let observations = request.results ?? []
-        // Coleta texto + média de confidence dos topCandidates.
-        var pieces: [String] = []
-        var confidences: [Float] = []
-        for obs in observations {
-            guard let top = obs.topCandidates(1).first else { continue }
-            pieces.append(top.string)
-            confidences.append(top.confidence)
-        }
-        let text = pieces.joined(separator: "\n")
-        let avgConfidence: Float = confidences.isEmpty
-            ? 0
-            : confidences.reduce(0, +) / Float(confidences.count)
-
-        // Thresholds conservadores. Escrita real geralmente fica >= 0.55 confidence.
-        // Rabisco/seta vai pra 0.2-0.4 e cai fora.
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2,
-              avgConfidence >= 0.5,
               trimmed.rangeOfCharacter(from: .letters) != nil else {
             return false
         }

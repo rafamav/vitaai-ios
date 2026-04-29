@@ -14,7 +14,7 @@ cd "$PROJECT_DIR"
 
 echo "🔨 Build $SIM_NAME"
 xcodebuild \
-    -project VitaAI.xcodeproj \
+    -workspace VitaAI.xcworkspace \
     -scheme VitaAI \
     -sdk iphonesimulator \
     -destination "platform=iOS Simulator,name=$SIM_NAME" \
