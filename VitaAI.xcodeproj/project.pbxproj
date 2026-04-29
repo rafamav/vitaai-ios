@@ -42,6 +42,7 @@
 		10D829548AC55E50CF4CF67A /* QBankDisciplineContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 409712121A5E2B5A4828C9B8 /* QBankDisciplineContent.swift */; };
 		110BF66A333485731D9A0322 /* CardDistributionDonutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FE1AAFA569EF09FEF974B98 /* CardDistributionDonutView.swift */; };
 		114FD2F8BF1B210A49DFBCA5 /* QBankPreviewRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = C35BCFF650678806A87397A0 /* QBankPreviewRequest.swift */; };
+		118945A82963F9290CFB98D1 /* EstudosBuilderComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6F3353FAFB83C3E4361EDAF /* EstudosBuilderComponents.swift */; };
 		121FE0E771F45319232ABC3D /* Date+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9212320A780555CC61D5103A /* Date+Helpers.swift */; };
 		1503B7BB5D7623276C09EED9 /* DocumentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A39A50DBBBBFF4725FAB863 /* DocumentModels.swift */; };
 		150EAC70F68E9DC56354A5ED /* BillingModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F3C9143F545BC2D2CD800CD /* BillingModels.swift */; };
@@ -762,6 +763,7 @@
 		C5526CA65D05956D67A4DB27 /* GamificationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GamificationModels.swift; sourceTree = "<group>"; };
 		C56CFB53F2B1028C931B5BBD /* MannesoftCookieStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MannesoftCookieStore.swift; sourceTree = "<group>"; };
 		C64F17D9E572284984FE6451 /* StrokeFileStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrokeFileStorage.swift; sourceTree = "<group>"; };
+		C6F3353FAFB83C3E4361EDAF /* EstudosBuilderComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EstudosBuilderComponents.swift; sourceTree = "<group>"; };
 		C84201C4AE38526C62B3DFD1 /* VitaMarkdown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitaMarkdown.swift; sourceTree = "<group>"; };
 		C8E084DA771ADE8DA5F560EE /* PdfBookmarksList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PdfBookmarksList.swift; sourceTree = "<group>"; };
 		C8F1A644E77BE71390EA086F /* PageEntity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageEntity.swift; sourceTree = "<group>"; };
@@ -1482,6 +1484,7 @@
 		938BAB8E7EF84A15B46FA925 /* Shared */ = {
 			isa = PBXGroup;
 			children = (
+				C6F3353FAFB83C3E4361EDAF /* EstudosBuilderComponents.swift */,
 				3EB85AABF35CB29900F8AADE /* StudyHeroStat.swift */,
 				3FF4ED41ED7BB65304F7B645 /* StudyOverviewStore.swift */,
 				E8B8F6A0A39DA9F089559142 /* StudyShellTheme.swift */,
@@ -2019,6 +2022,7 @@
 				263D6A8C87172EAA6BF4E4CC /* EndFocusSessionRequest.swift in Sources */,
 				4255415FE1599E6F46FA7480 /* EndFocusSessionRequestLeaksInner.swift in Sources */,
 				9B6644B6E7204A8FC569D705 /* EnvironmentKeys.swift in Sources */,
+				118945A82963F9290CFB98D1 /* EstudosBuilderComponents.swift in Sources */,
 				8107A559A4656C6B2522AA13 /* EstudosScreen.swift in Sources */,
 				0B365CDE13A4800E325112F4 /* EstudosViewModel.swift in Sources */,
 				4CD50558070536A9288C915A /* ExamUploadSheet.swift in Sources */,
