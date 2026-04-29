@@ -258,6 +258,8 @@
 		890FC31EC88EA15B242B0125 /* MonthlyCalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA88B383AB1A6C7CDD0DAD1F /* MonthlyCalendarView.swift */; };
 		89DE9C4E45C859556AB97749 /* DashboardAgendaItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = B75D2869DE32815B6A7A2E1B /* DashboardAgendaItem.swift */; };
 		89E5E213E3113C09A90A1775 /* VitaAI.storekit in Resources */ = {isa = PBXBuildFile; fileRef = BBA019CD302ADAC93CAC7F13 /* VitaAI.storekit */; };
+		8A1891EC28B37CEE131BA219 /* HorizontalDrillDown.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2CDE2B7285E067C81B33D5DF /* HorizontalDrillDown.swift */; };
+		8A1DC8F306C03A7324680161 /* PreviewDTOs.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBF4166A04EA469EA65D7241 /* PreviewDTOs.swift */; };
 		8A7B2012A76D8CA644F8978C /* QBankFiltersYearsInner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F09CA48EFF573A24B873087 /* QBankFiltersYearsInner.swift */; };
 		8B35A877FC3261B3C393E133 /* PdfPenStylesPopover.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44C06662646A204B5E67E9A5 /* PdfPenStylesPopover.swift */; };
 		8B828145F3EF0A186E6D522D /* TextToSpeechManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7ECE46CA939DEDECC0CA2196 /* TextToSpeechManager.swift */; };
@@ -506,6 +508,7 @@
 		2A4D770EA37E73C3601ACCFC /* ActivityModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityModels.swift; sourceTree = "<group>"; };
 		2B883C713EB6970D28AB99E1 /* OsceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OsceViewModel.swift; sourceTree = "<group>"; };
 		2C35522165E42799F3C2E84E /* VitaAPI+MaterialFolders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "VitaAPI+MaterialFolders.swift"; sourceTree = "<group>"; };
+		2CDE2B7285E067C81B33D5DF /* HorizontalDrillDown.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HorizontalDrillDown.swift; sourceTree = "<group>"; };
 		2CED8D8DC4852F3107E3E7B6 /* PdfDocumentPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PdfDocumentPicker.swift; sourceTree = "<group>"; };
 		2DB1D136E9C8BF95B31996F5 /* MindMapCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MindMapCanvasView.swift; sourceTree = "<group>"; };
 		2E56A26BE9510D582EC34800 /* SimuladoSessionScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimuladoSessionScreen.swift; sourceTree = "<group>"; };
@@ -856,6 +859,7 @@
 		F9908A582A7C0FF45AB9F61F /* JourneyType+Helpers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "JourneyType+Helpers.swift"; sourceTree = "<group>"; };
 		F9C164E4D40E5AABFA8BF1FD /* EndFocusSession200Response.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EndFocusSession200Response.swift; sourceTree = "<group>"; };
 		FB3CAA9D7ADA613A3FDC5EBD /* VitaColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitaColors.swift; sourceTree = "<group>"; };
+		FBF4166A04EA469EA65D7241 /* PreviewDTOs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewDTOs.swift; sourceTree = "<group>"; };
 		FCC1F628327D06BFCC498CFC /* InsightsChartModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsChartModels.swift; sourceTree = "<group>"; };
 		FF7EA3D2C60F323F39E9AD1E /* PdfExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PdfExporter.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -1096,6 +1100,7 @@
 			children = (
 				6E96A2F8EC619718B744BFD6 /* APIError.swift */,
 				3B18EC14C18BD1A28685ADF2 /* HTTPClient.swift */,
+				FBF4166A04EA469EA65D7241 /* PreviewDTOs.swift */,
 				389BFCF2463F09D0B4DBBD16 /* TokenRefresher.swift */,
 				750AA0D588E930C62DAA317F /* TranscricaoClient.swift */,
 				4C4DE24CBF4DF36D7893CE6A /* VitaAPI.swift */,
@@ -1506,6 +1511,7 @@
 			isa = PBXGroup;
 			children = (
 				C6F3353FAFB83C3E4361EDAF /* EstudosBuilderComponents.swift */,
+				2CDE2B7285E067C81B33D5DF /* HorizontalDrillDown.swift */,
 				3EB85AABF35CB29900F8AADE /* StudyHeroStat.swift */,
 				3FF4ED41ED7BB65304F7B645 /* StudyOverviewStore.swift */,
 				E8B8F6A0A39DA9F089559142 /* StudyShellTheme.swift */,
@@ -2088,6 +2094,7 @@
 				6BBC9742F225B4325F737616 /* HapticManager.swift in Sources */,
 				780B7A87E82A87349B6422DA /* HealthKitManager.swift in Sources */,
 				305CEED5D49052D0DCC78E5F /* HeatmapCalendarView.swift in Sources */,
+				8A1891EC28B37CEE131BA219 /* HorizontalDrillDown.swift in Sources */,
 				2E2C5A22A7D243994EBF9E02 /* ImmersivePreferenceKey.swift in Sources */,
 				7EF3ABE6544C36265A832C52 /* InlinePortalLoginSheet.swift in Sources */,
 				4F3666A0AD5A4A7BA7C5C86B /* InsightsChartModels.swift in Sources */,
@@ -2184,6 +2191,7 @@
 				7AC5BFDEB11AE245D988F564 /* PortalFilterFiles200Response.swift in Sources */,
 				E67209EEF1E9AE724E3BF80E /* PortalIcon.swift in Sources */,
 				9785A23EB0B29087BD76ADCF /* PostHogConfig.swift in Sources */,
+				8A1DC8F306C03A7324680161 /* PreviewDTOs.swift in Sources */,
 				4910B03C5AEDF46BA2199B5F /* PrivacyDocumentsScreen.swift in Sources */,
 				21F24A997B54241764402DD2 /* PrivacyPreferences.swift in Sources */,
 				98911F8CBA08E9A2F2572AEE /* PrivacySettingsScreen.swift in Sources */,
