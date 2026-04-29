@@ -26,7 +26,7 @@ struct PdfSettingsSheet: View {
     // Shape snap reactivated 2026-04-28 — default OFF (segurança até confirmar
     // em uso real que guards anti-letra estão calibrados). Usuário liga aqui.
     @AppStorage("pdf.shapeSnap.enabled")        private var shapeSnapEnabled: Bool = true
-    @AppStorage("pdf.handwriting.autoConvert")  private var autoConvertHandwriting: Bool = true
+    @AppStorage("pdf.handwriting.autoConvert")  private var autoConvertHandwriting: Bool = false
 
     @State private var showResetConfirm: Bool = false
 
@@ -63,13 +63,13 @@ struct PdfSettingsSheet: View {
 
                         toggleRow(
                             title: "Snap de formas",
-                            subtitle: "Linha torta vira reta, círculo torto vira perfeito",
+                            subtitle: "Linha torta vira reta, círculo vira perfeito, retângulo idem. Algoritmo $1 Recognizer (Wobbrock 2007) — battle-tested",
                             isOn: $shapeSnapEnabled
                         )
 
                         toggleRow(
                             title: "Auto-converter escrita em texto",
-                            subtitle: "Quando você para de escrever, vira digitado sozinho",
+                            subtitle: "EXPERIMENTAL — Apple Vision não foi feito pra handwriting cru. Pode apagar texto sem reconhecer. Migração pra Google ML Kit Digital Ink na próxima versão",
                             isOn: $autoConvertHandwriting
                         )
                     }

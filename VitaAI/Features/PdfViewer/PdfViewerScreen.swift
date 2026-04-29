@@ -1773,6 +1773,8 @@ private final class Coordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDe
             outcomeProps = ["kind": "line", "confidence": Double(conf), "applied": false]
         case .appliedCircle(let conf):
             outcomeProps = ["kind": "circle", "confidence": Double(conf), "applied": false]
+        case .appliedRectangle(let conf):
+            outcomeProps = ["kind": "rectangle", "confidence": Double(conf), "applied": false]
         case .rejectedTooShort:
             outcomeProps = ["kind": "none", "reason": "tooShort", "applied": false]
         case .rejectedTooSmall:
@@ -1793,6 +1795,9 @@ private final class Coordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDe
         case (.circle, .appliedCircle(let conf)) where conf >= minConfidence:
             applySnapResult(result, lastStroke: lastStroke, canvasView: canvasView)
             appliedKind = "circle"
+        case (.rectangle, .appliedRectangle(let conf)) where conf >= minConfidence:
+            applySnapResult(result, lastStroke: lastStroke, canvasView: canvasView)
+            appliedKind = "rectangle"
         default:
             appliedKind = nil
         }
