@@ -357,6 +357,28 @@ final class QBankViewModel {
         loadHomeData()
     }
 
+    /// Adopta uma session já criada (pelo QBankBuilderViewModel) e navega
+    /// pra tela de session ativa. Usado pelo coordinator pós-onSessionCreated.
+    func openSession(sessionId: String) async {
+        do {
+            let session = try await api.getQBankSessionDetail(id: sessionId)
+            state.session = session
+            state.currentQuestionIndex = session.currentIndex
+            state.sessionAnswers = [:]
+            state.sessionDetails = [:]
+            state.selectedAlternativeId = nil
+            state.answerResult = nil
+            state.showFeedback = false
+            state.questionStartDate = Date()
+            state.elapsedSeconds = 0
+            state.activeScreen = .session
+            sessionStartDate = Date()
+            await loadCurrentQuestion()
+        } catch {
+            state.error = "Erro ao abrir sessão: \(error.localizedDescription)"
+        }
+    }
+
     /// Sincroniza `state.selectedLens` com o que vier do profile carregado.
     /// Chamada no onAppear e quando profile atualiza. Override local persiste
     /// até o usuário voltar pra Home — não toca backend (Onda 4).

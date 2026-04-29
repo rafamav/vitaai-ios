@@ -45,8 +45,16 @@ struct QBankCoordinatorScreen: View {
     @ViewBuilder
     private func coordinator(vm: QBankViewModel) -> some View {
         switch vm.state.activeScreen {
-        case .home:
-            QBankHomeContent(vm: vm, onBack: onBack)
+        case .home, .config:
+            // Builder unificado (Fase 3 reescrita 2026-04-28). Substitui
+            // QBankHomeContent + QBankConfigContent. Hero + Lente + Filtros
+            // inline + Recents + CTA sticky.
+            QBankBuilderScreen(
+                onBack: onBack,
+                onSessionCreated: { sessionId in
+                    Task { await vm.openSession(sessionId: sessionId) }
+                }
+            )
 
         case .topics:
             QBankTopicsContent(vm: vm, onBack: {
@@ -56,11 +64,6 @@ struct QBankCoordinatorScreen: View {
         case .disciplines:
             QBankDisciplineContent(vm: vm, onBack: {
                 vm.goBackDiscipline()
-            })
-
-        case .config:
-            QBankConfigContent(vm: vm, onBack: {
-                vm.state.activeScreen = .disciplines
             })
 
         case .session:

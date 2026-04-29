@@ -3,6 +3,8 @@ import Foundation
 // MARK: - Filters
 
 struct QBankFiltersResponse: Decodable {
+    var lens: String? = nil
+    var groups: [QBankGroup] = []
     var institutions: [QBankInstitution] = []
     var topics: [QBankTopic] = []
     var years: [Int] = []
@@ -14,6 +16,8 @@ struct QBankFiltersResponse: Decodable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        lens = try? c.decode(String.self, forKey: .lens)
+        groups = (try? c.decode([QBankGroup].self, forKey: .groups)) ?? []
         institutions = (try? c.decode([QBankInstitution].self, forKey: .institutions)) ?? []
         topics = (try? c.decode([QBankTopic].self, forKey: .topics)) ?? []
         years = (try? c.decode([Int].self, forKey: .years)) ?? []
@@ -23,7 +27,72 @@ struct QBankFiltersResponse: Decodable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case institutions, topics, years, difficulties, totalQuestions, disciplines
+        case lens, groups, institutions, topics, years, difficulties, totalQuestions, disciplines
+    }
+}
+
+/// Grupo de Q conforme lente (Tradicional/PBL/CNRM-Areas). Schema novo
+/// adicionado em 2026-04-28 — `slug` + `name` + `count` é o mínimo. Icon
+/// e displayOrder são opcionais e preservam ordenação canônica do backend.
+struct QBankGroup: Identifiable, Hashable, Decodable {
+    var slug: String
+    var name: String
+    var count: Int
+    var icon: String?
+    var displayOrder: Int?
+
+    var id: String { slug }
+
+    private enum CodingKeys: String, CodingKey {
+        case slug, name, count, icon, displayOrder
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        slug = (try? c.decode(String.self, forKey: .slug)) ?? ""
+        name = (try? c.decode(String.self, forKey: .name)) ?? ""
+        count = (try? c.decode(Int.self, forKey: .count)) ?? 0
+        icon = try? c.decode(String.self, forKey: .icon)
+        displayOrder = try? c.decode(Int.self, forKey: .displayOrder)
+    }
+}
+
+// MARK: - QBank Preview (count dinâmico)
+
+struct QBankPreviewBody: Encodable {
+    var lens: String?
+    var groupSlugs: [String]?
+    var institutionIds: [Int]?
+    var topicIds: [Int]?
+    var years: QBankPreviewYears?
+    var difficulties: [String]?
+    var format: [String]?
+    var hideAnswered: Bool?
+    var hideAnnulled: Bool?
+    var hideReviewed: Bool?
+    var excludeNoExplanation: Bool?
+    var includeSynthetic: Bool?
+}
+
+struct QBankPreviewYears: Encodable {
+    var min: Int?
+    var max: Int?
+}
+
+struct QBankPreviewResp: Decodable {
+    var total: Int = 0
+    var byDifficulty: [String: Int] = [:]
+    var appliedJourneyBoost: String? = nil
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        total = (try? c.decode(Int.self, forKey: .total)) ?? 0
+        byDifficulty = (try? c.decode([String: Int].self, forKey: .byDifficulty)) ?? [:]
+        appliedJourneyBoost = try? c.decode(String.self, forKey: .appliedJourneyBoost)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case total, byDifficulty, appliedJourneyBoost
     }
 }
 

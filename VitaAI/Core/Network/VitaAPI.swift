@@ -514,8 +514,21 @@ actor VitaAPI {
         return try await client.get("qbank/progress", queryItems: items)
     }
 
-    func getQBankFilters() async throws -> QBankFiltersResponse {
-        try await client.get("qbank/filters")
+    func getQBankFilters(lens: String? = nil) async throws -> QBankFiltersResponse {
+        var items: [URLQueryItem] = []
+        if let lens, !lens.isEmpty {
+            items.append(URLQueryItem(name: "lens", value: lens))
+        }
+        if items.isEmpty {
+            return try await client.get("qbank/filters")
+        }
+        return try await client.get("qbank/filters", queryItems: items)
+    }
+
+    /// POST /api/qbank/preview — count dinâmico ANTES de criar sessão.
+    /// Usado pelo builder das telas Estudos com debounce 300ms client-side.
+    func previewQBankPool(body: QBankPreviewBody) async throws -> QBankPreviewResp {
+        try await client.post("qbank/preview", body: body)
     }
 
     func createQBankSession(request: QBankCreateSessionRequest) async throws -> QBankSession {
