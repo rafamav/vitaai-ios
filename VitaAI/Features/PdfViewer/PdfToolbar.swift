@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - PdfToolbar — Goodnotes-inspired 2-row top bar in VitaAI palette
+// MARK: - PdfToolbar — 2-row top bar in VitaAI palette
 //
 // Row 1 (navigation + title):
 //   [home]  Title...                              [page counter]
@@ -12,10 +12,12 @@ import SwiftUI
 // gold border. Divider between tool group and shell group.
 // Each button long-press → tooltip via SwiftUI .help() modifier.
 //
-// AI is NOT inside this toolbar — Vita mascot is a separate FAB (parity with
-// Flexcil and Goodnotes that keep AI outside the pen toolbar).
+// AI is NOT inside this toolbar — Vita mascot is a separate FAB.
 
 struct PdfToolbar: View {
+    @AppStorage("pdf.settings.twoPageSpread") private var twoPageSpread: Bool = false
+    @AppStorage("pdf.settings.pageByPage")    private var pageByPage: Bool = false
+
     let fileName: String
     let currentPage: Int
     let pageCount: Int
@@ -295,6 +297,19 @@ struct PdfToolbar: View {
                 if let onShowOutline {
                     Button(action: onShowOutline) {
                         Label("Sumário (TOC)", systemImage: "list.bullet.indent")
+                    }
+                }
+                // Atalho rápido: alterna página dupla (landscape iPad).
+                // Rafael 2026-04-28: feature legal escondida em Ajustes — promovida pra menu.
+                if UIDevice.current.userInterfaceIdiom == .pad {
+                    Button {
+                        twoPageSpread.toggle()
+                        PdfSettingsLive.apply(pageByPage: pageByPage, twoPageSpread: twoPageSpread)
+                    } label: {
+                        Label(
+                            twoPageSpread ? "Página única" : "Página dupla (paisagem)",
+                            systemImage: twoPageSpread ? "doc" : "rectangle.split.2x1"
+                        )
                     }
                 }
                 if let onShowSettings {

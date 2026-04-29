@@ -1768,7 +1768,7 @@ private final class Coordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDe
         }
 
         // Confidence gate: só substitui se algoritmo está MUITO seguro.
-        let minConfidence: CGFloat = 0.85
+        let minConfidence: CGFloat = 0.65
         let appliedKind: String?
         switch (result, outcome) {
         case (.line, .appliedLine(let conf)) where conf >= minConfidence:

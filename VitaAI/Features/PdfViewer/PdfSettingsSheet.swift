@@ -22,12 +22,10 @@ struct PdfSettingsSheet: View {
     @AppStorage("pdf.settings.autoSave")        private var autoSave: Bool = true
     @AppStorage("pdf.settings.pageByPage")      private var pageByPage: Bool = false
     @AppStorage("pdf.settings.twoPageSpread")   private var twoPageSpread: Bool = false
-    @AppStorage("pdf.settings.darkMode")        private var darkMode: Bool = false
-    @AppStorage("pdf.settings.brightness")      private var brightness: Double = 1.0
     @AppStorage("pdf.settings.freeTextSize")    private var freeTextSize: Double = 16.0
     // Shape snap reactivated 2026-04-28 — default OFF (segurança até confirmar
     // em uso real que guards anti-letra estão calibrados). Usuário liga aqui.
-    @AppStorage("pdf.shapeSnap.enabled")        private var shapeSnapEnabled: Bool = false
+    @AppStorage("pdf.shapeSnap.enabled")        private var shapeSnapEnabled: Bool = true
     @AppStorage("pdf.handwriting.autoConvert")  private var autoConvertHandwriting: Bool = false
 
     @State private var showResetConfirm: Bool = false
@@ -65,34 +63,18 @@ struct PdfSettingsSheet: View {
 
                         toggleRow(
                             title: "Snap de formas",
-                            subtitle: "Linha torta vira reta, círculo torto vira perfeito (estilo Goodnotes)",
+                            subtitle: "Linha torta vira reta, círculo torto vira perfeito",
                             isOn: $shapeSnapEnabled
                         )
 
                         toggleRow(
                             title: "Auto-converter escrita em texto",
-                            subtitle: "Quando você para de escrever, vira digitado sozinho (estilo Apple Notes)",
+                            subtitle: "BETA — pode apagar texto se reconhecimento falhar. Quando você para de escrever, vira digitado sozinho",
                             isOn: $autoConvertHandwriting
                         )
                     }
 
-                    section("Aparência") {
-                        toggleRow(
-                            title: "Modo noturno do PDF",
-                            subtitle: "Inverte cores (útil pra leitura à noite)",
-                            isOn: $darkMode
-                        )
-                        .onChange(of: darkMode) { _, _ in applyLive() }
-
-                        sliderRow(
-                            title: "Brilho",
-                            value: $brightness,
-                            range: 0.5...1.5,
-                            step: 0.05,
-                            valueText: String(format: "%.0f%%", brightness * 100)
-                        )
-                        .onChange(of: brightness) { _, _ in applyLive() }
-
+                    section("Texto") {
                         sliderRow(
                             title: "Tamanho default da fonte (caixa de texto)",
                             value: $freeTextSize,
@@ -217,9 +199,7 @@ struct PdfSettingsSheet: View {
         // displaysAsBook/inverted overlay, etc.
         PdfSettingsLive.apply(
             pageByPage: pageByPage,
-            twoPageSpread: twoPageSpread,
-            darkMode: darkMode,
-            brightness: brightness
+            twoPageSpread: twoPageSpread
         )
     }
 }
@@ -234,9 +214,7 @@ struct PdfSettingsSheet: View {
 enum PdfSettingsLive {
     static func apply(
         pageByPage: Bool,
-        twoPageSpread: Bool,
-        darkMode: Bool,
-        brightness: Double
+        twoPageSpread: Bool
     ) {
         // PdfViewerScreen subscreve via Notification e aplica no PDFView.
         NotificationCenter.default.post(
@@ -245,8 +223,6 @@ enum PdfSettingsLive {
             userInfo: [
                 "pageByPage": pageByPage,
                 "twoPageSpread": twoPageSpread,
-                "darkMode": darkMode,
-                "brightness": brightness,
             ]
         )
     }

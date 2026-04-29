@@ -54,6 +54,12 @@ struct PdfDocumentScanner: UIViewControllerRepresentable {
         }
 
         func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFailWithError error: Error) {
+            // Log + Sentry — antes era silencioso (bug Rafael 2026-04-28).
+            NSLog("[PdfDocumentScanner] didFailWithError: %@", error.localizedDescription)
+            SentryConfig.capture(error: error, context: ["stage": "document-scanner"])
+            VitaPostHogConfig.capture(event: "pdf_scan_failed", properties: [
+                "error": error.localizedDescription,
+            ])
             onCancel()
         }
     }

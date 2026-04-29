@@ -45,31 +45,31 @@ enum PdfShapeSnap {
     struct Config {
         /// Mínimo de pontos pra considerar tentativa de snap (descarta micro-strokes).
         /// Raised 8→20 (2026-04-28) — letras curtas (i, l, t, /) tinham 8-15 pontos.
-        var minPoints: Int = 20
+        var minPoints: Int = 12
         /// Duração mínima do stroke. Letras são rabiscadas em <0.3s; shape
         /// intencional o usuário pausa um pouco (>0.4s).
-        var minStrokeDuration: TimeInterval = 0.4
+        var minStrokeDuration: TimeInterval = 0.2
         /// Tamanho mínimo do bounding box (max(width, height) em pontos).
         /// Letras manuscritas tipicamente <40pt; shapes intencionais ≥60pt.
-        var minBboxSize: CGFloat = 60
+        var minBboxSize: CGFloat = 40
         /// Resíduo máximo (normalizado pelo bounding box) pra aceitar como linha.
         /// Apertado 0.04→0.025 (2026-04-28) — só linhas REALMENTE retas.
-        var lineResidualThreshold: CGFloat = 0.025
+        var lineResidualThreshold: CGFloat = 0.05
         /// Comprimento mínimo da linha em pontos. Linhas curtas viram letras
         /// tipo "I", "l", "/", "−". 100pt = ~2.5cm no display.
-        var lineMinLength: CGFloat = 100
+        var lineMinLength: CGFloat = 60
         /// Aspect ratio mínimo do bbox pra considerar linha (lado_longo/lado_curto).
         /// Linha intencional é estreita (>5:1); letras são quase quadradas (~1:1).
-        var lineMinAspectRatio: CGFloat = 5.0
+        var lineMinAspectRatio: CGFloat = 4.0
         /// Resíduo máximo pra aceitar como círculo.
         /// Apertado 0.05→0.04 (2026-04-28).
-        var circleResidualThreshold: CGFloat = 0.04
+        var circleResidualThreshold: CGFloat = 0.07
         /// Razão mínima pra considerar círculo (perimetro / hipotenuse_bbox).
         /// Círculo fechado tem ratio > 2.5 — descarta arcos abertos. Subido pra 2.4.
-        var circleClosureRatio: CGFloat = 2.4
+        var circleClosureRatio: CGFloat = 2.0
         /// Razão de fechamento (distância entre primeiro e último ponto / perímetro).
         /// Círculo fecha (<0.15); letra "C", "U", arco aberto não.
-        var circleMaxOpenness: CGFloat = 0.18
+        var circleMaxOpenness: CGFloat = 0.30
 
         static let `default` = Config()
     }
