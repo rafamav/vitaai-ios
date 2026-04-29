@@ -32,19 +32,23 @@ struct QBankFiltersResponse: Decodable {
 }
 
 /// Grupo de Q conforme lente (Tradicional/PBL/CNRM-Areas). Schema novo
-/// adicionado em 2026-04-28 — `slug` + `name` + `count` é o mínimo. Icon
-/// e displayOrder são opcionais e preservam ordenação canônica do backend.
+/// adicionado em 2026-04-28 — `slug` + `name` + `count` é o mínimo.
+/// `children` (2026-04-29) traz hierarquia 2-level:
+///   - tradicional: filhos = topics (qbank_topics) com slug = topicId.toString()
+///   - pbl: filhos = clusters de sintoma (pbl_symptom_clusters)
+///   - great-areas: vazio (Onda 2)
 struct QBankGroup: Identifiable, Hashable, Decodable {
     var slug: String
     var name: String
     var count: Int
     var icon: String?
     var displayOrder: Int?
+    var children: [QBankGroupChild] = []
 
     var id: String { slug }
 
     private enum CodingKeys: String, CodingKey {
-        case slug, name, count, icon, displayOrder
+        case slug, name, count, icon, displayOrder, children
     }
 
     init(from decoder: Decoder) throws {
@@ -54,6 +58,28 @@ struct QBankGroup: Identifiable, Hashable, Decodable {
         count = (try? c.decode(Int.self, forKey: .count)) ?? 0
         icon = try? c.decode(String.self, forKey: .icon)
         displayOrder = try? c.decode(Int.self, forKey: .displayOrder)
+        children = (try? c.decode([QBankGroupChild].self, forKey: .children)) ?? []
+    }
+}
+
+struct QBankGroupChild: Identifiable, Hashable, Decodable {
+    var slug: String
+    var name: String
+    var count: Int
+    var parentSlug: String
+
+    var id: String { "\(parentSlug)/\(slug)" }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        slug = (try? c.decode(String.self, forKey: .slug)) ?? ""
+        name = (try? c.decode(String.self, forKey: .name)) ?? ""
+        count = (try? c.decode(Int.self, forKey: .count)) ?? 0
+        parentSlug = (try? c.decode(String.self, forKey: .parentSlug)) ?? ""
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case slug, name, count, parentSlug
     }
 }
 
@@ -62,6 +88,8 @@ struct QBankGroup: Identifiable, Hashable, Decodable {
 struct QBankPreviewBody: Encodable {
     var lens: String?
     var groupSlugs: [String]?
+    /// Slugs do nível 2 (cluster sintoma PBL ou topic ID Tradicional).
+    var subgroupSlugs: [String]?
     var institutionIds: [Int]?
     var topicIds: [Int]?
     var years: QBankPreviewYears?

@@ -69,17 +69,41 @@ struct QBankBuilderScreen: View {
                         onClearAll: { vm.clearAllFilters() }
                     )
 
-                    // 4. Especialidades / Sistemas / Áreas (lente-aware)
-                    SpecialtyMultiSelect(
+                    // 4. Especialidades / Sistemas / Áreas (lente-aware) — hierarchical
+                    HierarchicalGroupSelect(
                         title: groupTitle(for: vm.state.lens),
-                        groups: vm.state.groups.map(toFiltersGroupsInner),
-                        selectedSlugs: Binding(
+                        groups: vm.state.groups,
+                        selectedGroupSlugs: Binding(
                             get: { vm.state.selectedGroupSlugs },
                             set: { newSet in
                                 let removed = vm.state.selectedGroupSlugs.subtracting(newSet)
                                 let added = newSet.subtracting(vm.state.selectedGroupSlugs)
                                 for s in removed { vm.toggleGroup(slug: s) }
                                 for s in added { vm.toggleGroup(slug: s) }
+                            }
+                        ),
+                        selectedSubgroupIds: Binding(
+                            get: { vm.state.selectedSubgroupIds },
+                            set: { newSet in
+                                let removed = vm.state.selectedSubgroupIds.subtracting(newSet)
+                                let added = newSet.subtracting(vm.state.selectedSubgroupIds)
+                                for id in removed {
+                                    if let parts = parseId(id) {
+                                        vm.toggleSubgroup(parentSlug: parts.0, childSlug: parts.1)
+                                    }
+                                }
+                                for id in added {
+                                    if let parts = parseId(id) {
+                                        vm.toggleSubgroup(parentSlug: parts.0, childSlug: parts.1)
+                                    }
+                                }
+                            }
+                        ),
+                        expandedSlugs: Binding(
+                            get: { vm.state.expandedGroupSlugs },
+                            set: { newSet in
+                                let toggleAll = newSet.symmetricDifference(vm.state.expandedGroupSlugs)
+                                for slug in toggleAll { vm.toggleExpand(slug: slug) }
                             }
                         ),
                         theme: .questoes
@@ -319,14 +343,10 @@ struct QBankBuilderScreen: View {
         ]
     }
 
-    private func toFiltersGroupsInner(_ g: QBankGroup) -> QBankFiltersGroupsInner {
-        QBankFiltersGroupsInner(
-            slug: g.slug,
-            name: g.name,
-            count: g.count,
-            icon: g.icon,
-            displayOrder: g.displayOrder
-        )
+    private func parseId(_ id: String) -> (String, String)? {
+        let parts = id.split(separator: "/", maxSplits: 1).map(String.init)
+        guard parts.count == 2 else { return nil }
+        return (parts[0], parts[1])
     }
 
     private func formatNumber(_ n: Int) -> String {

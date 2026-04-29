@@ -30,6 +30,11 @@ struct QBankBuilderState {
 
     // Seleções do user
     var selectedGroupSlugs: Set<String> = []
+    /// Slugs do level 2 (clusters PBL ou topic IDs Tradicional). Composto
+    /// como "parent/child" pra permitir mesmo cluster em múltiplos sistemas.
+    var selectedSubgroupIds: Set<String> = []  // formato: "parentSlug/childSlug"
+    /// Sistemas/disciplinas com children expandidos na UI.
+    var expandedGroupSlugs: Set<String> = []
     var selectedInstitutionIds: Set<Int> = []
     var selectedYearMin: Int? = nil
     var selectedYearMax: Int? = nil
@@ -124,6 +129,14 @@ final class QBankBuilderViewModel {
     func loadFilters() async {
         do {
             let resp = try await api.getQBankFilters(lens: state.lens.rawValue)
+            NSLog("[QBankBuilder] loadFilters lens=%@ groups=%d insts=%d total=%d",
+                  state.lens.rawValue,
+                  resp.groups.count,
+                  resp.institutions.count,
+                  resp.totalQuestions)
+            if let first = resp.groups.first {
+                NSLog("[QBankBuilder] first group: %@ (%d Q)", first.name, first.count)
+            }
             state.groups = resp.groups
             state.institutions = resp.institutions
             state.years = resp.years
@@ -131,7 +144,7 @@ final class QBankBuilderViewModel {
             state.totalQuestions = resp.totalQuestions
             state.stage = resp.lens // echo da lente aplicada
         } catch {
-            print("[QBankBuilder] loadFilters: \(error)")
+            NSLog("[QBankBuilder] loadFilters ERROR: %@", String(describing: error))
             state.error = "Não foi possível carregar filtros"
         }
     }
@@ -174,8 +187,31 @@ final class QBankBuilderViewModel {
     func toggleGroup(slug: String) {
         if state.selectedGroupSlugs.contains(slug) {
             state.selectedGroupSlugs.remove(slug)
+            // Ao desselecionar group, derruba subgroups dele
+            state.selectedSubgroupIds = state.selectedSubgroupIds.filter { !$0.hasPrefix("\(slug)/") }
         } else {
             state.selectedGroupSlugs.insert(slug)
+        }
+        scheduleRefreshPreview()
+    }
+
+    func toggleExpand(slug: String) {
+        if state.expandedGroupSlugs.contains(slug) {
+            state.expandedGroupSlugs.remove(slug)
+        } else {
+            state.expandedGroupSlugs.insert(slug)
+        }
+    }
+
+    /// Toggla um subgroup (cluster/topic). Auto-seleciona o group pai se ainda não.
+    func toggleSubgroup(parentSlug: String, childSlug: String) {
+        let id = "\(parentSlug)/\(childSlug)"
+        if state.selectedSubgroupIds.contains(id) {
+            state.selectedSubgroupIds.remove(id)
+        } else {
+            state.selectedSubgroupIds.insert(id)
+            // Auto-seleciona pai
+            state.selectedGroupSlugs.insert(parentSlug)
         }
         scheduleRefreshPreview()
     }
@@ -250,9 +286,22 @@ final class QBankBuilderViewModel {
         state.previewLoading = true
         defer { state.previewLoading = false }
 
+        let groupSlugsArr = Array(state.selectedGroupSlugs)
+        NSLog("[QBankBuilder] preview body lens=%@ groupSlugs=%@ insts=%@ diffs=%@",
+              state.lens.rawValue,
+              String(describing: groupSlugsArr),
+              String(describing: Array(state.selectedInstitutionIds)),
+              String(describing: Array(state.selectedDifficulties)))
+
+        // subgroupSlugs: extrair só o childSlug do "parent/child" composto
+        let subgroupSlugs = state.selectedSubgroupIds.compactMap { id -> String? in
+            id.split(separator: "/", maxSplits: 1).last.map(String.init)
+        }
+
         let body = QBankPreviewBody(
             lens: state.lens.rawValue,
-            groupSlugs: Array(state.selectedGroupSlugs).nilIfEmpty,
+            groupSlugs: groupSlugsArr.nilIfEmpty,
+            subgroupSlugs: subgroupSlugs.nilIfEmpty,
             institutionIds: Array(state.selectedInstitutionIds).nilIfEmpty,
             topicIds: nil,
             years: yearsBody(),
@@ -267,9 +316,10 @@ final class QBankBuilderViewModel {
 
         do {
             let resp = try await api.previewQBankPool(body: body)
+            NSLog("[QBankBuilder] preview RESPONSE total=%d", resp.total)
             state.previewCount = resp.total
         } catch {
-            print("[QBankBuilder] preview: \(error)")
+            NSLog("[QBankBuilder] preview ERROR: %@", String(describing: error))
             state.previewCount = nil
         }
     }

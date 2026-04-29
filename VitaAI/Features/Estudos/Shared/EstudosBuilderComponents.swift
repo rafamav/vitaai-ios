@@ -270,6 +270,242 @@ struct SpecialtyMultiSelect: View {
     }
 }
 
+// MARK: - HierarchicalGroupSelect — tree expandível com sub-niveis
+
+/// Substitui SpecialtyMultiSelect quando os groups têm `children` populated.
+/// Cada row é expandível: toca no chevron pra ver clusters/temas.
+/// Tap no group seleciona ele inteiro; tap num child filtra mais granular.
+struct HierarchicalGroupSelect: View {
+    let title: String
+    let groups: [QBankGroup]
+    @Binding var selectedGroupSlugs: Set<String>
+    @Binding var selectedSubgroupIds: Set<String>  // "parent/child"
+    @Binding var expandedSlugs: Set<String>
+    let theme: StudyShellTheme
+
+    @State private var search: String = ""
+    @State private var searchFocused: Bool = false
+
+    private var filtered: [QBankGroup] {
+        guard !search.isEmpty else { return groups }
+        let q = search.folding(options: .diacriticInsensitive, locale: .current).lowercased()
+        return groups.filter { g in
+            let n = g.name.folding(options: .diacriticInsensitive, locale: .current).lowercased()
+            if n.contains(q) { return true }
+            return g.children.contains { c in
+                c.name.folding(options: .diacriticInsensitive, locale: .current).lowercased().contains(q)
+            }
+        }
+    }
+
+    var body: some View {
+        VitaGlassCard(cornerRadius: 14) {
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                if searchFocused { searchBar }
+                Divider().background(VitaColors.glassBorder.opacity(0.4))
+                rowsList
+            }
+        }
+    }
+
+    private var header: some View {
+        HStack {
+            Text(title.uppercased())
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.8)
+                .foregroundStyle(VitaColors.sectionLabel)
+            if !selectedGroupSlugs.isEmpty {
+                Text("· \(selectedGroupSlugs.count) selec.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(theme.primaryLight)
+            }
+            Spacer()
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) { searchFocused.toggle() }
+            } label: {
+                Image(systemName: searchFocused ? "magnifyingglass.circle.fill" : "magnifyingglass")
+                    .font(.system(size: 14))
+                    .foregroundStyle(theme.primaryLight.opacity(0.9))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
+    }
+
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12))
+                .foregroundStyle(VitaColors.textTertiary)
+            TextField("Buscar...", text: $search)
+                .font(.system(size: 13))
+                .foregroundStyle(VitaColors.textPrimary)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            if !search.isEmpty {
+                Button { search = "" } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundStyle(VitaColors.textTertiary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(VitaColors.surfaceElevated.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 9))
+        .padding(.horizontal, 14)
+        .padding(.bottom, 10)
+    }
+
+    @ViewBuilder
+    private var rowsList: some View {
+        if filtered.isEmpty {
+            Text(search.isEmpty ? "Nenhum disponível" : "Nada encontrado para \"\(search)\"")
+                .font(.system(size: 12))
+                .foregroundStyle(VitaColors.textTertiary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 16)
+        } else {
+            VStack(spacing: 0) {
+                ForEach(filtered) { group in
+                    GroupTreeRow(
+                        group: group,
+                        isSelected: selectedGroupSlugs.contains(group.slug),
+                        isExpanded: expandedSlugs.contains(group.slug),
+                        selectedSubgroupIds: $selectedSubgroupIds,
+                        theme: theme,
+                        onToggleSelect: {
+                            if selectedGroupSlugs.contains(group.slug) {
+                                selectedGroupSlugs.remove(group.slug)
+                                // Limpa subgroups daquele pai
+                                selectedSubgroupIds = selectedSubgroupIds.filter {
+                                    !$0.hasPrefix("\(group.slug)/")
+                                }
+                            } else {
+                                selectedGroupSlugs.insert(group.slug)
+                            }
+                        },
+                        onToggleExpand: {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                if expandedSlugs.contains(group.slug) {
+                                    expandedSlugs.remove(group.slug)
+                                } else {
+                                    expandedSlugs.insert(group.slug)
+                                }
+                            }
+                        }
+                    )
+                    if group.slug != filtered.last?.slug {
+                        Divider()
+                            .background(VitaColors.glassBorder.opacity(0.3))
+                            .padding(.leading, 40)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct GroupTreeRow: View {
+    let group: QBankGroup
+    let isSelected: Bool
+    let isExpanded: Bool
+    @Binding var selectedSubgroupIds: Set<String>
+    let theme: StudyShellTheme
+    let onToggleSelect: () -> Void
+    let onToggleExpand: () -> Void
+
+    private var formattedCount: String {
+        let f = NumberFormatter()
+        f.numberStyle = .decimal
+        f.locale = Locale(identifier: "pt_BR")
+        return f.string(from: NSNumber(value: group.count)) ?? "\(group.count)"
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Button(action: onToggleSelect) {
+                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 16))
+                        .foregroundStyle(isSelected ? theme.primaryLight : VitaColors.textTertiary.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+
+                Button(action: onToggleSelect) {
+                    Text(group.name)
+                        .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                        .foregroundStyle(isSelected ? theme.primaryLight : VitaColors.textPrimary.opacity(0.9))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+
+                Text(formattedCount)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(VitaColors.textSecondary)
+
+                if !group.children.isEmpty {
+                    Button(action: onToggleExpand) {
+                        Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(VitaColors.textTertiary)
+                            .frame(width: 24, height: 24)
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Spacer().frame(width: 24)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+
+            if isExpanded && !group.children.isEmpty {
+                VStack(spacing: 0) {
+                    ForEach(group.children) { child in
+                        let id = child.id
+                        let childSelected = selectedSubgroupIds.contains(id)
+                        Button {
+                            if childSelected {
+                                selectedSubgroupIds.remove(id)
+                            } else {
+                                selectedSubgroupIds.insert(id)
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: childSelected ? "checkmark.square.fill" : "square")
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(childSelected ? theme.primaryLight : VitaColors.textTertiary.opacity(0.5))
+                                Text(child.name)
+                                    .font(.system(size: 12, weight: childSelected ? .semibold : .regular))
+                                    .foregroundStyle(childSelected ? theme.primaryLight : VitaColors.textPrimary.opacity(0.85))
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                                Spacer()
+                                Text(NumberFormatter.localizedString(from: NSNumber(value: child.count), number: .decimal))
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(VitaColors.textSecondary)
+                            }
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .padding(.leading, 26)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .background(VitaColors.surfaceElevated.opacity(0.25))
+                .transition(.opacity)
+            }
+        }
+    }
+}
+
 // MARK: - FormatPills — chips de formato (Objetivas/Discursivas/c/Imagem)
 
 struct FormatPills: View {
