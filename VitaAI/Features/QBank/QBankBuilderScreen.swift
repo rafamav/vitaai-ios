@@ -184,7 +184,7 @@ struct QBankBuilderScreen: View {
                     .foregroundStyle(VitaColors.sectionLabel)
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach([10, 20, 30, 50], id: \.self) { n in
+                        ForEach([20, 30, 50, 100], id: \.self) { n in
                             QBankChip(
                                 label: "\(n)",
                                 isSelected: vm.state.questionCount == n
