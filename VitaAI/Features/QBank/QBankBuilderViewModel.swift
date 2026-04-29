@@ -60,6 +60,10 @@ struct QBankBuilderState {
     var progressTotal: Int = 0
     var progressAnswered: Int = 0
     var progressAccuracy: Double = 0.0
+    /// Spec §3.1 — ofensiva no Hero. Default 0 ⇒ stat oculto (sem fake).
+    /// Hidratado quando endpoint expor; hoje só fica visível se backend popular
+    /// via outro caminho (p.ex. progress payload futuro).
+    var streakDays: Int = 0
 
     // Recents
     var recentSessions: [QBankSessionSummary] = []
@@ -371,7 +375,12 @@ final class QBankBuilderViewModel {
             title: nil,
             status: nil,
             excludeNoExplanation: state.excludeNoExplanation,
-            includeSynthetic: state.includeSynthetic
+            includeSynthetic: state.includeSynthetic,
+            // Spec §11.4 — Avançadas. Backend já aceita (placeholder no-op
+            // até table de revisão). Enviar somente quando true (nil omite).
+            hideAnnulled: state.hideAnnulled ? true : nil,
+            hideReviewed: state.hideReviewed ? true : nil,
+            format: Array(state.selectedFormats).nilIfEmpty
         )
 
         do {

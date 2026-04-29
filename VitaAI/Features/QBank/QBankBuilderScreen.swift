@@ -14,6 +14,12 @@ struct QBankBuilderScreen: View {
     let onBack: () -> Void
     let onSessionCreated: (String) -> Void
 
+    // Spec §11.2 default state — secundárias colapsadas no boot.
+    @State private var institutionsExpanded: Bool = false
+    @State private var yearsExpanded: Bool = false
+    @State private var formatExpanded: Bool = false
+    @State private var difficultyExpanded: Bool = false
+
     var body: some View {
         Group {
             if let vm {
@@ -42,10 +48,7 @@ struct QBankBuilderScreen: View {
                     StudyHeroStat(
                         primary: formatNumber(vm.state.progressAnswered),
                         primaryCaption: "questões respondidas",
-                        stats: [
-                            .init(value: formatNumber(vm.state.progressTotal), label: "disponíveis"),
-                            .init(value: "\(Int((vm.state.progressAccuracy * 100).rounded()))%", label: "acerto"),
-                        ],
+                        stats: heroStats(vm: vm),
                         theme: .questoes
                     )
                     .padding(.horizontal, 16)
@@ -133,43 +136,109 @@ struct QBankBuilderScreen: View {
                     .padding(.horizontal, 16)
                     }
 
-                    // 5. Quantidade (sempre visível)
+                    // 5. Quantidade (sempre visível — spec §11.2)
                     quantitySection(vm: vm)
                         .padding(.horizontal, 16)
 
-                    // 6. Modo Prática/Simulado
+                    // 6. Modo Prática/Simulado (sempre visível)
                     modeSection(vm: vm)
                         .padding(.horizontal, 16)
 
-                    // 7. Dificuldade
-                    if !vm.state.difficulties.isEmpty {
-                        difficultySection(vm: vm)
-                            .padding(.horizontal, 16)
+                    // ── Seções secundárias colapsadas por default (spec §11.2) ──
+
+                    // Instituições — abre sheet full-screen com search
+                    if !vm.state.institutions.isEmpty {
+                        InstitutionsCollapsibleSection(
+                            institutions: vm.state.institutions,
+                            selectedIds: Binding(
+                                get: { vm.state.selectedInstitutionIds },
+                                set: { newSet in
+                                    let removed = vm.state.selectedInstitutionIds.subtracting(newSet)
+                                    let added = newSet.subtracting(vm.state.selectedInstitutionIds)
+                                    for id in removed { vm.toggleInstitution(id: id) }
+                                    for id in added { vm.toggleInstitution(id: id) }
+                                }
+                            ),
+                            theme: .questoes
+                        )
+                        .padding(.horizontal, 16)
                     }
 
-                    // 8. Formato
-                    FormatPills(
-                        selected: Binding(
-                            get: { vm.state.selectedFormats },
-                            set: { newSet in
-                                let removed = vm.state.selectedFormats.subtracting(newSet)
-                                let added = newSet.subtracting(vm.state.selectedFormats)
-                                for f in removed { vm.toggleFormat(f) }
-                                for f in added { vm.toggleFormat(f) }
-                            }
-                        ),
-                        theme: .questoes
-                    )
+                    // Anos — presets + range slider, expand inline
+                    if !vm.state.years.isEmpty {
+                        YearsRangeSection(
+                            minYear: Binding(
+                                get: { vm.state.selectedYearMin },
+                                set: { vm.state.selectedYearMin = $0 }
+                            ),
+                            maxYear: Binding(
+                                get: { vm.state.selectedYearMax },
+                                set: { vm.state.selectedYearMax = $0 }
+                            ),
+                            availableMin: vm.state.years.min() ?? 1995,
+                            availableMax: vm.state.years.max() ?? 2026,
+                            theme: .questoes,
+                            expanded: $yearsExpanded,
+                            onChange: { vm.scheduleRefreshPreview() }
+                        )
+                        .padding(.horizontal, 16)
+                    }
+
+                    // Formato (collapsible — wrap em CollapsibleSectionCard)
+                    CollapsibleSectionCard(
+                        title: "Formato",
+                        icon: "doc.text",
+                        summary: formatSummary(vm: vm),
+                        theme: .questoes,
+                        expanded: $formatExpanded
+                    ) {
+                        FormatPills(
+                            selected: Binding(
+                                get: { vm.state.selectedFormats },
+                                set: { newSet in
+                                    let removed = vm.state.selectedFormats.subtracting(newSet)
+                                    let added = newSet.subtracting(vm.state.selectedFormats)
+                                    for f in removed { vm.toggleFormat(f) }
+                                    for f in added { vm.toggleFormat(f) }
+                                }
+                            ),
+                            theme: .questoes
+                        )
+                    }
                     .padding(.horizontal, 16)
 
-                    // 9. Avançadas (collapsible)
+                    // Dificuldade (collapsible)
+                    if !vm.state.difficulties.isEmpty {
+                        CollapsibleSectionCard(
+                            title: "Dificuldade",
+                            icon: "chart.bar",
+                            summary: difficultySummary(vm: vm),
+                            theme: .questoes,
+                            expanded: $difficultyExpanded
+                        ) {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(vm.state.difficulties) { dc in
+                                        let label = "\(dc.displayLabel) (\(dc.count))"
+                                        QBankChip(
+                                            label: label,
+                                            isSelected: vm.state.selectedDifficulties.contains(dc.difficulty)
+                                        ) { vm.toggleDifficulty(dc.difficulty) }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                    }
+
+                    // Avançadas (collapsible — já tem default expanded=false em AdvancedSection)
                     AdvancedSection(
                         items: advancedItems(vm: vm),
                         theme: .questoes
                     )
                     .padding(.horizontal, 16)
 
-                    // 10. Recents
+                    // Recents
                     if !vm.state.recentSessions.isEmpty {
                         recentsSection(vm: vm)
                     }
@@ -352,6 +421,13 @@ struct QBankBuilderScreen: View {
                 action: { vm.setHideAnswered(!vm.state.hideAnswered) }
             ),
             AdvancedToggleItem(
+                icon: "bookmark.slash",
+                title: "Ocultar revisadas",
+                description: "Cards já marcados como revisados",
+                isOn: vm.state.hideReviewed,
+                action: { vm.setHideReviewed(!vm.state.hideReviewed) }
+            ),
+            AdvancedToggleItem(
                 icon: "exclamationmark.octagon",
                 title: "Ocultar anuladas",
                 description: "Remove questões marcadas como erro pelo banco",
@@ -373,6 +449,30 @@ struct QBankBuilderScreen: View {
                 action: { vm.setIncludeSynthetic(!(!vm.state.includeSynthetic)) }
             ),
         ]
+    }
+
+    /// Spec §3.1: Hero do QBank — answered + acerto + ofensiva (condicional).
+    /// Streak só aparece se >0 — sem fake (regra: dataManager populates quando
+    /// endpoint real existir; hoje VM mantém 0 por default e oculta).
+    private func heroStats(vm: QBankBuilderViewModel) -> [StudyHeroStat.Stat] {
+        var stats: [StudyHeroStat.Stat] = [
+            .init(value: formatNumber(vm.state.progressTotal), label: "disponíveis"),
+            .init(value: "\(Int((vm.state.progressAccuracy * 100).rounded()))%", label: "acerto"),
+        ]
+        if vm.state.streakDays > 0 {
+            stats.append(.init(value: "\(vm.state.streakDays)d 🔥", label: "ofensiva"))
+        }
+        return stats
+    }
+
+    private func formatSummary(vm: QBankBuilderViewModel) -> String {
+        if vm.state.selectedFormats.isEmpty { return "Todos" }
+        return "\(vm.state.selectedFormats.count) selec."
+    }
+
+    private func difficultySummary(vm: QBankBuilderViewModel) -> String {
+        if vm.state.selectedDifficulties.isEmpty { return "Todas" }
+        return "\(vm.state.selectedDifficulties.count) selec."
     }
 
     private var groupsSkeleton: some View {
