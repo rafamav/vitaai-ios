@@ -16,7 +16,9 @@ use_frameworks!
 target 'VitaAI' do
   # Handwriting → texto digitado (300+ idiomas incl PT-BR, on-device, ~5MB).
   # Substitui Apple Vision VNRecognizeTextRequest que era pra texto impresso.
-  pod 'GoogleMLKit/DigitalInkRecognition', '8.0.0'
+  # Bumped from 8.0.0 (2024-05) to latest 2026 — 8.0.0 lacked arm64-sim slice
+  # in MLKitCommon 13.0.0, breaking sim build on Apple Silicon iOS 26.4.
+  pod 'GoogleMLKit/DigitalInkRecognition'
 end
 
 # Recommended para evitar conflitos de min iOS deployment target

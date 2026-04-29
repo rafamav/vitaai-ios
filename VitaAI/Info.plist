@@ -32,7 +32,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>146</string>
+	<string>1</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSAppTransportSecurity</key>
@@ -49,7 +49,7 @@
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>VitaAI usa reconhecimento de fala para transcrever suas aulas em tempo real.</string>
 	<key>SENTRY_DSN</key>
-	<string>https://305f5aa7326a463a0a676bdff2458632@o4510763265097728.ingest.us.sentry.io/4511237378211840</string>
+	<string>http://d502bfde3a71431c8c856037db7eefde@100.92.197.68:8210/3</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>
