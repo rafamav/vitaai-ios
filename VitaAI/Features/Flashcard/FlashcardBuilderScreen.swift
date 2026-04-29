@@ -16,6 +16,10 @@ import Sentry
 struct FlashcardBuilderScreen: View {
     @Environment(\.appContainer) private var container
     @State private var vm: FlashcardBuilderViewModel?
+    // Default state §11.2 — colapsadas: Origem
+    // (Instituições, Anos quando A7 publicar wrappers ficam colapsados também;
+    // Avançadas (AdvancedSection) já é collapsible nativo com default false)
+    @State private var originExpanded: Bool = false
     /// Quando vem de DisciplineDetailScreen → flashcardHome(subjectId), pré-seleciona
     /// essa disciplina e abre em mode `.specific`. nil = comportamento padrão (mode `.due`).
     var initialSubjectId: String? = nil
@@ -140,8 +144,8 @@ struct FlashcardBuilderScreen: View {
                         .padding(.horizontal, 16)
                     }
 
-                    // 3c. Origem (Todas / Vita IA / Eu criei / Overlays)
-                    originSection(vm: vm)
+                    // 3c. Origem — colapsada por default §11.2
+                    originCollapsible(vm: vm)
                         .padding(.horizontal, 16)
                 }
 
@@ -237,14 +241,25 @@ struct FlashcardBuilderScreen: View {
         }
     }
 
+    // MARK: - Origem collapsible (default colapsado §11.2)
+    // Usa CollapsibleSectionCard shared (A7 publicou em EstudosBuilderComponents).
+
+    private func originCollapsible(vm: FlashcardBuilderViewModel) -> some View {
+        CollapsibleSectionCard(
+            title: "Origem",
+            icon: "tag",
+            summary: vm.state.origin == .all ? "Todas" : vm.state.origin.displayName,
+            theme: .flashcards,
+            expanded: $originExpanded
+        ) {
+            originSection(vm: vm)
+        }
+    }
+
     // MARK: - Origem (só quando .specific)
 
     private func originSection(vm: FlashcardBuilderViewModel) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("ORIGEM")
-                .font(.system(size: 11, weight: .bold))
-                .tracking(0.8)
-                .foregroundStyle(VitaColors.sectionLabel)
             HStack(spacing: 6) {
                 ForEach(FlashcardOrigin.allCases) { o in
                     let isSelected = vm.state.origin == o
