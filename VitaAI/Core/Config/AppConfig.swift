@@ -18,19 +18,23 @@ enum AppConfig {
     static let onboardingKey = "vita_is_onboarded"
     static let legacyOnboardingKey = "vita_onboarding_done"
 
-    // Pre-beta (2026-04-24 em diante): TestFlight aponta pra DEV (monstro via Tailscale).
-    // Rafael está testando solo no iPad/iPhone dele, mesmos dados do simulador.
+    // Pre-beta (2026-04-24 em diante): TestFlight aponta pra DEV via Cloudflare Tunnel
+    // (dev.vita-ai.cloud → vita-web-dev container do monstro). Antes era Tailscale direto
+    // (monstro.tail7e98e6.ts.net:3110), mas Docker Desktop port-forwarding bugou em
+    // 2026-04-28 — porta 3110 não publicava no host Windows, Tailscale travava em request.
+    // Cloudflare Tunnel ignora host port-forward (fala com container interno via Docker
+    // network), então sempre funciona. SOT: incident `2026-04-28_docker-desktop-port-forwarding-stale.md`.
     // Quando lançar beta público pra testers reais, trocar Release bloc pra vita-ai.cloud
     // (prod VPS Hostinger).
     #if DEBUG
-    private static let defaultAPIBaseURL = "http://monstro.tail7e98e6.ts.net:3110/api"
-    private static let defaultAuthBaseURL = "http://monstro.tail7e98e6.ts.net:3110"
-    private static let defaultWhisperLiveURL = "ws://monstro.tail7e98e6.ts.net:8795/asr"
+    private static let defaultAPIBaseURL = "https://dev.vita-ai.cloud/api"
+    private static let defaultAuthBaseURL = "https://dev.vita-ai.cloud"
+    private static let defaultWhisperLiveURL = "wss://dev.vita-ai.cloud/whisper/asr"
     #else
     // PRE-BETA: mesma coisa do DEBUG — trocar pra https://vita-ai.cloud ao lançar beta
-    private static let defaultAPIBaseURL = "http://monstro.tail7e98e6.ts.net:3110/api"
-    private static let defaultAuthBaseURL = "http://monstro.tail7e98e6.ts.net:3110"
-    private static let defaultWhisperLiveURL = "ws://monstro.tail7e98e6.ts.net:8795/asr"
+    private static let defaultAPIBaseURL = "https://dev.vita-ai.cloud/api"
+    private static let defaultAuthBaseURL = "https://dev.vita-ai.cloud"
+    private static let defaultWhisperLiveURL = "wss://dev.vita-ai.cloud/whisper/asr"
     #endif
 
     struct InjectedSession {

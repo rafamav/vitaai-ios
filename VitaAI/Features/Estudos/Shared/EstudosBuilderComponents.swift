@@ -915,7 +915,20 @@ struct AdvancedSection: View {
 }
 
 // MARK: - StickyBottomCTA — count vivo + botão "Iniciar"
-
+//
+// Usado via `.safeAreaInset(edge: .bottom)` no ScrollView. Isso garante:
+// 1. Conteúdo do scroll respeita automaticamente a altura do CTA
+//    (sem precisar de Spacer(minLength:) ou padding fake).
+// 2. CTA fica grudado acima da custom tab bar (VitaTabBar mora em overlay
+//    fora do safe area do sistema, então reservamos os ~94px manualmente
+//    via `tabBarReserve` abaixo).
+// 3. Background gradient se mistura naturalmente sobre o conteúdo do scroll
+//    sem cobrir nem ser coberto pelo tab bar.
+//
+// Bug fix 2026-04-28: antes usava ZStack(alignment:.bottom) com padding
+// .bottom 140 fixo, mas como AppRouter aplica `.ignoresSafeArea(.container,
+// edges: .bottom)` no activeTabView, o CTA renderizava em coordenada fora
+// da viewport útil. Rafael cobrou 5x, agora usa o pattern canônico SwiftUI.
 struct StickyBottomCTA: View {
     let title: String
     let count: Int
@@ -923,6 +936,11 @@ struct StickyBottomCTA: View {
     let isCreating: Bool
     let theme: StudyShellTheme
     let action: () -> Void
+
+    /// Altura visual do VitaTabBar custom (54) + safe area bottom típico
+    /// iPhone moderno (~34) + folga visual (6) = 94. Tab bar mora em
+    /// overlay no AppRouter, então não conta no safeAreaInset do sistema.
+    private let tabBarReserve: CGFloat = 94
 
     private var formattedCount: String {
         let f = NumberFormatter()
@@ -955,18 +973,18 @@ struct StickyBottomCTA: View {
             }
         }
         .padding(.top, 12)
-        .padding(.bottom, 140)  // tab bar (90px) + safeArea bottom (~34px) + breathing room
+        .padding(.bottom, tabBarReserve)
         .background(
             LinearGradient(
                 stops: [
                     .init(color: .clear, location: 0),
-                    .init(color: VitaColors.surface.opacity(0.95), location: 0.3),
+                    .init(color: VitaColors.surface.opacity(0.92), location: 0.25),
                     .init(color: VitaColors.surface, location: 1),
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
-            .ignoresSafeArea(edges: .bottom)
+            .allowsHitTesting(false)
         )
     }
 }

@@ -35,9 +35,8 @@ struct QBankBuilderScreen: View {
 
     @ViewBuilder
     private func content(vm: QBankBuilderViewModel) -> some View {
-        ZStack(alignment: .bottom) {
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 16) {
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 16) {
 
                     // 1. Hero
                     StudyHeroStat(
@@ -149,13 +148,13 @@ struct QBankBuilderScreen: View {
                         recentsSection(vm: vm)
                     }
 
-                    // Espaço pra CTA sticky não cobrir
-                    Spacer(minLength: 140)
                 }
                 .padding(.bottom, 16)
             }
-
-            // CTA sticky
+        // CTA sticky via safeAreaInset — pattern canônico SwiftUI
+        // (substitui ZStack/Spacer/padding manual). O conteúdo do scroll
+        // respeita a altura automaticamente, e o CTA fica acima do tab bar.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             StickyBottomCTA(
                 title: ctaTitle(vm: vm),
                 count: vm.state.displayCount,

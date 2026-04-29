@@ -9,6 +9,15 @@ import Foundation
 
 public struct QBankFilters: Sendable, Codable, Hashable {
 
+    public enum Lens: String, Sendable, Codable, CaseIterable {
+        case tradicional = "tradicional"
+        case pbl = "pbl"
+        case greatAreas = "great-areas"
+    }
+    /** Lente aplicada na resposta atual. Echo do query param OU profile.contentOrganizationMode. Added 2026-04-28. */
+    public var lens: Lens?
+    /** Agrupamento de Q conforme `lens`. Substitui `disciplines` (deprecated) como filtro principal de UI. Cada item tem slug + name + count global. - tradicional: vita.disciplines (96 itens) - pbl: vita.pbl_systems (12 itens) - great-areas: vita.exam_great_areas (5 itens) Ordenado por count desc. Added 2026-04-28.  */
+    public var groups: [QBankFiltersGroupsInner]?
     public var institutions: [QBankFiltersInstitutionsInner]?
     public var topics: [QBankFiltersTopicsInner]?
     /** [DEPRECATED 2026-04-17b] Catalog view from qbank_topics.disciplineSlug + vita.disciplines. Use GET /api/subjects instead — QBank must filter by the student's actual enrolled subjects, not the universal MedSimple catalog. This field stays for fallback during iOS/Android migration and may be removed in 2026-05.  */
@@ -20,7 +29,9 @@ public struct QBankFilters: Sendable, Codable, Hashable {
     public var totalAllStages: Int?
     public var stage: String?
 
-    public init(institutions: [QBankFiltersInstitutionsInner]? = nil, topics: [QBankFiltersTopicsInner]? = nil, disciplines: [QBankFiltersDisciplinesInner]? = nil, years: [QBankFiltersYearsInner]? = nil, difficulties: [QBankFiltersDifficultiesInner]? = nil, totalQuestions: Int? = nil, totalAllStages: Int? = nil, stage: String? = nil) {
+    public init(lens: Lens? = nil, groups: [QBankFiltersGroupsInner]? = nil, institutions: [QBankFiltersInstitutionsInner]? = nil, topics: [QBankFiltersTopicsInner]? = nil, disciplines: [QBankFiltersDisciplinesInner]? = nil, years: [QBankFiltersYearsInner]? = nil, difficulties: [QBankFiltersDifficultiesInner]? = nil, totalQuestions: Int? = nil, totalAllStages: Int? = nil, stage: String? = nil) {
+        self.lens = lens
+        self.groups = groups
         self.institutions = institutions
         self.topics = topics
         self.disciplines = disciplines
@@ -32,6 +43,8 @@ public struct QBankFilters: Sendable, Codable, Hashable {
     }
 
     public enum CodingKeys: String, CodingKey, CaseIterable {
+        case lens
+        case groups
         case institutions
         case topics
         case disciplines
@@ -46,6 +59,8 @@ public struct QBankFilters: Sendable, Codable, Hashable {
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(lens, forKey: .lens)
+        try container.encodeIfPresent(groups, forKey: .groups)
         try container.encodeIfPresent(institutions, forKey: .institutions)
         try container.encodeIfPresent(topics, forKey: .topics)
         try container.encodeIfPresent(disciplines, forKey: .disciplines)

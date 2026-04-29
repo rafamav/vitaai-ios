@@ -14,12 +14,12 @@ public struct VitaExplainPdfRequest: Sendable, Codable, Hashable {
     public static let questionRule = StringRule(minLength: nil, maxLength: 2000, pattern: nil)
     public var documentId: String
     public var pageIndex: Int
-    public var rect: VitaExplainPdfRequestRect
+    public var rect: RecordPdfMaskAttemptRequestBbox
     public var pageText: String
     public var pageImageBase64: String?
     public var question: String?
 
-    public init(documentId: String, pageIndex: Int, rect: VitaExplainPdfRequestRect, pageText: String, pageImageBase64: String? = nil, question: String? = nil) {
+    public init(documentId: String, pageIndex: Int, rect: RecordPdfMaskAttemptRequestBbox, pageText: String, pageImageBase64: String? = nil, question: String? = nil) {
         self.documentId = documentId
         self.pageIndex = pageIndex
         self.rect = rect

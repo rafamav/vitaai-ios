@@ -19,7 +19,6 @@ public struct OnboardingV2Request: Sendable, Codable, Hashable {
     public enum InFaculdade: String, Sendable, Codable, CaseIterable {
         case _true = "true"
         case graduated = "graduated"
-        case skip = "skip"
     }
     public enum CurrentStage: String, Sendable, Codable, CaseIterable {
         case primeira = "PRIMEIRA"

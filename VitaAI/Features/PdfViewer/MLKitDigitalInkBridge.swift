@@ -1,6 +1,5 @@
 import Foundation
 import PencilKit
-import MLKit
 import OSLog
 
 // MARK: - MLKitDigitalInkBridge
@@ -22,6 +21,17 @@ import OSLog
 // Rafael 2026-04-29: substitui Vision framework (que comia o texto sem
 // converter) pra parar o sangramento. PT-BR é o foco — Rafael estuda em
 // português.
+//
+// SIMULATOR STUB (2026-04-29 SWIFT): MLKit binary fat (MLKitCommon 7.0.0)
+// só veio com slice arm64-iOS-device, não arm64-iOS-simulator. iOS 26.4 sim
+// é arm64-only (sem Rosetta x86_64). Resultado: link error em sim arm64.
+// Solução: gate o import e a impl real atrás de `#if !targetEnvironment(simulator)`.
+// No sim, retorna nil (caller de PdfViewerViewModel já trata nil graciosamente).
+// Em device real (arm64-ios), funciona normal.
+
+#if !targetEnvironment(simulator)
+import MLKitDigitalInkRecognition
+#endif
 
 enum MLKitDigitalInkBridge {
 
@@ -32,6 +42,12 @@ enum MLKitDigitalInkBridge {
         case textPtBR = "pt-BR"
         case textEnUS = "en-US"
         case shapes = "zxx-Zsym-x-shapes"
+    }
+
+    /// Resultado do reconhecimento.
+    struct RecognitionResult {
+        let text: String
+        let score: Float
     }
 
     /// Reconhece handwriting. Retorna o texto candidato top + score 0..1, ou
@@ -47,6 +63,13 @@ enum MLKitDigitalInkBridge {
 
         guard !strokes.isEmpty else { return nil }
 
+#if targetEnvironment(simulator)
+        // Simulator stub — MLKit não suporta arm64-ios-simulator (vide nota
+        // no topo do arquivo). Loga e retorna nil; auto-convert no PDF viewer
+        // simplesmente não roda no sim. Em device real, fluxo completo abaixo.
+        logger.notice("[mlkit] simulator stub — recognize() retorna nil (model=\(model.rawValue, privacy: .public))")
+        return nil
+#else
         // 1. Garantir que o model está baixado
         guard let identifier = DigitalInkRecognitionModelIdentifier(forLanguageTag: model.rawValue) else {
             logger.error("[mlkit] model identifier inválido pra \(model.rawValue, privacy: .public)")
@@ -110,15 +133,11 @@ enum MLKitDigitalInkBridge {
                 continuation.resume(returning: RecognitionResult(text: top.text, score: scoreFloat))
             }
         }
+#endif
     }
 
-    /// Resultado do reconhecimento.
-    struct RecognitionResult {
-        let text: String
-        let score: Float
-    }
-
-    // MARK: - Helpers
+#if !targetEnvironment(simulator)
+    // MARK: - Helpers (device-only)
 
     private static func waitForDownload(
         model: DigitalInkRecognitionModel,
@@ -172,4 +191,5 @@ enum MLKitDigitalInkBridge {
             }
         }
     }
+#endif
 }

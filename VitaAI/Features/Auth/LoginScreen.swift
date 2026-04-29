@@ -93,9 +93,9 @@ struct LoginScreen: View {
                     : nil
                 )
 
-            // Intro text
+            // Intro text — espelha pattern do Pixio (Rafael 2026-04-28)
             if p < 0.3 {
-                Text("Uma nova era de\nestudos est\u{00E1} aqui.")
+                Text("O futuro dos seus estudos\ncome\u{00E7}a aqui.")
                     .font(.system(size: 34, weight: .light, design: .serif))
                     .foregroundStyle(.white.opacity(0.85))
                     .multilineTextAlignment(.center)
@@ -133,14 +133,14 @@ struct LoginScreen: View {
                 }
             }
 
-            // Reveal headline
+            // Reveal headline — espelha pattern do Pixio (Rafael 2026-04-28)
             if p > 0.6 {
                 VStack(spacing: 8) {
                     Text("Conhe\u{00E7}a Vita")
                         .font(.system(size: 38, weight: .light, design: .serif))
                         .foregroundStyle(.white.opacity(0.9))
 
-                    Text("O futuro dos seus estudos\ncome\u{00E7}a agora")
+                    Text("Seu agente de estudos pessoal")
                         .font(.system(size: 18, weight: .regular))
                         .foregroundStyle(.white.opacity(0.5))
                         .multilineTextAlignment(.center)
