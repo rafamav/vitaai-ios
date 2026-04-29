@@ -282,31 +282,6 @@ private struct QBankInfoCard: View {
     }
 }
 
-// MARK: - QBank Background (bg-qbank fullscreen + dark overlay)
-
-struct QBankBackground: View {
-    var body: some View {
-        ZStack {
-            VitaColors.surface
-
-            Image("bg-qbank")
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-
-            // Dark gradient overlay
-            LinearGradient(
-                stops: [
-                    .init(color: VitaColors.surface.opacity(0.15), location: 0),
-                    .init(color: VitaColors.surface.opacity(0.15), location: 0.40),
-                    .init(color: VitaColors.surface.opacity(0.55), location: 1.0),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        }
-        .ignoresSafeArea()
-    }
-}
 
 // MARK: - Section Label (uppercase, matches .section-label CSS)
 
