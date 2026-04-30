@@ -175,6 +175,30 @@ fi
 echo "       Archive OK"
 
 # -------------------------------------------------------------------------
+# STEP 2.5: Upload dSYMs to GlitchTip (Sentry-compatible)
+# -------------------------------------------------------------------------
+# Without dSYMs, crash stack traces in GlitchTip are hex addresses and we
+# can't tell which Swift function blew up. With them: full symbolicated
+# trace down to file:line. ~30s upload, ~5MB per build.
+#
+# Token: pass bymav/glitchtip/api-token-dsym-upload (scopes project:write+releases).
+# Org: bymav. Project: vitaai-ios.
+echo ""
+echo "[2.5/4] Uploading dSYMs to GlitchTip..."
+if command -v sentry-cli >/dev/null 2>&1; then
+  GLITCHTIP_TOKEN_PATH="$HOME/.private_keys/glitchtip-dsym-token"
+  if [[ -f "$GLITCHTIP_TOKEN_PATH" ]]; then
+    SENTRY_AUTH_TOKEN="$(cat "$GLITCHTIP_TOKEN_PATH")"     sentry-cli --url https://glitchtip.vita-ai.cloud/       upload-dif --org bymav --project vitaai-ios       "$ARCHIVE_PATH" 2>&1 | tail -5 || echo "       WARN: dSYM upload failed (non-fatal, continuing)"
+  else
+    echo "       SKIP: token at $GLITCHTIP_TOKEN_PATH missing"
+    echo "       Setup: pass bymav/glitchtip/api-token-dsym-upload | tr -d '
+' > $GLITCHTIP_TOKEN_PATH && chmod 600 $GLITCHTIP_TOKEN_PATH"
+  fi
+else
+  echo "       SKIP: sentry-cli not installed (brew install getsentry/tools/sentry-cli)"
+fi
+
+# -------------------------------------------------------------------------
 # STEP 3: Export + Upload
 # -------------------------------------------------------------------------
 echo ""

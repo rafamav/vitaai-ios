@@ -53,7 +53,7 @@ targets:
         # Razao: Sentry SaaS quota Errors 5K/5K estourado, eventos novos dropados.
         # GlitchTip ilimitado, MCP funcional pros agents (TOKEN: atlas-mcp).
         # Quando Cloudflare Tunnel glitchtip.bymav.dev resolver, troca host.
-        SENTRY_DSN: http://d502bfde3a71431c8c856037db7eefde@100.92.197.68:8210/3
+        SENTRY_DSN: https://ebcb3ccce0cf4bfd8de976f3eab55046@glitchtip.vita-ai.cloud/1
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
         NSHealthShareUsageDescription: "VitaAI usa dados de sono e exercicio para correlacionar com seu desempenho academico."
