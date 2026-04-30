@@ -44,6 +44,8 @@ enum PdfShapeSnap {
         case rejectedTooSmall
         case rejectedTooFewPoints
         case rejectedNoMatch
+        /// Triangle detected with confidence but no replacement geometry yet.
+        case triangleDetectedButNotApplied(confidence: CGFloat)
     }
 
     struct Config {
@@ -123,9 +125,12 @@ enum PdfShapeSnap {
             return (.rectangle(rect: bbox), .appliedRectangle(confidence: confidence))
 
         case "triangle":
-            // Triângulo: trata como nada por enquanto (não temos replacement geométrico).
-            // Adicionar futuramente shape annotation triangular.
-            return (.none, .rejectedNoMatch)
+            // Triângulo: detectado mas sem replacement geométrico ainda.
+            // Antes retornávamos rejectedNoMatch silenciosamente, mascarando o
+            // sinal "user desenhou triângulo intencional". Agora reportamos
+            // outcome próprio para dashboard saber a frequência e priorizar
+            // implementar substitutio geom triangular (#TBD).
+            return (.none, .triangleDetectedButNotApplied(confidence: confidence))
 
         default:
             return (.none, .rejectedNoMatch)

@@ -21,6 +21,12 @@ import PostHog
 // by the SDK — never duplicate them here.
 
 enum VitaEvent: String {
+    // Cross-cutting tool error (instrumented via tracked() helper).
+    // See Tracked.swift + incidents/vitaai/2026-04-30_silent-tool-catches.md.
+    case toolError = "tool_error"
+    case handwritingConverted = "handwriting_converted"
+    case shapeSnapped = "shape_snapped"
+
     // Auth lifecycle
     case userSignedUp = "user_signed_up"
     case userLoggedIn = "user_logged_in"

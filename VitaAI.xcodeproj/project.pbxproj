@@ -406,6 +406,7 @@
 		E529109D0803E34CB4DC0B2D /* MindMapListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6487870DA0185F897228C92 /* MindMapListViewModel.swift */; };
 		E67209EEF1E9AE724E3BF80E /* PortalIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEF7D0E3B2FB0CC1C188ADB6 /* PortalIcon.swift */; };
 		E9CB954DF22CC9B832B690FD /* ConnectorsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46C06511C1120C3D564023F3 /* ConnectorsViewModel.swift */; };
+		EA369AAC6B59C5AE7B5607CB /* Tracked.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D0016723BD79953A759AA2A /* Tracked.swift */; };
 		EA730842FB7C3E9FB8F4065E /* JourneyType+Helpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9908A582A7C0FF45AB9F61F /* JourneyType+Helpers.swift */; };
 		EBD32F8B6FC327034ED9A70E /* PdfTabBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = D76BE069C1F75FD8C95A138A /* PdfTabBar.swift */; };
 		ED4FCA6A681400D2B2E82598 /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E96A2F8EC619718B744BFD6 /* APIError.swift */; };
@@ -651,6 +652,7 @@
 		7BA44FA79DA06D105CBE8F08 /* HealthKitManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthKitManager.swift; sourceTree = "<group>"; };
 		7BD3F3D91DE3FE5D24710650 /* TranscricaoShared.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscricaoShared.swift; sourceTree = "<group>"; };
 		7CF7A4E142CDD4D34FC14BF1 /* OneDollarRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OneDollarRecognizer.swift; sourceTree = "<group>"; };
+		7D0016723BD79953A759AA2A /* Tracked.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tracked.swift; sourceTree = "<group>"; };
 		7ECE46CA939DEDECC0CA2196 /* TextToSpeechManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextToSpeechManager.swift; sourceTree = "<group>"; };
 		7F941EEE1160DE104E36CA06 /* VitaXpToast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VitaXpToast.swift; sourceTree = "<group>"; };
 		7FB81E58389F9A442111E690 /* AppConfigResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfigResponse.swift; sourceTree = "<group>"; };
@@ -1392,6 +1394,7 @@
 				0A3908944C6BDBECD98FFDB7 /* ScreenTracking.swift */,
 				E70BF1F2E97BAFB99CB82BAA /* SentryConfig.swift */,
 				E94679ADA237C7F8A3B01896 /* SoundManager.swift */,
+				7D0016723BD79953A759AA2A /* Tracked.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -2297,6 +2300,7 @@
 				64BEEEA27A432C76D55DDD12 /* TrabalhoScreen.swift in Sources */,
 				32A5334EB02F4EBE5B756188 /* TrabalhoViewModel.swift in Sources */,
 				AEDC3DAE0344D001528D5784 /* TrabalhosResponse.swift in Sources */,
+				EA369AAC6B59C5AE7B5607CB /* Tracked.swift in Sources */,
 				FE43857DB04F620C6AD212AE /* TranscricaoAudioPlayer.swift in Sources */,
 				AEEC20C37390C592A9616E30 /* TranscricaoClient.swift in Sources */,
 				FA6A48A92EB08C41F55D6766 /* TranscricaoControls.swift in Sources */,

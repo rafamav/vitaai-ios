@@ -1761,7 +1761,8 @@ private final class Coordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDe
         }
 
         // 2. Shape snap (linha/círculo).
-        guard UserDefaults.standard.bool(forKey: "pdf.shapeSnap.enabled") else { return }
+        let snapEnabled = UserDefaults.standard.object(forKey: "pdf.shapeSnap.enabled") as? Bool ?? true  // default ON since 2026-04-30
+guard snapEnabled else { return }
         guard let lastStroke = canvasView.drawing.strokes.last else { return }
 
         let (result, outcome) = PdfShapeSnap.detect(stroke: lastStroke)
@@ -1783,6 +1784,8 @@ private final class Coordinator: NSObject, PDFPageOverlayViewProvider, PDFViewDe
             outcomeProps = ["kind": "none", "reason": "tooFewPoints", "applied": false]
         case .rejectedNoMatch:
             outcomeProps = ["kind": "none", "reason": "noMatch", "applied": false]
+        case .triangleDetectedButNotApplied(let conf):
+            outcomeProps = ["kind": "triangle", "reason": "no_replacement_geometry", "confidence": Double(conf), "applied": false]
         }
 
         // Confidence gate: só substitui se algoritmo está MUITO seguro.

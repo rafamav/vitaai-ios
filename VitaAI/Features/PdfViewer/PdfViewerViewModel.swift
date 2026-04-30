@@ -555,12 +555,21 @@ final class PdfViewerViewModel {
         pageIndex: Int,
         applyToCanvas: (PKDrawing) -> Void
     ) async -> Bool {
-        guard !newStrokes.isEmpty else { return false }
-        guard let document, let page = document.page(at: pageIndex) else { return false }
+        guard !newStrokes.isEmpty else {
+            trackToolFailure(tool: "pdf_auto_convert", stage: "input", reason: "empty_strokes", extraProps: ["page_index": pageIndex])
+            return false
+        }
+        guard let document, let page = document.page(at: pageIndex) else {
+            trackToolFailure(tool: "pdf_auto_convert", stage: "input", reason: "missing_document_or_page", extraProps: ["page_index": pageIndex])
+            return false
+        }
 
         let deltaDrawing = PKDrawing(strokes: newStrokes)
         let bounds = deltaDrawing.bounds
-        guard bounds.width > 4, bounds.height > 4 else { return false }
+        guard bounds.width > 4, bounds.height > 4 else {
+            trackToolFailure(tool: "pdf_auto_convert", stage: "bounds_check", reason: "stroke_too_small", extraProps: ["page_index": pageIndex, "width": Double(bounds.width), "height": Double(bounds.height)])
+            return false
+        }
 
         // 2026-04-29: trocou Apple VNRecognizeTextRequest (que era pra texto
         // IMPRESSO em imagens, falhava com handwriting cru) por Google ML Kit
@@ -572,13 +581,23 @@ final class PdfViewerViewModel {
             model: .textPtBR,
             minScore: 0.5
         )
-        guard let result, !result.text.isEmpty else { return false }
+        guard let result, !result.text.isEmpty else {
+            trackToolFailure(tool: "pdf_auto_convert", stage: "mlkit_result", reason: "empty_text", extraProps: ["page_index": pageIndex])
+            return false
+        }
 
         let trimmed = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2,
               trimmed.rangeOfCharacter(from: .letters) != nil else {
+            trackToolFailure(tool: "pdf_auto_convert", stage: "text_validation", reason: "too_short_or_no_letters", extraProps: ["page_index": pageIndex, "trimmed_count": trimmed.count, "score": Double(result.score)])
             return false
         }
+        // Success path
+        PostHogTracker.shared.event(.handwritingConverted, properties: [
+            "page_index": pageIndex,
+            "char_count": trimmed.count,
+            "score": Double(result.score),
+        ])
 
         // 1. Cria freeText annotation no bbox dos strokes novos.
         let inset: CGFloat = 4

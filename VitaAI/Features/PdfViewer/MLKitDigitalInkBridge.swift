@@ -68,11 +68,13 @@ enum MLKitDigitalInkBridge {
         // no topo do arquivo). Loga e retorna nil; auto-convert no PDF viewer
         // simplesmente não roda no sim. Em device real, fluxo completo abaixo.
         logger.notice("[mlkit] simulator stub — recognize() retorna nil (model=\(model.rawValue, privacy: .public))")
+        trackToolFailure(tool: "mlkit", stage: "recognize", reason: "simulator_stub", extraProps: ["model": model.rawValue])
         return nil
 #else
         // 1. Garantir que o model está baixado
         guard let identifier = DigitalInkRecognitionModelIdentifier(forLanguageTag: model.rawValue) else {
             logger.error("[mlkit] model identifier inválido pra \(model.rawValue, privacy: .public)")
+            trackToolFailure(tool: "mlkit", stage: "model_identifier", reason: "invalid_language_tag", extraProps: ["model": model.rawValue])
             return nil
         }
         let inkModel = DigitalInkRecognitionModel(modelIdentifier: identifier)
@@ -87,6 +89,7 @@ enum MLKitDigitalInkBridge {
                 try await waitForDownload(model: inkModel, conditions: conditions, manager: manager)
             } catch {
                 logger.error("[mlkit] download falhou: \(error.localizedDescription, privacy: .public)")
+                trackToolFailure(tool: "mlkit", stage: "model_download", reason: "download_failed", extraProps: ["model": model.rawValue, "error": error.localizedDescription])
                 return nil
             }
         }
@@ -118,10 +121,12 @@ enum MLKitDigitalInkBridge {
             recognizer.recognize(ink: ink) { result, error in
                 if let error {
                     Self.logger.error("[mlkit] recognize erro: \(error.localizedDescription, privacy: .public)")
+                    trackToolFailure(tool: "mlkit", stage: "recognize_callback", reason: "sdk_error", extraProps: ["model": model.rawValue, "error": error.localizedDescription])
                     continuation.resume(returning: nil)
                     return
                 }
                 guard let result, !result.candidates.isEmpty else {
+                    trackToolFailure(tool: "mlkit", stage: "recognize_result", reason: "no_candidates", extraProps: ["model": model.rawValue])
                     continuation.resume(returning: nil)
                     return
                 }
