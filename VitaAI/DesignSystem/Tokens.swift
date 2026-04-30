@@ -1,5 +1,7 @@
 // Auto-generated from design-tokens.json — DO NOT EDIT
-// Brand: vita-gold | Generated: 2026-04-01
+// Brand: vita-gold | Generated: 2026-04-30
+// Source: agent-brain/design-tokens.json
+// Regenerator: agent-brain/scripts/generate-tokens.mjs
 
 import SwiftUI
 
@@ -14,21 +16,21 @@ enum VitaTokens {
         static let bgElevated = Color(red: 0.055, green: 0.043, blue: 0.031) // #0e0b08
         static let bgHover = Color(red: 0.071, green: 0.055, blue: 0.039) // #120e0a
         static let bgActive = Color(red: 0.094, green: 0.075, blue: 0.055) // #18130e
-        static let bgSubtle = Color(red: 0.784, green: 0.627, blue: 0.314).opacity(0.08)
-        static let borderSurface = Color(red: 1.000, green: 0.941, blue: 0.839).opacity(0.04)
-        static let text = Color(red: 1.000, green: 0.988, blue: 0.973).opacity(0.96)
-        static let textSecondary = Color(red: 1.000, green: 0.941, blue: 0.843).opacity(0.4)
-        static let textMuted = Color(red: 1.000, green: 0.941, blue: 0.843).opacity(0.25)
+        static let bgSubtle = Color(red: 0.784, green: 0.627, blue: 0.314).opacity(0.08) // #c8a05014
+        static let borderSurface = Color(red: 1.000, green: 0.941, blue: 0.839).opacity(0.04) // #fff0d60a
+        static let text = Color(red: 1.000, green: 0.988, blue: 0.973).opacity(0.96) // #fffcf8f5
+        static let textSecondary = Color(red: 1.000, green: 0.941, blue: 0.843).opacity(0.40) // #fff0d766
+        static let textMuted = Color(red: 1.000, green: 0.941, blue: 0.843).opacity(0.25) // #fff0d740
         static let dataBlue = Color(red: 0.376, green: 0.647, blue: 0.980) // #60a5fa
         static let dataGreen = Color(red: 0.290, green: 0.871, blue: 0.502) // #4ade80
         static let dataAmber = Color(red: 0.984, green: 0.749, blue: 0.141) // #fbbf24
         static let dataRed = Color(red: 0.973, green: 0.443, blue: 0.443) // #f87171
         static let accent = Color(red: 0.784, green: 0.627, blue: 0.314) // #c8a050
         static let accentHover = Color(red: 1.000, green: 0.784, blue: 0.471) // #ffc878
-        static let accentSubtle = Color(red: 0.784, green: 0.627, blue: 0.314).opacity(0.08)
-        static let border = Color(red: 1.000, green: 0.784, blue: 0.471).opacity(0.08)
-        static let borderHover = Color(red: 1.000, green: 0.784, blue: 0.471).opacity(0.14)
-        static let borderActive = Color(red: 1.000, green: 0.784, blue: 0.471).opacity(0.2)
+        static let accentSubtle = Color(red: 0.784, green: 0.627, blue: 0.314).opacity(0.08) // #c8a05014
+        static let border = Color(red: 1.000, green: 0.784, blue: 0.471).opacity(0.08) // #ffc87814
+        static let borderHover = Color(red: 1.000, green: 0.784, blue: 0.471).opacity(0.14) // #ffc87824
+        static let borderActive = Color(red: 1.000, green: 0.784, blue: 0.471).opacity(0.20) // #ffc87833
     }
 
     // MARK: Light Colors
@@ -50,7 +52,7 @@ enum VitaTokens {
         static let dataRed = Color(red: 0.937, green: 0.267, blue: 0.267) // #ef4444
         static let accent = Color(red: 0.706, green: 0.549, blue: 0.235) // #b48c3c
         static let accentHover = Color(red: 0.627, green: 0.471, blue: 0.188) // #a07830
-        static let accentSubtle = Color(red: 0.784, green: 0.627, blue: 0.314).opacity(0.06)
+        static let accentSubtle = Color(red: 0.784, green: 0.627, blue: 0.314).opacity(0.06) // #c8a0500f
     }
 
     // MARK: Primitive Colors
@@ -85,7 +87,7 @@ enum VitaTokens {
         static let black = Color(red: 0.000, green: 0.000, blue: 0.000) // #000000
     }
 
-    // MARK: Spacing
+    // MARK: Spacing (CGFloat in points)
     enum Spacing {
         static let xxs: CGFloat = 2
         static let xs: CGFloat = 4
@@ -107,7 +109,7 @@ enum VitaTokens {
         static let full: CGFloat = 9999
     }
 
-    // MARK: Elevation
+    // MARK: Elevation (shadow radius)
     enum Elevation {
         static let none: CGFloat = 0
         static let xs: CGFloat = 1
@@ -128,20 +130,17 @@ enum VitaTokens {
         static let fontSizeXl: CGFloat = 20
         static let fontSize2xl: CGFloat = 24
         static let fontSize3xl: CGFloat = 30
-
         static let fontWeightNormal: CGFloat = 400
         static let fontWeightMedium: CGFloat = 500
         static let fontWeightSemibold: CGFloat = 600
         static let fontWeightBold: CGFloat = 700
-
         static let letterSpacingTight: CGFloat = -0.4
         static let letterSpacingNormal: CGFloat = 0
         static let letterSpacingWide: CGFloat = 0.5
-
-        static let fontFamilySans = "Space Grotesk"
-        static let fontFamilyMono = "JetBrains Mono"
-        static let fontFamilyIosBody = "SF Pro Text"
-        static let fontFamilyIosDisplay = "SF Pro Display"
+        static let fontFamilySans: String = "Space Grotesk"
+        static let fontFamilyMono: String = "JetBrains Mono"
+        static let fontFamilyIosBody: String = "SF Pro Text"
+        static let fontFamilyIosDisplay: String = "SF Pro Display"
     }
 
     // MARK: Animation
@@ -149,7 +148,7 @@ enum VitaTokens {
         static let durationFast: Double = 0.15
         static let durationNormal: Double = 0.3
         static let durationSlow: Double = 0.5
-        static let easeOut = "cubic-bezier(0.33, 1, 0.68, 1)"
+        static let easeOut: String = "cubic-bezier(0.33, 1, 0.68, 1)"
     }
 
     // MARK: Components
@@ -159,24 +158,24 @@ enum VitaTokens {
             static let radius: CGFloat = 14
             static let fontSize: CGFloat = 12
             static let iconSize: CGFloat = 16
-            static let bgAlpha: Double = 0.08
-            static let borderAlpha: Double = 0.18
+            static let bgAlpha: CGFloat = 0.08
+            static let borderAlpha: CGFloat = 0.18
         }
         enum GlassCard {
             static let radius: CGFloat = 16
-            static let bgAlpha: Double = 0.92
-            static let borderAlpha: Double = 0.34
-            static let innerLightAlpha: Double = 0.16
+            static let bgAlpha: CGFloat = 0.92
+            static let borderAlpha: CGFloat = 0.34
+            static let innerLightAlpha: CGFloat = 0.16
         }
         enum ChatBubble {
             static let radius: CGFloat = 16
-            static let maxWidth = "85%"
+            static let maxWidth: String = "85%"
         }
         enum Flashcard {
-            static let flipDuration: Double = 0.5
+            static let flipDuration: CGFloat = 0.5
             static let perspective: CGFloat = 1200
-            static let frontBorderAlpha: Double = 0.12
-            static let backBorderAlpha: Double = 0.12
+            static let frontBorderAlpha: CGFloat = 0.12
+            static let backBorderAlpha: CGFloat = 0.12
             static let blur: CGFloat = 16
         }
         enum Chip {
@@ -192,7 +191,8 @@ enum VitaTokens {
             static let radius: CGFloat = 9999
             static let fontSize: CGFloat = 10
             static let fontWeight: CGFloat = 600
-            static let letterSpacing: Double = 0.8
+            static let letterSpacing: CGFloat = 0.8
         }
     }
+
 }
